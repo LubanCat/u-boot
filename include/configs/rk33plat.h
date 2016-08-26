@@ -307,6 +307,7 @@
 /* more config for display */
 #ifdef CONFIG_LCD
 #if defined(CONFIG_RKCHIP_RK3399)
+#define CONFIG_ROCKCHIP_DISPLAY
 #define CONFIG_RK322X_FB
 #define CONFIG_DIRECT_LOGO
 #define CONFIG_OF_BOARD_SETUP

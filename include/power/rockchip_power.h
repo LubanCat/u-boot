@@ -63,6 +63,8 @@ int charger_bq25700_init(void);
 int ricoh619_poll_pwr_key_sta(void);
 int pmic_rk816_poll_pwrkey_stat(void);
 
+int ec_battery_init(void);
+
 struct regulator_init_reg_name {
 	const char *name;
 };

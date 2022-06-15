@@ -337,7 +337,6 @@ function fit_gen_uboot_itb()
 		fi
 
 		# repack spl
-		rm -f *_loader_*.bin
 		if [ "${ARG_SPL_NEW}" == "y" ]; then
 			cat spl/u-boot-spl-nodtb.bin > spl/u-boot-spl.bin
 			if ! grep -q '^CONFIG_SPL_SEPARATE_BSS=y' .config ; then
@@ -584,10 +583,15 @@ function fit_gen_loader()
 {
 	if grep -Eq '^CONFIG_FIT_SIGNATURE=y' .config ; then
 		${RK_SIGN_TOOL} cc --chip ${ARG_CHIP: 2: 6}
-		${RK_SIGN_TOOL} sl --key ${RSA_PRI_KEY} --pubkey ${RSA_PUB_KEY} --loader *_loader_*.bin
-		if [ $? -ne 0 ]; then
-			echo "ERROR: ${RK_SIGN_TOOL} failed to sign loader"
-			exit 1
+		${RK_SIGN_TOOL} lk --key ${RSA_PRI_KEY} --pubkey ${RSA_PUB_KEY}
+		if ls *loader*.bin >/dev/null 2>&1 ; then
+			${RK_SIGN_TOOL} sl --loader *loader*.bin
+		fi
+		if ls *download*.bin >/dev/null 2>&1 ; then
+			${RK_SIGN_TOOL} sl --loader *download*.bin
+		fi
+		if ls *idblock*.img >/dev/null 2>&1 ; then
+			${RK_SIGN_TOOL} sb --idb *idblock*.img
 		fi
 	fi
 }
@@ -662,12 +666,18 @@ function fit_msg_recovery()
 
 function fit_msg_loader()
 {
-	LOADER=`ls *loader*.bin`
+	if ls *loader*.bin >/dev/null 2>&1 ; then
+		LOADER=`ls *loader*.bin`
+	fi
+
+	if ls *idblock*.img >/dev/null 2>&1 ; then
+		LOADER=`ls *idblock*.img`
+	fi
 
 	if grep -q '^CONFIG_FIT_SIGNATURE=y' .config ; then
-		echo "Image(signed):  ${LOADER} (with spl, ddr, usbplug) is ready"
+		echo "Image(signed):  ${LOADER} (with spl, ddr...) is ready"
 	else
-		echo "Image(no-signed):  ${LOADER} (with spl, ddr, usbplug) is ready"
+		echo "Image(no-signed):  ${LOADER} (with spl, ddr...) is ready"
 	fi
 }
 

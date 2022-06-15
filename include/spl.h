@@ -293,7 +293,8 @@ void spl_invoke_atf(struct spl_image_info *spl_image);
 /**
  * bl31_entry - Fill bl31_params structure, and jump to bl31
  */
-void bl31_entry(uintptr_t bl31_entry, uintptr_t bl32_entry,
+void bl31_entry(struct spl_image_info *spl_image,
+		uintptr_t bl31_entry, uintptr_t bl32_entry,
 		uintptr_t bl33_entry, uintptr_t fdt_addr);
 
 /**
@@ -343,6 +344,13 @@ int spl_board_prepare_for_jump(struct spl_image_info *spl_image);
 #ifdef CONFIG_SPL_KERNEL_BOOT
 const char *spl_kernel_partition(struct spl_image_info *spl,
 				 struct spl_load_info *info);
+#endif
+
+#ifdef CONFIG_SPL_ENVF
+/**
+ * envf_load() - envf data load and init.
+ */
+int envf_load(struct blk_desc *dev_desc);
 #endif
 
 #endif

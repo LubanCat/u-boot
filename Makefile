@@ -651,6 +651,7 @@ HAVE_VENDOR_COMMON_LIB = $(if $(wildcard $(srctree)/board/$(VENDOR)/common/Makef
 libs-y += lib/
 libs-$(HAVE_VENDOR_COMMON_LIB) += board/$(VENDOR)/common/
 libs-$(CONFIG_OF_EMBED) += dts/
+ifneq ($(CONFIG_SPL_BUILD)$(CONFIG_SPL_DECOMP_HEADER),yy)
 libs-y += fs/
 libs-y += net/
 libs-y += disk/
@@ -700,6 +701,7 @@ libs-y += common/
 libs-y += env/
 libs-$(CONFIG_API) += api/
 libs-$(CONFIG_HAS_POST) += post/
+endif
 libs-y += test/
 libs-y += test/dm/
 libs-$(CONFIG_UT_ENV) += test/env/
@@ -773,6 +775,10 @@ endif
 # Always append ALL so that arch config.mk's can add custom ones
 ALL-y += u-boot.srec u-boot.bin u-boot.sym System.map binary_size_check
 ALL-$(CONFIG_SUPPORT_USBPLUG) += usbplug.bin
+
+ifdef CONFIG_SPL_DECOMP_HEADER
+ALL-$(CONFIG_SPL_LZMA) += u-boot.bin.lzma
+endif
 
 ALL-$(CONFIG_ONENAND_U_BOOT) += u-boot-onenand.bin
 ifeq ($(CONFIG_SPL_FSL_PBL),y)
@@ -887,6 +893,26 @@ quiet_cmd_copy = COPY    $@
 
 quiet_cmd_truncate = ALIGN   $@
       cmd_truncate = truncate -s "%8" $@
+
+size_append = printf $(shell                                            \
+dec_size=0;                                                             \
+for F in $1; do                                                         \
+        fsize=$$(stat -c "%s" $$F);                                     \
+        dec_size=$$(expr $$dec_size + $$fsize);                         \
+done;                                                                   \
+printf "%08x\n" $$dec_size |                                            \
+        sed 's/\(..\)/\1 /g' | {                                        \
+                read ch0 ch1 ch2 ch3;                                   \
+                for ch in $$ch3 $$ch2 $$ch1 $$ch0; do                   \
+                        printf '%s%03o' '\\' $$((0x$$ch));              \
+                done;                                                   \
+        }                                                               \
+)
+
+quiet_cmd_lzma = LZMA    $@
+cmd_lzma = (cat $(filter-out FORCE,$^) | \
+        lzma -9 -k && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
+        (rm -f $@ ; false)
 
 ifeq ($(CONFIG_MULTI_DTB_FIT),y)
 
@@ -1049,6 +1075,9 @@ u-boot-dtb.img u-boot.img u-boot.kwb u-boot.pbl u-boot-ivt.img: \
 
 u-boot.itb: u-boot-nodtb.bin dts/dt.dtb $(U_BOOT_ITS) FORCE
 	$(call if_changed,mkfitimage)
+
+u-boot.bin.lzma: u-boot.bin FORCE
+	$(call if_changed,lzma)
 
 u-boot-spl.kwb: u-boot.img spl/u-boot-spl.bin FORCE
 	$(call if_changed,mkimage)
@@ -1483,7 +1512,7 @@ checkarmreloc: u-boot
 		false; \
 	fi
 
-envtools: scripts_basic
+envtools: scripts_basic $(version_h) $(timestamp_h)
 	$(Q)$(MAKE) $(build)=tools/env
 
 tools-only: scripts_basic $(version_h) $(timestamp_h)
@@ -1699,6 +1728,13 @@ endif
 	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1)   \
 	$(build)=$(build-dir) $(@:.ko=.o)
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modpost
+
+quiet_cmd_genenv = GENENV $@
+cmd_genenv = $(OBJCOPY) --dump-section .rodata.default_environment=$@ env/common.o; \
+	sed --in-place -e 's/\x00/\x0A/g' $@
+
+u-boot-initial-env: u-boot.bin
+	$(call if_changed,genenv)
 
 # FIXME Should go into a make.lib or something
 # ===========================================================================

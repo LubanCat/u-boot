@@ -81,6 +81,7 @@ __weak int rk_board_init(void)
 	return 0;
 }
 
+#ifdef CONFIG_ROCKCHIP_SET_ETHADDR
 /*
  * define serialno max length, the max length is 512 Bytes
  * The remaining bytes are used to ensure that the first 512 bytes
@@ -140,7 +141,9 @@ static int rockchip_set_ethaddr(void)
 
 	return 0;
 }
+#endif
 
+#ifdef CONFIG_ROCKCHIP_SET_SN
 static int rockchip_set_serialno(void)
 {
 	u8 low[CPUID_LEN / 2], high[CPUID_LEN / 2];
@@ -214,6 +217,8 @@ static int rockchip_set_serialno(void)
 
 	return ret;
 }
+#endif
+
 
 #if defined(CONFIG_USB_FUNCTION_FASTBOOT)
 int fb_set_reboot_flag(void)
@@ -362,8 +367,12 @@ static void cmdline_handle(void)
 
 int board_late_init(void)
 {
+#ifdef CONFIG_ROCKCHIP_SET_ETHADDR
 	rockchip_set_ethaddr();
+#endif
+#ifdef CONFIG_ROCKCHIP_SET_SN
 	rockchip_set_serialno();
+#endif
 	setup_download_mode();
 #if (CONFIG_ROCKCHIP_BOOT_MODE_REG > 0)
 	setup_boot_mode();
@@ -545,7 +554,6 @@ void arch_preboot_os(uint32_t bootm_state, bootm_headers_t *images)
 
 #ifdef CONFIG_ARM64
 	u8 *data = (void *)images->ep;
-	ulong dst;
 
 	/*
 	 * Fix kernel 5.10 arm64 boot warning:
@@ -560,16 +568,16 @@ void arch_preboot_os(uint32_t bootm_state, bootm_headers_t *images)
 	 *   1. this is the common and final path for any boot command.
 	 *   2. don't influence original boot flow, just fix it exactly before
 	 *	jumping kernel.
+	 *
+	 * But relocation is in board_quiesce_devices() until all decompress
+	 * done, mainly for saving boot time.
 	 */
 	if (data[10] == 0x00) {
-		dst = round_down(images->ep, SZ_2M);
-		if (dst != images->ep) {
-			memcpy((char *)dst, (const char *)images->ep,
-			       images->os.image_len);
-			printf("   ** RELOCATE ** Kernel from 0x%08lx to 0x%08lx\n",
-			       images->ep, dst);
-			images->ep = dst;
-		}
+		if (round_down(images->ep, SZ_2M) != images->ep)
+			images->ep = round_down(images->ep, SZ_2M);
+	} else {
+		if (IS_ALIGNED(images->ep, SZ_2M))
+			images->ep += 0x80000;
 	}
 #endif
 	hotkey_run(HK_CLI_OS_PRE);
@@ -657,6 +665,7 @@ int board_bidram_reserve(struct bidram *bidram)
 	return 0;
 }
 
+#ifdef CONFIG_SYSMEM
 int board_sysmem_reserve(struct sysmem *sysmem)
 {
 #ifdef CONFIG_SKIP_RELOCATE_UBOOT
@@ -668,6 +677,7 @@ int board_sysmem_reserve(struct sysmem *sysmem)
 #endif
 	return 0;
 }
+#endif
 
 parse_fn_t board_bidram_parse_fn(void)
 {
@@ -678,6 +688,8 @@ parse_fn_t board_bidram_parse_fn(void)
 int board_init_f_boot_flags(void)
 {
 	int boot_flags = 0;
+
+	arch_fpga_init();
 
 	param_parse_pre_serial();
 
@@ -830,7 +842,7 @@ int bootm_image_populate_dtb(void *img)
 	else
 		gd->fdt_blob = (void *)env_get_ulong("fdt_addr_r", 16, 0);
 
-	return resource_populate_dtb(img, (void *)gd->fdt_blob);
+	return rockchip_ram_read_dtb_file(img, (void *)gd->fdt_blob);
 }
 
 /*
@@ -879,7 +891,7 @@ int board_do_bootm(int argc, char * const argv[])
 
 		ret = bootm_image_populate_dtb(img);
 		if (ret) {
-			printf("bootm can't read dtb\n");
+			printf("bootm can't read dtb, ret=%d\n", ret);
 			return ret;
 		}
 
@@ -903,7 +915,7 @@ int board_do_bootm(int argc, char * const argv[])
 
 		ret = bootm_image_populate_dtb(img);
 		if (ret) {
-			printf("bootm can't read dtb\n");
+			printf("bootm can't read dtb, ret=%d\n", ret);
 			return ret;
 		}
 		snprintf(boot_cmd, sizeof(boot_cmd), "boot_fit %s", argv[1]);
@@ -983,18 +995,13 @@ int fit_write_trusty_rollback_index(u32 trusty_index)
 
 void board_quiesce_devices(void *images)
 {
-	hotkey_run(HK_CMDLINE);
-	hotkey_run(HK_CLI_OS_GO);
+	bootm_headers_t *bootm_images = (bootm_headers_t *)images;
+	ulong kernel_addr;
 
 #ifdef CONFIG_ROCKCHIP_PRELOADER_ATAGS
 	/* Destroy atags makes next warm boot safer */
 	atags_destroy();
 #endif
-
-#ifdef CONFIG_ROCKCHIP_REBOOT_TEST
-	do_reset(NULL, 0, 0, NULL);
-#endif
-
 #ifdef CONFIG_FIT_ROLLBACK_PROTECT
 	int ret;
 
@@ -1004,9 +1011,22 @@ void board_quiesce_devices(void *images)
 		      gd->rollback_index, ret);
 	}
 #endif
-
 #ifdef CONFIG_ROCKCHIP_HW_DECOMPRESS
 	misc_decompress_cleanup();
+#endif
+	/* relocate kernel after decompress cleanup */
+	kernel_addr = env_get_ulong("kernel_addr_r", 16, 0);
+	if (kernel_addr != bootm_images->ep) {
+		memmove((char *)bootm_images->ep, (const char *)kernel_addr,
+			bootm_images->os.image_len);
+		printf("== DO RELOCATE == Kernel from 0x%08lx to 0x%08lx\n",
+		       kernel_addr, bootm_images->ep);
+	}
+
+	hotkey_run(HK_CMDLINE);
+	hotkey_run(HK_CLI_OS_GO);
+#ifdef CONFIG_ROCKCHIP_REBOOT_TEST
+	do_reset(NULL, 0, 0, NULL);
 #endif
 }
 
@@ -1034,14 +1054,6 @@ char *board_fdt_chosen_bootargs(void *fdt)
 		bootargs = fdt_getprop(fdt, nodeoffset, arr_bootargs[i], NULL);
 		if (!bootargs)
 			continue;
-#ifdef CONFIG_ENVF
-		/* Allow "bootargs_envf" to replace "bootargs" */
-		if (!strcmp("bootargs", arr_bootargs[i]) &&
-		    env_get("bootargs_envf")) {
-			bootargs = env_get("bootargs_envf");
-			msg = "envf";
-		}
-#endif
 		if (dump)
 			printf("## bootargs(%s-%s): %s\n\n",
 			       msg, arr_bootargs[i], bootargs);
@@ -1059,12 +1071,24 @@ char *board_fdt_chosen_bootargs(void *fdt)
 #endif
 	}
 
-#ifdef CONFIG_MTD_BLK
-	char *mtd_par_info = mtd_part_parse(NULL);
+#ifdef CONFIG_ENVF
+	char * sys_bootargs;
 
-	if (mtd_par_info) {
-		if (memcmp(env_get("devtype"), "mtd", 3) == 0)
-			env_update("bootargs", mtd_par_info);
+	sys_bootargs = env_get("sys_bootargs");
+	if (sys_bootargs) {
+		env_update("bootargs", sys_bootargs);
+		if (dump)
+			printf("## sys_bootargs: %s\n\n", sys_bootargs);
+	}
+#endif
+#ifdef CONFIG_MTD_BLK
+	if (!env_get("mtdparts")) {
+		char *mtd_par_info = mtd_part_parse(NULL);
+
+		if (mtd_par_info) {
+			if (memcmp(env_get("devtype"), "mtd", 3) == 0)
+				env_update("bootargs", mtd_par_info);
+		}
 	}
 #endif
 	/*

@@ -262,7 +262,7 @@ static int analogix_dp_process_clock_recovery(struct analogix_dp_device *dp)
 	u8 link_status[2], adjust_request[2];
 	u8 training_pattern = TRAINING_PTN2;
 
-	udelay(101);
+	drm_dp_link_train_clock_recovery_delay(dp->dpcd);
 
 	lane_count = dp->link_train.lane_count;
 
@@ -337,7 +337,7 @@ static int analogix_dp_process_equalizer_training(struct analogix_dp_device *dp)
 	u32 reg;
 	u8 link_align, link_status[2], adjust_request[2];
 
-	udelay(401);
+	drm_dp_link_train_channel_eq_delay(dp->dpcd);
 
 	lane_count = dp->link_train.lane_count;
 
@@ -803,6 +803,52 @@ static int analogix_dp_connector_get_edid(struct display_state *state)
 	return 0;
 }
 
+static int analogix_dp_link_power_up(struct analogix_dp_device *dp)
+{
+	u8 value;
+	int ret;
+
+	if (dp->dpcd[DP_DPCD_REV] < 0x11)
+		return 0;
+
+	ret = analogix_dp_read_byte_from_dpcd(dp, DP_SET_POWER, &value);
+	if (ret < 0)
+		return ret;
+
+	value &= ~DP_SET_POWER_MASK;
+	value |= DP_SET_POWER_D0;
+
+	ret = analogix_dp_write_byte_to_dpcd(dp, DP_SET_POWER, value);
+	if (ret < 0)
+		return ret;
+
+	mdelay(1);
+
+	return 0;
+}
+
+static int analogix_dp_link_power_down(struct analogix_dp_device *dp)
+{
+	u8 value;
+	int ret;
+
+	if (dp->dpcd[DP_DPCD_REV] < 0x11)
+		return 0;
+
+	ret = analogix_dp_read_byte_from_dpcd(dp, DP_SET_POWER, &value);
+	if (ret < 0)
+		return ret;
+
+	value &= ~DP_SET_POWER_MASK;
+	value |= DP_SET_POWER_D3;
+
+	ret = analogix_dp_write_byte_to_dpcd(dp, DP_SET_POWER, value);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
 static int analogix_dp_connector_enable(struct display_state *state)
 {
 	struct connector_state *conn_state = &state->conn_state;
@@ -843,6 +889,19 @@ static int analogix_dp_connector_enable(struct display_state *state)
 		break;
 	}
 
+	ret = analogix_dp_read_bytes_from_dpcd(dp, DP_DPCD_REV,
+					       DP_RECEIVER_CAP_SIZE, dp->dpcd);
+	if (ret) {
+		dev_err(dp->dev, "failed to read dpcd caps: %d\n", ret);
+		return ret;
+	}
+
+	ret = analogix_dp_link_power_up(dp);
+	if (ret) {
+		dev_err(dp->dev, "failed to power up link: %d\n", ret);
+		return ret;
+	}
+
 	ret = analogix_dp_set_link_train(dp, dp->video_info.max_lane_count,
 					 dp->video_info.max_link_rate);
 	if (ret) {
@@ -870,6 +929,9 @@ static int analogix_dp_connector_disable(struct display_state *state)
 	const struct rockchip_connector *connector = conn_state->connector;
 	const struct rockchip_dp_chip_data *pdata = connector->data;
 	struct analogix_dp_device *dp = dev_get_priv(conn_state->dev);
+
+	if (!analogix_dp_get_plug_in_status(dp))
+		analogix_dp_link_power_down(dp);
 
 	if (pdata->chip_type == RK3588_EDP)
 		regmap_write(dp->grf, dp->id ? RK3588_GRF_VO1_CON1 : RK3588_GRF_VO1_CON0,

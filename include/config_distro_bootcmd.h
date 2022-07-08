@@ -326,6 +326,38 @@
 	"boot_scripts=boot.scr.uimg boot.scr\0" \
 	"boot_script_dhcp=boot.scr.uimg\0" \
 	BOOTENV_BOOT_TARGETS \
+	"loaduEnv=" \
+		"echo load ${devtype} ${devnum}:${distro_bootpart} ${env_addr_r} /uEnv.txt ...; "\
+		"load ${devtype} ${devnum}:${distro_bootpart} ${env_addr_r} /uEnv.txt;\0" \
+	\
+	"importbootenv=" \
+		"echo Importing environment from ${devtype} ...; " \
+		"env import -t ${env_addr_r} 0x8000 \0" \
+	\
+	"loadfdtb="    \
+		"if test -e ${devtype} "       \
+				"${devnum}:${distro_bootpart} "    \
+				"${prefix}/usr/lib/linux-image-${uname_r}/${dtb}; then "  \
+				"echo loading /usr/lib/linux-image-${uname_r}/${dtb};" \
+				"load ${devtype} ${devnum}:${distro_bootpart} 0x83000000 /usr/lib/linux-image-${uname_r}/${dtb};" \
+			"else "      \
+				"echo no serch ${dtb}, loading default rk-kernel.dtb;"\
+				"load ${devtype} ${devnum}:${distro_bootpart} 0x83000000 /rk-kernel.dtb;"\
+		"fi\0"   \
+	\
+	"scan_dev_for_lubancat="     \
+		"echo run loaduEnv ...; "\
+		"if run loaduEnv; then " \
+			"run importbootenv;" \
+			"echo loading ${devtype} ${devnum}:${distro_bootpart} 0x80800000 /Image-${uname_r} ...; "\
+			"load ${devtype} ${devnum}:${distro_bootpart} 0x80800000 /Image-${uname_r};"\
+			"run loadfdtb;" \
+			"dtfile 0x83000000 0x87000000  /uEnv.txt ${env_addr_r};"   \
+			"echo debug: [${devtype} ${devnum}:${distro_bootpart}] ... ;" \
+			"echo debug: [booti] ...  ;" \
+			"booti 0x80800000 - 0x83000000;"	\
+		"fi;"                    \
+		"echo SCRIPT FAILED: continuing...; \0"       \
 	\
 	"boot_extlinux="                                                  \
 		"sysboot ${devtype} ${devnum}:${distro_bootpart} any "    \
@@ -361,6 +393,7 @@
 		"echo Scanning ${devtype} "                               \
 				"${devnum}:${distro_bootpart}...; "       \
 		"for prefix in ${boot_prefixes}; do "                     \
+			"run scan_dev_for_lubancat; "                     \
 			"run scan_dev_for_extlinux; "                     \
 			"run scan_dev_for_scripts; "                      \
 		"done;"                                                   \

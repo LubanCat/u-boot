@@ -1760,7 +1760,7 @@ DTBLOB_T *dtoverlay_load_dtb(ulong fdt, char* dt_file,int max_size)
 			const char *ifname = env_fat_get_intf();
 			const char *dev_and_part;
 
-			dev_and_part="1:4";
+			dev_and_part="0:3";
 
 			fs_set_blk_dev(ifname, dev_and_part, FS_TYPE_ANY);
 
@@ -2120,12 +2120,6 @@ void edit_dtparam(ulong fdt, char* dt_file,char *param[],char *param_val[],int n
 
 void load_env_file(char* env_name,ulong file_addr,loff_t* len_read)
 {
-
-#if defined(CONFIG_SYS_BOOT_NAND)
-	
-	fs_set_blk_dev("ramblock", "0:1", FS_TYPE_ANY);
-   
-#else
 	const char *ifname = env_fat_get_intf();
 	const char *dev_and_part = env_fat_get_dev_part();
 //
@@ -2136,7 +2130,6 @@ void load_env_file(char* env_name,ulong file_addr,loff_t* len_read)
 //   else 
 //     fs_set_blk_dev("mmc", "1:1", FS_TYPE_ANY);
 	fs_set_blk_dev(ifname, dev_and_part, FS_TYPE_ANY);
-#endif
 
 	if(fs_read(env_name, file_addr, 0, 0, len_read)<0)
 		dtoverlay_debug("**%s read error\n",env_name);

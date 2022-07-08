@@ -341,8 +341,8 @@
 				"echo loading /usr/lib/linux-image-${uname_r}/${dtb};" \
 				"load ${devtype} ${devnum}:${distro_bootpart} 0x83000000 /usr/lib/linux-image-${uname_r}/${dtb};" \
 			"else "      \
-				"echo loading /${dtb};"\
-				"load ${devtype} ${devnum}:${distro_bootpart} 0x83000000 /${dtb};"\
+				"echo no serch ${dtb}, loading default rk-kernel.dtb;"\
+				"load ${devtype} ${devnum}:${distro_bootpart} 0x83000000 /rk-kernel.dtb;"\
 		"fi\0"   \
 	\
 	"scan_dev_for_lubancat="     \

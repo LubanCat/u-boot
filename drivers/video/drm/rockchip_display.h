@@ -44,6 +44,13 @@ enum display_mode {
 	ROCKCHIP_DISPLAY_CENTER,
 };
 
+enum display_rotation {
+	ROCKCHIP_DISPLAY_ROTATION_0 = 0,
+	ROCKCHIP_DISPLAY_ROTATION_90,
+	ROCKCHIP_DISPLAY_ROTATION_180,
+	ROCKCHIP_DISPLAY_ROTATION_270,
+};
+
 enum rockchip_cmd_type {
 	CMD_TYPE_DEFAULT,
 	CMD_TYPE_SPI,
@@ -207,6 +214,7 @@ struct connector_state {
 
 struct logo_info {
 	int mode;
+	int rotation;
 	char *mem;
 	bool ymirror;
 	u32 offset;
@@ -237,6 +245,7 @@ struct display_state {
 	struct logo_info logo;
 	int logo_mode;
 	int charge_logo_mode;
+	int logo_rotation;
 	void *mem_base;
 	int mem_size;
 

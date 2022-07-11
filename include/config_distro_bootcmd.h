@@ -327,8 +327,8 @@
 	"boot_script_dhcp=boot.scr.uimg\0" \
 	BOOTENV_BOOT_TARGETS \
 	"loaduEnv=" \
-		"echo load ${devtype} ${devnum}:${distro_bootpart} ${env_addr_r} /uEnv.txt ...; "\
-		"load ${devtype} ${devnum}:${distro_bootpart} ${env_addr_r} /uEnv.txt;\0" \
+		"echo load ${devtype} ${devnum}:${distro_bootpart} ${env_addr_r} /uEnv${board_env}.txt ...; "\
+		"load ${devtype} ${devnum}:${distro_bootpart} ${env_addr_r} /uEnv${board_env}.txt;\0" \
 	\
 	"importbootenv=" \
 		"echo Importing environment from ${devtype} ...; " \

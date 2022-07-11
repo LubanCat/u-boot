@@ -4,4 +4,4 @@
 # Copyright (c) 2020 Rockchip Electronics Co., Ltd
 #
 
-obj-y	+= evb_rk3568.o
+obj-y	+= evb_rk3568.o hwrev.o

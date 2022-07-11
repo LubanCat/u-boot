@@ -7,6 +7,8 @@
 #include <common.h>
 #include <dwc3-uboot.h>
 #include <usb.h>
+#include <adc.h>
+#include "hwrev.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -29,5 +31,28 @@ int usb_gadget_handle_interrupts(void)
 int board_usb_init(int index, enum usb_init_type init)
 {
 	return dwc3_uboot_init(&dwc3_device_data);
+}
+#endif
+
+#ifdef CONFIG_MISC_INIT_R
+int misc_init_r(void)
+{
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_DISPLAY_BOARDINFO
+int show_board_info(void)
+{
+	printf("Board: %s\n", get_board_name());
+
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_BOARD_LATE_INIT
+int rk_board_late_init(void)
+{
+	return 0;
 }
 #endif

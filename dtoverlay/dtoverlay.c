@@ -1744,6 +1744,7 @@ error_exit:
 
 DTBLOB_T *dtoverlay_load_dtb(ulong fdt, char* dt_file,int max_size)
 {
+	char *dev_bootpart, *devtype;
     DTBLOB_T *dtb = NULL;
     loff_t bytes_read = max_size;
     int dtb_len;
@@ -1755,9 +1756,13 @@ DTBLOB_T *dtoverlay_load_dtb(ulong fdt, char* dt_file,int max_size)
 
     dtoverlay_debug("loading overlay: %s\n",dt_file);
 
+	devtype = env_get("devtype");
+	dev_bootpart = env_get("dev_bootpart");
+    dtoverlay_debug("** read fs_set_blk_dev: %s %s\n",devtype,dev_bootpart);
+
     if ((len > 0) && (strcmp(dt_file + len, ".dtbo") == 0))
     {
-        fs_set_blk_dev(CONFIG_ENV_FAT_INTERFACE, CONFIG_ENV_FAT_DEVICE_AND_PART, FS_TYPE_ANY);
+        fs_set_blk_dev(devtype, dev_bootpart, FS_TYPE_ANY);
 
         if(fs_read(dt_file,fdt,0,0,&bytes_read)<0)
             dtoverlay_debug("** %s read error\n",dt_file);
@@ -2113,7 +2118,12 @@ void edit_dtparam(ulong fdt, char* dt_file,char *param[],char *param_val[],int n
 
 void load_env_file(char* env_name,ulong file_addr,loff_t* len_read)
 {
-    fs_set_blk_dev(CONFIG_ENV_FAT_INTERFACE, CONFIG_ENV_FAT_DEVICE_AND_PART, FS_TYPE_ANY);
+    char *dev_bootpart, *devtype;
+	devtype = env_get("devtype");
+	dev_bootpart = env_get("dev_bootpart");
+    
+    dtoverlay_debug("** read fs_set_blk_dev: %s %s\n",devtype,dev_bootpart);
+    fs_set_blk_dev(devtype, dev_bootpart, FS_TYPE_ANY);
 
     if(fs_read(env_name, file_addr, 0, 0, len_read)<0)
         dtoverlay_debug("**%s read error\n",env_name);

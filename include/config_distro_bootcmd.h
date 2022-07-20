@@ -339,23 +339,24 @@
 				"${devnum}:${distro_bootpart} "    \
 				"/usr/lib/linux-image-${uname_r}/${dtb}; then "  \
 				"echo loading /usr/lib/linux-image-${uname_r}/${dtb};" \
-				"load ${devtype} ${devnum}:${distro_bootpart} 0x83000000 /usr/lib/linux-image-${uname_r}/${dtb};" \
+				"load ${devtype} ${devnum}:${distro_bootpart} ${fdt_addr_r} /usr/lib/linux-image-${uname_r}/${dtb};" \
 			"else "      \
 				"echo no serch ${dtb}, loading default rk-kernel.dtb;"\
-				"load ${devtype} ${devnum}:${distro_bootpart} 0x83000000 /rk-kernel.dtb;"\
+				"load ${devtype} ${devnum}:${distro_bootpart} ${fdt_addr_r} /rk-kernel.dtb;"\
 		"fi\0"   \
 	\
 	"scan_dev_for_lubancat="     \
 		"echo run loaduEnv ...; "\
 		"if run loaduEnv; then " \
 			"run importbootenv;" \
-			"echo loading ${devtype} ${devnum}:${distro_bootpart} 0x80800000 /Image-${uname_r} ...; "\
-			"load ${devtype} ${devnum}:${distro_bootpart} 0x80800000 /Image-${uname_r};"\
+			"echo loading ${devtype} ${devnum}:${distro_bootpart} ${kernel_addr_r} /Image-${uname_r} ...; "\
+			"load ${devtype} ${devnum}:${distro_bootpart} ${kernel_addr_r} /Image-${uname_r};"\
 			"run loadfdtb;" \
-			"dtfile 0x83000000 0x87000000  /uEnv.txt ${env_addr_r};"   \
+			"setenv dev_bootpart ${devnum}:${distro_bootpart};" \
+			"dtfile ${fdt_addr_r} ${fdt_over_addr}  /uEnv.txt ${env_addr_r};"   \
 			"echo debug: [${devtype} ${devnum}:${distro_bootpart}] ... ;" \
 			"echo debug: [booti] ...  ;" \
-			"booti 0x80800000 - 0x83000000;"	\
+			"booti ${kernel_addr_r} - ${fdt_addr_r};"	\
 		"fi;"                    \
 		"echo SCRIPT FAILED: continuing...; \0"       \
 	\

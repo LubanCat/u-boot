@@ -58,11 +58,14 @@ static uint32_t get_adc_index(int chn)
 }
 
 /*
- * Board revision by ADC_IN4
- *  0x11 - LubanCat1
- *  0x21 - LubanCat1N
- *  0x31 - LubanCat Zreo W
- *  0x41 - LubanCat Zreo N
+ * Board revision by ((ADC_IN3 << 8) + ADC_IN4)
+ *  0x0000 - LubanCat1
+ *  0x0100 - LubanCat1N
+ *  0x0200 - LubanCat Zero N
+ *  0x0300 - LubanCat Zreo W
+ *  0x0400 - LubanCat2
+ *  0x0500 - LubanCat2N
+ *  0x0600 - LubanCat2IO
  */
 static int pcb_rev = -1;
 static int pcb_rev_ch2 = -1;
@@ -91,25 +94,25 @@ const char *get_board_name(void)
 	printf("Board Version: Board_ID 0x%04x\n", pcb_rev);
 
 	switch (pcb_rev) {
-		case 0x0100:
+		case 0x0000:
 			env_set("board_env", "LubanCat1");
 			return "LubanCat1";
-		case 0x0200:
+		case 0x0100:
 			env_set("board_env", "LubanCat1N");
 			return "LubanCat1N";
+		case 0x0200:
+			env_set("board_env", "LubanCatZN");
+			return "LubanCat Zero N";			
 		case 0x0300:
 			env_set("board_env", "LubanCatZW");
 			return "LubanCat Zero W";
 		case 0x0400:
-			env_set("board_env", "LubanCatZN");
-			return "LubanCat Zero N";
-		case 0x0500:
 			env_set("board_env", "LubanCat2");
 			return "LubanCat2";
-		case 0x0600:
+		case 0x0500:
 			env_set("board_env", "LubanCat2N");
 			return "LubanCat2N";
-		case 0x0700:
+		case 0x0600:
 			env_set("board_env", "LubanCat2IO");
 			return "LubanCat2IO";
 		default:

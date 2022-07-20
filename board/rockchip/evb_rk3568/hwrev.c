@@ -91,25 +91,25 @@ const char *get_board_name(void)
 	printf("Board Version: Board_ID 0x%04x\n", pcb_rev);
 
 	switch (pcb_rev) {
-		case 0x0101:
+		case 0x0100:
 			env_set("board_env", "LubanCat1");
 			return "LubanCat1";
-		case 0x0201:
+		case 0x0200:
 			env_set("board_env", "LubanCat1N");
 			return "LubanCat1N";
-		case 0x0301:
-			env_set("board_env", "LubanCatZN");
-			return "LubanCat Zero N";
-		case 0x0401:
+		case 0x0300:
 			env_set("board_env", "LubanCatZW");
 			return "LubanCat Zero W";
-		case 0x0501:
+		case 0x0400:
+			env_set("board_env", "LubanCatZN");
+			return "LubanCat Zero N";
+		case 0x0500:
 			env_set("board_env", "LubanCat2");
 			return "LubanCat2";
-		case 0x0601:
+		case 0x0600:
 			env_set("board_env", "LubanCat2N");
 			return "LubanCat2N";
-		case 0x0701:
+		case 0x0700:
 			env_set("board_env", "LubanCat2IO");
 			return "LubanCat2IO";
 		default:

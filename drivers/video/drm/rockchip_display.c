@@ -1315,11 +1315,15 @@ static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 	struct rockchip_logo_cache *logo_cache;
 	struct bmp_header *header;
 	void *dst = NULL, *pdst;
-	int size, len;
+	int size;
 	int ret = 0;
 	int reserved = 0;
 	int dst_size;
     enum LOGO_SOURCE logo_source;
+
+#ifdef CONFIG_ROCKCHIP_RESOURCE_IMAGE
+	int len;
+#endif
 
 	if (!logo || !bmp_name)
 		return -EINVAL;

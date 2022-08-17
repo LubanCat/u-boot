@@ -327,8 +327,8 @@
 	"boot_script_dhcp=boot.scr.uimg\0" \
 	BOOTENV_BOOT_TARGETS \
 	"loaduEnv=" \
-		"echo load ${devtype} ${devnum}:${distro_bootpart} ${env_addr_r} /uEnv${board_env}.txt ...; "\
-		"load ${devtype} ${devnum}:${distro_bootpart} ${env_addr_r} /uEnv${board_env}.txt;\0" \
+		"echo load ${devtype} ${devnum}:${distro_bootpart} ${env_addr_r} /uEnv/uEnv${board_env}.txt ...; "\
+		"load ${devtype} ${devnum}:${distro_bootpart} ${env_addr_r} /uEnv/uEnv${board_env}.txt;\0" \
 	\
 	"importbootenv=" \
 		"echo Importing environment from ${devtype} ...; " \
@@ -337,9 +337,9 @@
 	"loadfdtb="    \
 		"if test -e ${devtype} "       \
 				"${devnum}:${distro_bootpart} "    \
-				"/usr/lib/linux-image-${uname_r}/${dtb}; then "  \
-				"echo loading /usr/lib/linux-image-${uname_r}/${dtb};" \
-				"load ${devtype} ${devnum}:${distro_bootpart} ${fdt_addr_r} /usr/lib/linux-image-${uname_r}/${dtb};" \
+				"/dtb/${dtb}; then "  \
+				"echo loading /dtb/${dtb};" \
+				"load ${devtype} ${devnum}:${distro_bootpart} ${fdt_addr_r} /dtb/${dtb};" \
 			"else "      \
 				"echo no serch ${dtb}, loading default rk-kernel.dtb;"\
 				"load ${devtype} ${devnum}:${distro_bootpart} ${fdt_addr_r} /rk-kernel.dtb;"\
@@ -353,7 +353,7 @@
 			"load ${devtype} ${devnum}:${distro_bootpart} ${kernel_addr_r} /Image-${uname_r};"\
 			"run loadfdtb;" \
 			"setenv dev_bootpart ${devnum}:${distro_bootpart};" \
-			"dtfile ${fdt_addr_r} ${fdt_over_addr}  /uEnv.txt ${env_addr_r};"   \
+			"dtfile ${fdt_addr_r} ${fdt_over_addr}  /uEnv/uEnv.txt ${env_addr_r};"   \
 			"echo debug: [${devtype} ${devnum}:${distro_bootpart}] ... ;" \
 			"echo debug: [booti] ...  ;" \
 			"booti ${kernel_addr_r} - ${fdt_addr_r};"	\

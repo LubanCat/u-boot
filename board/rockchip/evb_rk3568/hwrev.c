@@ -64,8 +64,8 @@ static uint32_t get_adc_index(int chn)
  *  0x0200 - LubanCat Zero N
  *  0x0300 - LubanCat Zreo W
  *  0x0400 - LubanCat2
- *  0x0500 - LubanCat2N
- *  0x0600 - LubanCat2IO
+ *  0x0500/0x0600 - LubanCat2N
+ *  0x0700 - LubanCat2IO
  */
 static int pcb_rev = -1;
 static int pcb_rev_ch2 = -1;
@@ -113,6 +113,9 @@ const char *get_board_name(void)
 			env_set("board_env", "LubanCat2N");
 			return "LubanCat2N";
 		case 0x0600:
+			env_set("board_env", "LubanCat2N");
+			return "LubanCat2N";
+		case 0x0700:
 			env_set("board_env", "LubanCat2IO");
 			return "LubanCat2IO";
 		default:

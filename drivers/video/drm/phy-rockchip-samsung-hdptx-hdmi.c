@@ -875,7 +875,7 @@ static int hdptx_post_enable_lane(struct rockchip_hdptx_phy *hdptx)
 	hdptx_grf_write(hdptx, GRF_HDPTX_CON0, val);
 
 	val = 0;
-	for (i = 0; i < 20; i++) {
+	for (i = 0; i < 50; i++) {
 		val = hdptx_grf_read(hdptx, GRF_HDPTX_STATUS);
 
 		if (val & HDPTX_O_PHY_RDY && val & HDPTX_O_PLL_LOCK_DONE)
@@ -883,7 +883,7 @@ static int hdptx_post_enable_lane(struct rockchip_hdptx_phy *hdptx)
 		udelay(100);
 	}
 
-	if (i == 20) {
+	if (i == 50) {
 		dev_err(hdptx->dev, "hdptx phy lane can't ready!\n");
 		return -EINVAL;
 	}
@@ -910,7 +910,7 @@ static int hdptx_post_enable_pll(struct rockchip_hdptx_phy *hdptx)
 	reset_deassert(&hdptx->cmn_reset);
 
 	val = 0;
-	for (i = 0; i < 20; i++) {
+	for (i = 0; i < 50; i++) {
 		val = hdptx_grf_read(hdptx, GRF_HDPTX_STATUS);
 
 		if (val & HDPTX_O_PHY_CLK_RDY)
@@ -918,7 +918,7 @@ static int hdptx_post_enable_pll(struct rockchip_hdptx_phy *hdptx)
 		udelay(20);
 	}
 
-	if (i == 20) {
+	if (i == 50) {
 		dev_err(hdptx->dev, "hdptx phy pll can't lock!\n");
 		return -EINVAL;
 	}
@@ -945,7 +945,7 @@ static int hdptx_post_power_up(struct rockchip_hdptx_phy *hdptx)
 	udelay(10);
 	reset_deassert(&hdptx->cmn_reset);
 
-	for (i = 0; i < 20; i++) {
+	for (i = 0; i < 50; i++) {
 		val = hdptx_grf_read(hdptx, GRF_HDPTX_STATUS);
 
 		if (val & HDPTX_O_PLL_LOCK_DONE)
@@ -953,7 +953,7 @@ static int hdptx_post_power_up(struct rockchip_hdptx_phy *hdptx)
 		udelay(20);
 	}
 
-	if (i == 20) {
+	if (i == 50) {
 		dev_err(hdptx->dev, "hdptx phy can't lock!\n");
 		return -EINVAL;
 	}
@@ -962,7 +962,7 @@ static int hdptx_post_power_up(struct rockchip_hdptx_phy *hdptx)
 
 	reset_deassert(&hdptx->lane_reset);
 
-	for (i = 0; i < 20; i++) {
+	for (i = 0; i < 50; i++) {
 		val = hdptx_grf_read(hdptx, GRF_HDPTX_STATUS);
 
 		if (val & HDPTX_O_PHY_RDY)
@@ -970,7 +970,7 @@ static int hdptx_post_power_up(struct rockchip_hdptx_phy *hdptx)
 		udelay(100);
 	}
 
-	if (i == 20) {
+	if (i == 50) {
 		dev_err(hdptx->dev, "hdptx phy can't ready!\n");
 		return -EINVAL;
 	}
@@ -1240,6 +1240,10 @@ static int hdptx_ropll_cmn_config(struct rockchip_hdptx_phy *hdptx, unsigned lon
 static int hdptx_ropll_tmds_mode_config(struct rockchip_hdptx_phy *hdptx, u32 rate)
 {
 	u32 bit_rate = rate & DATA_RATE_MASK;
+	u8 color_depth = (rate & COLOR_DEPTH_MASK) ? 1 : 0;
+
+	if (color_depth)
+		bit_rate = bit_rate * 5 / 4;
 
 	if (!hdptx->pll_locked) {
 		int ret;
@@ -1333,6 +1337,19 @@ static int hdptx_ropll_tmds_mode_config(struct rockchip_hdptx_phy *hdptx, u32 ra
 	hdptx_write(hdptx, LANE_REG061E, 0x08);
 	hdptx_write(hdptx, LANE_REG061F, 0x15);
 	hdptx_write(hdptx, LANE_REG0620, 0xa0);
+
+	hdptx_write(hdptx, LANE_REG0303, 0x2f);
+	hdptx_write(hdptx, LANE_REG0403, 0x2f);
+	hdptx_write(hdptx, LANE_REG0503, 0x2f);
+	hdptx_write(hdptx, LANE_REG0603, 0x2f);
+	hdptx_write(hdptx, LANE_REG0305, 0x03);
+	hdptx_write(hdptx, LANE_REG0405, 0x03);
+	hdptx_write(hdptx, LANE_REG0505, 0x03);
+	hdptx_write(hdptx, LANE_REG0605, 0x03);
+	hdptx_write(hdptx, LANE_REG0306, 0x1c);
+	hdptx_write(hdptx, LANE_REG0406, 0x1c);
+	hdptx_write(hdptx, LANE_REG0506, 0x1c);
+	hdptx_write(hdptx, LANE_REG0606, 0x1c);
 
 	return hdptx_post_enable_lane(hdptx);
 }
@@ -1556,6 +1573,28 @@ static int hdptx_ropll_frl_mode_config(struct rockchip_hdptx_phy *hdptx, u32 rat
 	hdptx_write(hdptx, LANE_REG061B, 0x01);
 	hdptx_write(hdptx, LANE_REG061F, 0x15);
 	hdptx_write(hdptx, LANE_REG0620, 0xa0);
+
+	hdptx_write(hdptx, LANE_REG0303, 0x2f);
+	hdptx_write(hdptx, LANE_REG0403, 0x2f);
+	hdptx_write(hdptx, LANE_REG0503, 0x2f);
+	hdptx_write(hdptx, LANE_REG0603, 0x2f);
+	hdptx_write(hdptx, LANE_REG0305, 0x03);
+	hdptx_write(hdptx, LANE_REG0405, 0x03);
+	hdptx_write(hdptx, LANE_REG0505, 0x03);
+	hdptx_write(hdptx, LANE_REG0605, 0x03);
+	hdptx_write(hdptx, LANE_REG0306, 0xfc);
+	hdptx_write(hdptx, LANE_REG0406, 0xfc);
+	hdptx_write(hdptx, LANE_REG0506, 0xfc);
+	hdptx_write(hdptx, LANE_REG0606, 0xfc);
+
+	hdptx_write(hdptx, LANE_REG0305, 0x4f);
+	hdptx_write(hdptx, LANE_REG0405, 0x4f);
+	hdptx_write(hdptx, LANE_REG0505, 0x4f);
+	hdptx_write(hdptx, LANE_REG0605, 0x4f);
+	hdptx_write(hdptx, LANE_REG0304, 0x14);
+	hdptx_write(hdptx, LANE_REG0404, 0x14);
+	hdptx_write(hdptx, LANE_REG0504, 0x14);
+	hdptx_write(hdptx, LANE_REG0604, 0x14);
 
 	return hdptx_post_power_up(hdptx);
 }

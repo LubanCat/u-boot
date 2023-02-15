@@ -158,8 +158,6 @@ static struct edid_quirk {
  * Do not access directly, instead always use cea_mode_for_vic().
  */
 static const struct drm_display_mode edid_cea_modes_1[] = {
-	/* 0 - dummy, VICs start at 1 */
-	{ },
 	/* 1 - 640x480@60Hz */
 	{ DRM_MODE(DRM_MODE_TYPE_DRIVER, 25175, 640, 656,
 		   752, 800, 480, 490, 492, 525, 0,
@@ -971,25 +969,25 @@ static const struct drm_display_mode edid_4k_modes[] = {
 		   3840, 4016, 4104, 4400,
 		   2160, 2168, 2178, 2250, 0,
 		   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC),
-	  .vrefresh = 30, },
+	  .vrefresh = 30, .picture_aspect_ratio = HDMI_PICTURE_ASPECT_16_9, },
 	/* 2 - 3840x2160@25Hz */
 	{ DRM_MODE(DRM_MODE_TYPE_DRIVER, 297000,
 		   3840, 4896, 4984, 5280,
 		   2160, 2168, 2178, 2250, 0,
 		   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC),
-	  .vrefresh = 25, },
+	  .vrefresh = 25, .picture_aspect_ratio = HDMI_PICTURE_ASPECT_16_9, },
 	/* 3 - 3840x2160@24Hz */
 	{ DRM_MODE(DRM_MODE_TYPE_DRIVER, 297000,
 		   3840, 5116, 5204, 5500,
 		   2160, 2168, 2178, 2250, 0,
 		   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC),
-	  .vrefresh = 24, },
+	  .vrefresh = 24, .picture_aspect_ratio = HDMI_PICTURE_ASPECT_16_9, },
 	/* 4 - 4096x2160@24Hz (SMPTE) */
 	{ DRM_MODE(DRM_MODE_TYPE_DRIVER, 297000,
 		   4096, 5116, 5204, 5500,
 		   2160, 2168, 2178, 2250, 0,
 		   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC),
-	  .vrefresh = 24, },
+	  .vrefresh = 24, .picture_aspect_ratio = HDMI_PICTURE_ASPECT_256_135, },
 };
 
 /*
@@ -6835,7 +6833,9 @@ void drm_rk_select_mode(struct hdmi_edid_data *edid_data,
 					   &edid_data->mode_buf[i])) {
 				edid_data->preferred_mode =
 					&edid_data->mode_buf[i];
-				break;
+
+				if (edid_data->mode_buf[i].picture_aspect_ratio)
+					break;
 			}
 		}
 	}

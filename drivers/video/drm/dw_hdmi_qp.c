@@ -512,6 +512,25 @@ hdmi_get_tmdsclock(struct dw_hdmi_qp *hdmi, unsigned long mpixelclock)
 	return tmdsclock;
 }
 
+static void hdmi_infoframe_set_checksum(u8 *ptr, int size)
+{
+	u8 csum = 0;
+	int i;
+
+	ptr[3] = 0;
+	/* compute checksum */
+	for (i = 0; i < size; i++)
+		csum += ptr[i];
+
+	ptr[3] = 256 - csum;
+}
+
+static bool is_hdmi2_sink(struct dw_hdmi_qp *hdmi)
+{
+	return hdmi->edid_data.display_info.hdmi.scdc.supported ||
+		hdmi->edid_data.display_info.color_formats & DRM_COLOR_FORMAT_YCRCB420;
+}
+
 static void hdmi_config_AVI(struct dw_hdmi_qp *hdmi, struct drm_display_mode *mode)
 {
 	struct hdmi_avi_infoframe frame;
@@ -542,7 +561,7 @@ static void hdmi_config_AVI(struct dw_hdmi_qp *hdmi, struct drm_display_mode *mo
 	else
 		frame.colorspace = HDMI_COLORSPACE_RGB;
 
-	/* Set up colorimetry */
+	/* Set up colorimetry and quant range */
 	if (!hdmi_bus_fmt_is_rgb(hdmi->hdmi_data.enc_out_bus_format)) {
 		switch (hdmi->hdmi_data.enc_out_encoding) {
 		case V4L2_YCBCR_ENC_601:
@@ -561,17 +580,53 @@ static void hdmi_config_AVI(struct dw_hdmi_qp *hdmi, struct drm_display_mode *mo
 			frame.extended_colorimetry =
 					HDMI_EXTENDED_COLORIMETRY_XV_YCC_709;
 			break;
+		case V4L2_YCBCR_ENC_BT2020:
+			if (hdmi->hdmi_data.enc_in_encoding == V4L2_YCBCR_ENC_BT2020)
+				frame.colorimetry = HDMI_COLORIMETRY_EXTENDED;
+			else
+				frame.colorimetry = HDMI_COLORIMETRY_ITU_709;
+			frame.extended_colorimetry =
+					HDMI_EXTENDED_COLORIMETRY_BT2020;
+			break;
 		default: /* Carries no data */
 			frame.colorimetry = HDMI_COLORIMETRY_ITU_601;
 			frame.extended_colorimetry =
 					HDMI_EXTENDED_COLORIMETRY_XV_YCC_601;
 			break;
 		}
+
+		frame.ycc_quantization_range = HDMI_YCC_QUANTIZATION_RANGE_LIMITED;
+	} else {
+		if (hdmi->hdmi_data.enc_out_encoding == V4L2_YCBCR_ENC_BT2020) {
+			frame.colorimetry = HDMI_COLORIMETRY_EXTENDED;
+			frame.extended_colorimetry =
+				HDMI_EXTENDED_COLORIMETRY_BT2020;
+		} else {
+			frame.colorimetry = HDMI_COLORIMETRY_NONE;
+			frame.extended_colorimetry =
+				HDMI_EXTENDED_COLORIMETRY_XV_YCC_601;
+		}
+
+		if (is_hdmi2_sink(hdmi) &&
+		    frame.quantization_range == HDMI_QUANTIZATION_RANGE_FULL)
+			frame.ycc_quantization_range = HDMI_YCC_QUANTIZATION_RANGE_FULL;
+		else
+			frame.ycc_quantization_range = HDMI_YCC_QUANTIZATION_RANGE_LIMITED;
 	}
 
 	frame.scan_mode = HDMI_SCAN_MODE_NONE;
 
 	hdmi_avi_infoframe_pack_only(&frame, buff, 17);
+
+	/* mode which vic >= 128 must use avi version 3 */
+	if (hdmi->vic >= 128) {
+		frame.version = 3;
+		buff[1] = frame.version;
+		buff[4] &= 0x1f;
+		buff[4] |= ((frame.colorspace & 0x7) << 5);
+		buff[7] = hdmi->vic;
+		hdmi_infoframe_set_checksum(buff, 17);
+	}
 
 	/*
 	 * The Designware IP uses a different byte format from standard
@@ -594,8 +649,65 @@ static void hdmi_config_AVI(struct dw_hdmi_qp *hdmi, struct drm_display_mode *mo
 		hdmi_writel(hdmi, val, PKT_AVI_CONTENTS1 + i * 4);
 	}
 
+	hdmi_modb(hdmi, 0, PKTSCHED_AVI_FIELDRATE, PKTSCHED_PKT_CONFIG1);
+
 	hdmi_modb(hdmi, PKTSCHED_AVI_TX_EN | PKTSCHED_GCP_TX_EN,
 		  PKTSCHED_AVI_TX_EN | PKTSCHED_GCP_TX_EN,
+		  PKTSCHED_PKT_EN);
+}
+
+static void hdmi_config_vendor_specific_infoframe(struct dw_hdmi_qp *hdmi,
+						  struct drm_display_mode *mode)
+{
+	struct hdmi_vendor_infoframe frame;
+	u8 buffer[10];
+	u32 val;
+	ssize_t err;
+	int i, reg;
+
+	hdmi_modb(hdmi, 0, PKTSCHED_VSI_TX_EN, PKTSCHED_PKT_EN);
+	err = drm_hdmi_vendor_infoframe_from_display_mode(&frame, mode);
+	if (err < 0)
+		/*
+		 * Going into that statement does not means vendor infoframe
+		 * fails. It just informed us that vendor infoframe is not
+		 * needed for the selected mode. Only 4k or stereoscopic 3D
+		 * mode requires vendor infoframe. So just simply return.
+		 */
+		return;
+
+	err = hdmi_vendor_infoframe_pack(&frame, buffer, sizeof(buffer));
+	if (err < 0) {
+		dev_err(hdmi->dev, "Failed to pack vendor infoframe: %zd\n",
+			err);
+		return;
+	}
+
+	/* vsi header */
+	val = (buffer[2] << 16) | (buffer[1] << 8) | buffer[0];
+	hdmi_writel(hdmi, val, PKT_VSI_CONTENTS0);
+
+	reg = PKT_VSI_CONTENTS1;
+	for (i = 3; i < err; i++) {
+		if (i % 4 == 3)
+			val = buffer[i];
+		if (i % 4 == 0)
+			val |= buffer[i] << 8;
+		if (i % 4 == 1)
+			val |= buffer[i] << 16;
+		if (i % 4 == 2)
+			val |= buffer[i] << 24;
+
+		if ((i % 4 == 2) || (i == (err - 1))) {
+			hdmi_writel(hdmi, val, reg);
+			reg += 4;
+		}
+	}
+
+	hdmi_writel(hdmi, 0, PKT_VSI_CONTENTS7);
+
+	hdmi_modb(hdmi, 0, PKTSCHED_VSI_FIELDRATE, PKTSCHED_PKT_CONFIG1);
+	hdmi_modb(hdmi, PKTSCHED_VSI_TX_EN, PKTSCHED_VSI_TX_EN,
 		  PKTSCHED_PKT_EN);
 }
 
@@ -710,7 +822,12 @@ static int hdmi_start_flt(struct dw_hdmi_qp *hdmi, u8 rate)
 	int i = 0;
 	bool ltsp = false;
 
-	hdmi_modb(hdmi, BIT(6), BIT(6), 0x44);
+	hdmi_modb(hdmi, AVP_DATAPATH_VIDEO_SWDISABLE,
+		  AVP_DATAPATH_VIDEO_SWDISABLE, GLOBAL_SWDISABLE);
+
+	/* clear flt flags */
+	drm_scdc_writeb(&hdmi->adap, 0x10, 0xff);
+
 	/* FLT_READY & FFE_LEVELS read */
 	for (i = 0; i < 20; i++) {
 		drm_scdc_readb(&hdmi->adap, SCDC_STATUS_FLAGS_0, &val);
@@ -720,18 +837,18 @@ static int hdmi_start_flt(struct dw_hdmi_qp *hdmi, u8 rate)
 	}
 
 	if (i == 20) {
-		dev_err(hdmi->dev, "sink flt isn't ready\n");
+		printf("sink flt isn't ready\n");
 		return -EINVAL;
 	}
 
 	/* max ffe level 3 */
 	val = 0 << 4 | hdmi_set_frl_mask(rate);
 	drm_scdc_writeb(&hdmi->adap, 0x31, val);
-
 	/* select FRL_RATE & FFE_LEVELS */
 	hdmi_writel(hdmi, ffe_lv, FLT_CONFIG0);
 
-	while (1) {
+	i = 500;
+	while (i--) {
 		mdelay(4);
 		drm_scdc_readb(&hdmi->adap, 0x10, &val);
 
@@ -750,14 +867,14 @@ static int hdmi_start_flt(struct dw_hdmi_qp *hdmi, u8 rate)
 			ln3 = (reg_val >> 4) & 0xf;
 
 			if (!ln0 && !ln1 && !ln2 && !ln3) {
-				printf("ltsp!\n");
+				printf("goto ltsp\n");
 				ltsp = true;
 				hdmi_writel(hdmi, 0, FLT_CONFIG1);
 			} else if ((ln0 == 0xf) | (ln1 == 0xf) | (ln2 == 0xf) | (ln3 == 0xf)) {
-				printf("lts4!\n");
+				printf("goto lts4\n");
 				break;
 			} else if ((ln0 == 0xe) | (ln1 == 0xe) | (ln2 == 0xe) | (ln3 == 0xe)) {
-				printf("ffe!\n");
+				printf("goto ffe\n");
 				break;
 			} else {
 				value = (ln3 << 16) | (ln2 << 12) | (ln1 << 8) | (ln0 << 4) | 0xf;
@@ -768,12 +885,17 @@ static int hdmi_start_flt(struct dw_hdmi_qp *hdmi, u8 rate)
 		drm_scdc_writeb(&hdmi->adap, 0x10, val);
 
 		if ((val & BIT(4)) && ltsp) {
+			hdmi_modb(hdmi, 0, AVP_DATAPATH_VIDEO_SWDISABLE, GLOBAL_SWDISABLE);
 			printf("flt success\n");
 			break;
 		}
 	}
 
-	hdmi_modb(hdmi, 0, BIT(6), 0x44);
+	if (i < 0) {
+		printf("flt time out\n");
+		return -ETIMEDOUT;
+	}
+
 	return 0;
 }
 
@@ -808,10 +930,11 @@ static void hdmi_set_op_mode(struct dw_hdmi_qp *hdmi,
 	frl_rate = link_cfg->frl_lanes * link_cfg->rate_per_lane;
 	hdmi_start_flt(hdmi, frl_rate);
 
-	for (i = 0; i < 50; i++) {
+	for (i = 0; i < 200; i++) {
 		hdmi_modb(hdmi, PKTSCHED_NULL_TX_EN, PKTSCHED_NULL_TX_EN, PKTSCHED_PKT_EN);
-		mdelay(1);
+		udelay(50);
 		hdmi_modb(hdmi, 0, PKTSCHED_NULL_TX_EN, PKTSCHED_PKT_EN);
+		udelay(50);
 	}
 }
 
@@ -831,7 +954,7 @@ static int dw_hdmi_setup(struct dw_hdmi_qp *hdmi,
 	else
 		printf("CEA mode used vic=%d\n", hdmi->vic);
 
-	vmode->mpixelclock = mode->crtc_clock * 1000;
+	vmode->mpixelclock = mode->clock * 1000;
 	vmode->mtmdsclock = hdmi_get_tmdsclock(hdmi, vmode->mpixelclock);
 	if (hdmi_bus_fmt_is_yuv420(hdmi->hdmi_data.enc_out_bus_format))
 		vmode->mtmdsclock /= 2;
@@ -914,8 +1037,11 @@ static int dw_hdmi_setup(struct dw_hdmi_qp *hdmi,
 		}
 		/* HDMI Initialization Step F - Configure AVI InfoFrame */
 		hdmi_config_AVI(hdmi, mode);
+		hdmi_config_vendor_specific_infoframe(hdmi, mode);
 		hdmi_config_CVTEM(hdmi, link_cfg);
 		hdmi_set_op_mode(hdmi, link_cfg, hdmi_info->scdc.supported);
+		/* clear avmute */
+		hdmi_writel(hdmi, 2, PKTSCHED_PKT_CONTROL0);
 	} else {
 		hdmi_modb(hdmi, OPMODE_DVI, OPMODE_DVI, LINK_CONFIG0);
 		printf("%s DVI mode\n", __func__);

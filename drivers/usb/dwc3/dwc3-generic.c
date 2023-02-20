@@ -441,7 +441,13 @@ static int dwc3_glue_probe(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	if (glue->resets.count < 1) {
+	if (glue->clks.count == 0) {
+		ret = dwc3_glue_clk_init(child, glue);
+		if (ret)
+			return ret;
+	}
+
+	if (glue->resets.count == 0) {
 		ret = dwc3_glue_reset_init(child, glue);
 		if (ret)
 			return ret;

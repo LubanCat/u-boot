@@ -23,11 +23,7 @@
 #include <clk.h>
 #include <usb/xhci.h>
 
-struct dwc3_glue_data {
-	struct clk_bulk		clks;
-	struct reset_ctl_bulk	resets;
-	fdt_addr_t regs;
-};
+#include "dwc3-generic.h"
 
 struct dwc3_generic_plat {
 	fdt_addr_t base;
@@ -209,12 +205,6 @@ U_BOOT_DRIVER(dwc3_generic_host) = {
 };
 #endif
 
-struct dwc3_glue_ops {
-	int (*glue_get_ctrl_dev)(struct udevice *parent, ofnode *node);
-	void (*glue_configure)(struct udevice *dev, int index,
-			       enum usb_dr_mode mode);
-};
-
 void dwc3_ti_glue_configure(struct udevice *dev, int index,
 			    enum usb_dr_mode mode)
 {
@@ -352,7 +342,7 @@ static int dwc3_glue_bind_common(struct udevice *parent, ofnode node)
 	return 0;
 }
 
-static int dwc3_glue_bind(struct udevice *parent)
+int dwc3_glue_bind(struct udevice *parent)
 {
 	struct dwc3_glue_ops *ops = (struct dwc3_glue_ops *)dev_get_driver_data(parent);
 	ofnode node;
@@ -419,7 +409,7 @@ static int dwc3_glue_clk_init(struct udevice *dev,
 	return 0;
 }
 
-static int dwc3_glue_probe(struct udevice *dev)
+int dwc3_glue_probe(struct udevice *dev)
 {
 	struct dwc3_glue_ops *ops = (struct dwc3_glue_ops *)dev_get_driver_data(dev);
 	struct dwc3_glue_data *glue = dev_get_platdata(dev);
@@ -466,7 +456,7 @@ static int dwc3_glue_probe(struct udevice *dev)
 	return 0;
 }
 
-static int dwc3_glue_remove(struct udevice *dev)
+int dwc3_glue_remove(struct udevice *dev)
 {
 	struct dwc3_glue_data *glue = dev_get_platdata(dev);
 

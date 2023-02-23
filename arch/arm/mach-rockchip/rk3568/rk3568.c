@@ -913,6 +913,9 @@ int arch_cpu_init(void)
 	writel(((0x1 << 14) << 16) | (0x0 << 14), SGRF_BASE + SGRF_SOC_CON3);
 #endif
 
+	/* Set i2c0 iomux */
+	writel(0x07700110, 0xfdc20008);
+
 	return 0;
 }
 

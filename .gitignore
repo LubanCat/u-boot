@@ -87,3 +87,6 @@ GTAGS
 *.orig
 *~
 \#*#
+
+spi.ini
+trust.ini

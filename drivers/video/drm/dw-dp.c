@@ -228,6 +228,7 @@ struct dw_dp {
 	struct dw_dp_link link;
 	struct dw_dp_video video;
 
+	bool force_hpd;
 	bool force_output;
 };
 
@@ -439,7 +440,7 @@ static bool dw_dp_bandwidth_ok(struct dw_dp *dp,
 
 static void dw_dp_hpd_init(struct dw_dp *dp)
 {
-	if (dm_gpio_is_valid(&dp->hpd_gpio)) {
+	if (dm_gpio_is_valid(&dp->hpd_gpio) || dp->force_hpd) {
 		regmap_update_bits(dp->regmap, DPTX_CCTL, FORCE_HPD,
 				   FIELD_PREP(FORCE_HPD, 1));
 		return;
@@ -560,7 +561,8 @@ static int dw_dp_link_probe(struct dw_dp *dp)
 		!!(dpcd & DP_VSC_SDP_EXT_FOR_COLORIMETRY_SUPPORTED);
 
 	link->revision = link->dpcd[DP_DPCD_REV];
-	link->rate = drm_dp_max_link_rate(link->dpcd);
+	link->rate = min_t(u32, dp->phy.attrs.max_link_rate * 100,
+			   drm_dp_max_link_rate(link->dpcd));
 	link->lanes = min_t(u8, dp->phy.attrs.bus_width,
 			    drm_dp_max_lane_count(link->dpcd));
 
@@ -1394,14 +1396,10 @@ static bool dw_dp_detect(struct dw_dp *dp)
 	if (dm_gpio_is_valid(&dp->hpd_gpio))
 		return dm_gpio_get_value(&dp->hpd_gpio);
 
-	regmap_read(dp->regmap, DPTX_GENERAL_INTERRUPT, &value);
-	if (value & HPD_EVENT) {
-		regmap_read(dp->regmap, DPTX_HPD_STATUS, &value);
-		if ((value & HPD_HOT_PLUG) &&
-		    (FIELD_GET(HPD_STATE, value) == SOURCE_STATE_PLUG)) {
-			regmap_write(dp->regmap, DPTX_HPD_STATUS, HPD_HOT_PLUG);
-			return true;
-		}
+	regmap_read(dp->regmap, DPTX_HPD_STATUS, &value);
+	if (FIELD_GET(HPD_STATE, value) == SOURCE_STATE_PLUG) {
+		regmap_write(dp->regmap, DPTX_HPD_STATUS, HPD_HOT_PLUG);
+		return true;
 	}
 
 	return false;
@@ -1451,6 +1449,40 @@ static int dw_dp_connector_get_edid(struct display_state *state)
 	return ret;
 }
 
+static int dw_dp_get_output_fmts_index(u32 bus_format)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(possible_output_fmts); i++) {
+		const struct dw_dp_output_format *fmt = &possible_output_fmts[i];
+
+		if (fmt->bus_format == bus_format)
+			break;
+	}
+
+	if (i == ARRAY_SIZE(possible_output_fmts))
+		return 1;
+
+	return i;
+}
+
+static int dw_dp_connector_prepare(struct display_state *state)
+{
+	struct connector_state *conn_state = &state->conn_state;
+	struct dw_dp *dp = dev_get_priv(conn_state->dev);
+	struct dw_dp_video *video = &dp->video;
+	int bus_fmt;
+
+	bus_fmt = dw_dp_get_output_fmts_index(conn_state->bus_format);
+	video->video_mapping = possible_output_fmts[bus_fmt].video_mapping;
+	video->color_format = possible_output_fmts[bus_fmt].color_format;
+	video->bus_format = possible_output_fmts[bus_fmt].bus_format;
+	video->bpc = possible_output_fmts[bus_fmt].bpc;
+	video->bpp = possible_output_fmts[bus_fmt].bpp;
+
+	return 0;
+}
+
 static int dw_dp_connector_enable(struct display_state *state)
 {
 	struct connector_state *conn_state = &state->conn_state;
@@ -1494,9 +1526,9 @@ static int dw_dp_connector_detect(struct display_state *state)
 {
 	struct connector_state *conn_state = &state->conn_state;
 	struct dw_dp *dp = dev_get_priv(conn_state->dev);
-	int status, tries;
+	int status, tries, ret;
 
-	for (tries = 0; tries < 100; tries++) {
+	for (tries = 0; tries < 200; tries++) {
 		status = dw_dp_detect(dp);
 		if (status)
 			break;
@@ -1508,6 +1540,12 @@ static int dw_dp_connector_detect(struct display_state *state)
 
 	if (!status && !dp->force_output)
 		generic_phy_power_off(&dp->phy);
+
+	if (status && !dp->force_output) {
+		ret = dw_dp_link_probe(dp);
+		if (ret)
+			printf("failed to probe DP link: %d\n", ret);
+	}
 
 	return status;
 }
@@ -1573,29 +1611,11 @@ static u32 dw_dp_get_output_bus_fmts(struct dw_dp *dp, struct hdmi_edid_data *ed
 	return i;
 }
 
-static int dw_dp_get_force_output_fmts(struct display_state *state)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(possible_output_fmts); i++) {
-		const struct dw_dp_output_format *fmt = &possible_output_fmts[i];
-
-		if (fmt->bus_format == state->force_bus_format)
-			break;
-	}
-
-	if (i == ARRAY_SIZE(possible_output_fmts))
-		return 1;
-
-	return i;
-}
-
 static int dw_dp_connector_get_timing(struct display_state *state)
 {
 	int ret, i;
 	struct connector_state *conn_state = &state->conn_state;
 	struct dw_dp *dp = dev_get_priv(conn_state->dev);
-	struct dw_dp_video *video = &dp->video;
 	struct drm_display_mode *mode = &conn_state->mode;
 	struct hdmi_edid_data edid_data;
 	struct drm_display_mode *mode_buf;
@@ -1619,13 +1639,6 @@ static int dw_dp_connector_get_timing(struct display_state *state)
 			goto err;
 		}
 
-		ret = dw_dp_link_probe(dp);
-		if (ret) {
-			printf("failed to probe DP link: %d\n", ret);
-			ret = -EINVAL;
-			goto err;
-		}
-
 		drm_rk_filter_whitelist(&edid_data);
 		drm_mode_max_resolution_filter(&edid_data,
 					       &state->crtc_state.max_output);
@@ -1646,17 +1659,13 @@ static int dw_dp_connector_get_timing(struct display_state *state)
 	}
 
 	if (state->force_output)
-		bus_fmt = dw_dp_get_force_output_fmts(state);
+		bus_fmt = dw_dp_get_output_fmts_index(state->force_bus_format);
 	else
 		bus_fmt = dw_dp_get_output_bus_fmts(dp, &edid_data);
 
-	video->video_mapping = possible_output_fmts[bus_fmt].video_mapping;
-	video->color_format = possible_output_fmts[bus_fmt].color_format;
-	video->bus_format = possible_output_fmts[bus_fmt].bus_format;
-	video->bpc = possible_output_fmts[bus_fmt].bpc;
-	video->bpp = possible_output_fmts[bus_fmt].bpp;
+	conn_state->bus_format = possible_output_fmts[bus_fmt].bus_format;
 
-	switch (video->color_format) {
+	switch (possible_output_fmts[bus_fmt].color_format) {
 	case DRM_COLOR_FORMAT_YCRCB420:
 		conn_state->output_mode = ROCKCHIP_OUT_MODE_YUV420;
 		break;
@@ -1670,7 +1679,6 @@ static int dw_dp_connector_get_timing(struct display_state *state)
 		break;
 	}
 
-	conn_state->bus_format = video->bus_format;
 err:
 	free(mode_buf);
 
@@ -1681,6 +1689,7 @@ static const struct rockchip_connector_funcs dw_dp_connector_funcs = {
 	.pre_init = dw_dp_connector_pre_init,
 	.init = dw_dp_connector_init,
 	.get_edid = dw_dp_connector_get_edid,
+	.prepare = dw_dp_connector_prepare,
 	.enable = dw_dp_connector_enable,
 	.disable = dw_dp_connector_disable,
 	.detect = dw_dp_connector_detect,
@@ -1715,6 +1724,8 @@ static int dw_dp_probe(struct udevice *dev)
 		dev_err(dev, "failed to get reset control: %d\n", ret);
 		return ret;
 	}
+
+	dp->force_hpd = dev_read_bool(dev, "force-hpd");
 
 	ret = gpio_request_by_name(dev, "hpd-gpios", 0, &dp->hpd_gpio,
 				   GPIOD_IS_IN);

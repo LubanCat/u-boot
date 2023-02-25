@@ -1710,8 +1710,10 @@ static void vop2_global_initial(struct vop2 *vop2, struct display_state *state)
 			vop2->vp_plane_mask[i].plane_mask = plane_mask;
 			layer_nr = hweight32(plane_mask); /* use bitmap to store plane mask */
 			vop2->vp_plane_mask[i].attached_layers_nr = layer_nr;
-			primary_plane_id = vop2_get_primary_plane(vop2, plane_mask);
-			vop2->vp_plane_mask[i].primary_plane_id =  primary_plane_id;
+			primary_plane_id = cstate->crtc->vps[i].primary_plane_id;
+			if (primary_plane_id < 0)
+				primary_plane_id = vop2_get_primary_plane(vop2, plane_mask);
+			vop2->vp_plane_mask[i].primary_plane_id = primary_plane_id;
 			vop2->vp_plane_mask[i].plane_mask = plane_mask;
 
 			/* plane mask[bitmap] convert into layer phy id[enum vop2_layer_phy_id]*/
@@ -2055,9 +2057,11 @@ static int vop2_calc_dsc_clk(struct display_state *state)
 	/* dsc_cds = crtc_clock / (cds_dat_width / bits_per_pixel)
 	 * cds_dat_width = 96;
 	 * bits_per_pixel = [8-12];
-	 * As only support 1/2/4 div, so we set dsc_cds = crtc_clock / 8;
+	 * As cds clk is div from txp clk and only support 1/2/4 div,
+	 * so when txp_clk is equal to v_pixclk, we set dsc_cds = crtc_clock / 4,
+	 * otherwise dsc_cds = crtc_clock / 8;
 	 */
-	cstate->dsc_cds_clk_rate = v_pixclk / 8;
+	cstate->dsc_cds_clk_rate = v_pixclk / (cstate->dsc_txp_clk_rate == v_pixclk ? 4 : 8);
 
 	return 0;
 }
@@ -2072,8 +2076,6 @@ static unsigned long rk3588_vop2_if_cfg(struct display_state *state)
 	u32 vp_offset = (cstate->crtc_id * 0x100);
 	u16 hdisplay = mode->crtc_hdisplay;
 	int output_if = conn_state->output_if;
-	int dclk_core_div = 0;
-	int dclk_out_div = 0;
 	int if_pixclk_div = 0;
 	int if_dclk_div = 0;
 	unsigned long dclk_rate;
@@ -2108,7 +2110,7 @@ static unsigned long rk3588_vop2_if_cfg(struct display_state *state)
 		       dsc_sink_cap->slice_height, cstate->dsc_slice_num);
 	}
 
-	dclk_rate = vop2_calc_cru_cfg(state, &dclk_core_div, &dclk_out_div, &if_pixclk_div, &if_dclk_div);
+	dclk_rate = vop2_calc_cru_cfg(state, &cstate->dclk_core_div, &cstate->dclk_out_div, &if_pixclk_div, &if_dclk_div);
 
 	if (output_if & VOP_OUTPUT_IF_RGB) {
 		vop2_mask_write(vop2, RK3568_DSP_IF_EN, 0x7, RK3588_RGB_EN_SHIFT,
@@ -2278,9 +2280,9 @@ static unsigned long rk3588_vop2_if_cfg(struct display_state *state)
 	}
 
 	vop2_mask_write(vop2, RK3588_VP0_CLK_CTRL + vp_offset, 0x3,
-			DCLK_CORE_DIV_SHIFT, dclk_core_div, false);
+			DCLK_CORE_DIV_SHIFT, cstate->dclk_core_div, false);
 	vop2_mask_write(vop2, RK3588_VP0_CLK_CTRL + vp_offset, 0x3,
-			DCLK_OUT_DIV_SHIFT, dclk_out_div, false);
+			DCLK_OUT_DIV_SHIFT, cstate->dclk_out_div, false);
 
 	return dclk_rate;
 }
@@ -2590,6 +2592,10 @@ static void vop2_dsc_enable(struct display_state *state, struct vop2 *vop2, u8 d
 		u64 dsc_cds_rate = cstate->dsc_cds_clk_rate;
 		u32 v_pixclk_mhz = mode->crtc_clock / 1000; /* video timing pixclk */
 		u32 dly_num, dsc_cds_rate_mhz, val = 0;
+		int k = 1;
+
+		if (conn_state->output_flags & ROCKCHIP_OUTPUT_DUAL_CHANNEL_LEFT_RIGHT_MODE)
+			k = 2;
 
 		if (target_bpp >> 4 < dsc_data->min_bits_per_pixel)
 			printf("Unsupported bpp less than: %d\n", dsc_data->min_bits_per_pixel);
@@ -2613,13 +2619,24 @@ static void vop2_dsc_enable(struct display_state *state, struct vop2 *vop2, u8 d
 				DSC_INIT_DLY_NUM_SHIFT, dly_num, false);
 
 		dsc_hsync = hsync_len / 2;
-		dsc_htotal = htotal / (1 << dsc_cds_clk_div);
+		/*
+		 * htotal / dclk_core = dsc_htotal /cds_clk
+		 *
+		 * dclk_core = DCLK / (1 << dclk_core->div_val)
+		 * cds_clk = txp_clk / (1 << dsc_cds_clk->div_val)
+		 * txp_clk = DCLK / (1 << dsc_txp_clk->div_val)
+		 *
+		 * dsc_htotal = htotal * (1 << dclk_core->div_val) /
+		 *              ((1 << dsc_txp_clk->div_val) * (1 << dsc_cds_clk->div_val))
+		 */
+		dsc_htotal = htotal * (1 << cstate->dclk_core_div) /
+			     ((1 << dsc_txp_clk_div) * (1 << dsc_cds_clk_div));
 		val = dsc_htotal << 16 | dsc_hsync;
 		vop2_mask_write(vop2, RK3588_DSC_8K_HTOTAL_HS_END + ctrl_regs_offset, DSC_HTOTAL_PW_MASK,
 				DSC_HTOTAL_PW_SHIFT, val, false);
 
 		dsc_hact_st = hact_st / 2;
-		dsc_hact_end = (hdisplay * target_bpp >> 4) / 24 + dsc_hact_st;
+		dsc_hact_end = (hdisplay / k * target_bpp >> 4) / 24 + dsc_hact_st;
 		val = dsc_hact_end << 16 | dsc_hact_st;
 		vop2_mask_write(vop2, RK3588_DSC_8K_HACT_ST_END + ctrl_regs_offset, DSC_HACT_ST_END_MASK,
 				DSC_HACT_ST_END_SHIFT, val, false);
@@ -2690,7 +2707,7 @@ static bool is_extend_pll(struct display_state *state, struct udevice **clk_dev)
 	ret = dev_read_phandle_with_args(vp_dev, "assigned-clock-parents", "#clock-cells", 0,
 					 0, &args);
 	if (ret) {
-		printf("warn: can't get assigned-clock-parents's node\n");
+		printf("assigned-clock-parents's node not define\n");
 		return false;
 	}
 
@@ -2726,12 +2743,12 @@ static int rockchip_vop2_init(struct display_state *state)
 	u16 vact_st = mode->crtc_vtotal - mode->crtc_vsync_start;
 	u16 vact_end = vact_st + vdisplay;
 	bool yuv_overlay = false;
-	bool splice_en = false;
 	u32 vp_offset = (cstate->crtc_id * 0x100);
 	u32 line_flag_offset = (cstate->crtc_id * 4);
 	u32 val, act_end;
 	u8 dither_down_en = 0;
 	u8 pre_dither_down_en = 0;
+	u8 dclk_div_factor = 0;
 	char output_type_name[30] = {0};
 	char dclk_name[9];
 	struct clk dclk;
@@ -2751,13 +2768,15 @@ static int rockchip_vop2_init(struct display_state *state)
 
 	if (mode->hdisplay > VOP2_MAX_VP_OUTPUT_WIDTH) {
 		cstate->splice_mode = true;
-		splice_en = true;
 		cstate->splice_crtc_id = vop2->data->vp_data[cstate->crtc_id].splice_vp_id;
 		if (!cstate->splice_crtc_id) {
 			printf("%s: Splice mode is unsupported by vp%d\n",
 			       __func__, cstate->crtc_id);
 			return -EINVAL;
 		}
+
+		vop2_mask_write(vop2, RK3568_SYS_LUT_PORT_SEL, EN_MASK,
+				PORT_MERGE_EN_SHIFT, 1, false);
 	}
 
 	vop2_initial(vop2, state);
@@ -2815,9 +2834,6 @@ static int rockchip_vop2_init(struct display_state *state)
 			yuv_overlay, false);
 
 	cstate->yuv_overlay = yuv_overlay;
-
-	vop2_mask_write(vop2, RK3568_SYS_LUT_PORT_SEL, EN_MASK,
-			PORT_MERGE_EN_SHIFT, splice_en, false);
 
 	vop2_writel(vop2, RK3568_VP0_DSP_HTOTAL_HS_END + vp_offset,
 		    (htotal << 16) | hsync_len);
@@ -2880,7 +2896,7 @@ static int rockchip_vop2_init(struct display_state *state)
 	else
 		val = 0;
 	vop2_writel(vop2, RK3568_VP0_DSP_BG + vp_offset, val);
-	if (splice_en) {
+	if (cstate->splice_mode) {
 		vop2_mask_write(vop2, RK3568_OVL_CTRL, OVL_MODE_SEL_MASK,
 				OVL_MODE_SEL_SHIFT + cstate->splice_crtc_id,
 				yuv_overlay, false);
@@ -2913,10 +2929,10 @@ static int rockchip_vop2_init(struct display_state *state)
 	if (!ret) {
 		ret = clk_get_by_name(disp_dev, "hdmi0_phy_pll", &hdmi0_phy_pll);
 		if (ret)
-			printf("%s: Failed to get hdmi0_phy_pll ret=%d\n", __func__, ret);
+			printf("%s: hdmi0_phy_pll may not define\n", __func__);
 		ret = clk_get_by_name(disp_dev, "hdmi1_phy_pll", &hdmi1_phy_pll);
 		if (ret)
-			printf("%s: Failed to get hdmi1_phy_pll ret=%d\n", __func__, ret);
+			printf("%s: hdmi1_phy_pll may not define\n", __func__);
 	} else {
 		hdmi0_phy_pll.dev = NULL;
 		hdmi1_phy_pll.dev = NULL;
@@ -2945,33 +2961,21 @@ static int rockchip_vop2_init(struct display_state *state)
 			else
 				ret = vop2_clk_set_rate(&dclk, dclk_rate * 1000);
 		}
-
-		if (IS_ERR_VALUE(ret)) {
-			printf("%s: Failed to set vp%d dclk[%ld KHZ] ret=%d\n",
-			       __func__, cstate->crtc_id, dclk_rate, ret);
-			return ret;
-		} else {
-			if (mode->flags & DRM_MODE_FLAG_DBLCLK)
-				mode->crtc_clock = ret * 2 / 1000;
-			else
-				mode->crtc_clock = ret / 1000;
-		}
 	} else {
 		if (is_extend_pll(state, &hdmi_phy_pll.dev))
 			ret = vop2_clk_set_rate(&hdmi_phy_pll, dclk_rate * 1000);
 		else
 			ret = vop2_clk_set_rate(&dclk, dclk_rate * 1000);
+	}
 
-		if (IS_ERR_VALUE(ret)) {
-			printf("%s: Failed to set vp%d dclk[%ld KHZ] ret=%d\n",
-			       __func__, cstate->crtc_id, dclk_rate, ret);
-			return ret;
-		} else {
-			if (mode->flags & DRM_MODE_FLAG_DBLCLK)
-				mode->crtc_clock = ret * 2 / 1000;
-			else
-				mode->crtc_clock = ret / 1000;
-		}
+	if (IS_ERR_VALUE(ret)) {
+		printf("%s: Failed to set vp%d dclk[%ld KHZ] ret=%d\n",
+		       __func__, cstate->crtc_id, dclk_rate, ret);
+		return ret;
+	} else {
+		dclk_div_factor = mode->clock / dclk_rate;
+		mode->crtc_clock = ret * dclk_div_factor / 1000;
+		printf("VP%d set crtc_clock to %dKHz\n", cstate->crtc_id, mode->crtc_clock);
 	}
 
 	vop2_mask_write(vop2, RK3568_SYS_CTRL_LINE_FLAG0 + line_flag_offset, LINE_FLAG_NUM_MASK,
@@ -3264,41 +3268,6 @@ static void vop2_set_smart_win(struct display_state *state, struct vop2_win_data
 	vop2_writel(vop2, RK3568_REG_CFG_DONE, cfg_done);
 }
 
-static int display_rect_calc_scale(int src, int dst)
-{
-	int scale = 0;
-
-	if (WARN_ON(src < 0 || dst < 0))
-		return -EINVAL;
-
-	if (dst == 0)
-		return 0;
-
-	if (src > (dst << 16))
-		return DIV_ROUND_UP(src, dst);
-
-	scale = src / dst;
-
-	return scale;
-}
-
-static int display_rect_calc_hscale(const struct display_rect *src,
-				    const struct display_rect *dst,
-				    int min_hscale, int max_hscale)
-{
-	int src_w = src->w;
-	int dst_w = dst->w;
-	int hscale = display_rect_calc_scale(src_w, dst_w);
-
-	if (hscale < 0 || dst_w == 0)
-		return hscale;
-
-	if (hscale < min_hscale || hscale > max_hscale)
-		return -ERANGE;
-
-	return hscale;
-}
-
 static void vop2_calc_display_rect_for_splice(struct display_state *state)
 {
 	struct crtc_state *cstate = &state->crtc_state;
@@ -3308,7 +3277,6 @@ static void vop2_calc_display_rect_for_splice(struct display_state *state)
 	struct display_rect *dst_rect = &cstate->crtc_rect;
 	struct display_rect left_src, left_dst, right_src, right_dst;
 	u16 half_hdisplay = mode->crtc_hdisplay >> 1;
-	int hscale = display_rect_calc_hscale(src_rect, dst_rect, 0, INT_MAX);
 	int left_src_w, left_dst_w, right_dst_w;
 
 	left_dst_w = min_t(u16, half_hdisplay, dst_rect->x + dst_rect->w) - dst_rect->x;
@@ -3319,7 +3287,7 @@ static void vop2_calc_display_rect_for_splice(struct display_state *state)
 	if (!right_dst_w)
 		left_src_w = src_rect->w;
 	else
-		left_src_w = left_dst_w * hscale;
+		left_src_w = src_rect->x + src_rect->w - src_rect->w / 2;
 
 	left_src.x = src_rect->x;
 	left_src.w = left_src_w;
@@ -3980,7 +3948,7 @@ static struct vop2_dsc_data rk3588_dsc_data[] = {
 		.pd_id = VOP2_PD_DSC_8K,
 		.max_slice_num = 8,
 		.max_linebuf_depth = 11,
-		.min_bits_per_pixel = 9,
+		.min_bits_per_pixel = 8,
 		.dsc_txp_clk_src_name = "dsc_8k_txp_clk_src",
 		.dsc_txp_clk_name = "dsc_8k_txp_clk",
 		.dsc_pxl_clk_name = "dsc_8k_pxl_clk",
@@ -3992,7 +3960,7 @@ static struct vop2_dsc_data rk3588_dsc_data[] = {
 		.pd_id = VOP2_PD_DSC_4K,
 		.max_slice_num = 2,
 		.max_linebuf_depth = 11,
-		.min_bits_per_pixel = 9,
+		.min_bits_per_pixel = 8,
 		.dsc_txp_clk_src_name = "dsc_4k_txp_clk_src",
 		.dsc_txp_clk_name = "dsc_4k_txp_clk",
 		.dsc_pxl_clk_name = "dsc_4k_pxl_clk",

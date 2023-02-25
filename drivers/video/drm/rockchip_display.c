@@ -862,6 +862,14 @@ static int display_init(struct display_state *state)
 		}
 	}
 
+	if (conn_state->bridge) {
+		if (!rockchip_bridge_detect(conn_state->bridge)) {
+			printf("%s disconnected\n",
+			       dev_np(conn_state->bridge->dev)->full_name);
+			goto deinit;
+		}
+	}
+
 	if (panel_state->panel) {
 		ret = display_get_timing(state);
 		if (!ret)
@@ -1104,7 +1112,7 @@ static int display_logo(struct display_state *state)
 	crtc_state->dma_addr = (u32)(unsigned long)logo->mem + logo->offset;
 	crtc_state->xvir = ALIGN(crtc_state->src_rect.w * logo->bpp, 32) >> 5;
 
-	if (logo->mode == ROCKCHIP_DISPLAY_FULLSCREEN) {
+	if (state->logo_mode == ROCKCHIP_DISPLAY_FULLSCREEN) {
 		crtc_state->crtc_rect.x = 0;
 		crtc_state->crtc_rect.y = 0;
 		crtc_state->crtc_rect.w = hdisplay;
@@ -2020,15 +2028,14 @@ static int rockchip_display_probe(struct udevice *dev)
 					cursor_plane = ofnode_read_u32_default(vp_node, "cursor-win-id", -1);
 					s->crtc_state.crtc->vps[vp_id].cursor_plane = cursor_plane;
 					if (ret) {
-						int primary_plane = 0;
-
 						s->crtc_state.crtc->vps[vp_id].plane_mask = ret;
 						s->crtc_state.crtc->assign_plane |= true;
-						primary_plane = ofnode_read_u32_default(vp_node, "rockchip,primary-plane", 0);
+						s->crtc_state.crtc->vps[vp_id].primary_plane_id =
+							ofnode_read_u32_default(vp_node, "rockchip,primary-plane", -1);
 						printf("get vp%d plane mask:0x%x, primary id:%d, cursor_plane:%d, from dts\n",
 						       vp_id,
 						       s->crtc_state.crtc->vps[vp_id].plane_mask,
-						       primary_plane,
+						       s->crtc_state.crtc->vps[vp_id].primary_plane_id,
 						       cursor_plane);
 					}
 

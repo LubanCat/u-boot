@@ -167,7 +167,7 @@
 		"setenv devtype spinand; setenv devnum 0;" \
 	"elif rksfc dev 1; then " \
 		"setenv devtype spinor; setenv devnum 1;" \
-	"else" \
+	"else;" \
 		"setenv devtype ramdisk; setenv devnum 0;" \
 	"fi; \0"
 
@@ -189,5 +189,6 @@
 
 #define CONFIG_DISPLAY_BOARDINFO_LATE
 #define CONFIG_SYS_AUTOLOAD	"no"
+#define CONFIG_SPL_LOAD_FIT_ADDRESS		0x2000000
 
 #endif /* _ROCKCHIP_COMMON_H_ */

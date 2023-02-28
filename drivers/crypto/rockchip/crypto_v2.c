@@ -397,7 +397,7 @@ static int rk_hash_direct_calc(void *hw_data, const u8 *data,
 
 	if (!(*started_flag)) {
 		lli->user_define |=
-			(LLI_USER_STRING_START | LLI_USER_CPIHER_START);
+			(LLI_USER_STRING_START | LLI_USER_CIPHER_START);
 		crypto_write((u32)virt_to_phys(lli), CRYPTO_DMA_LLI_ADDR);
 		crypto_write((CRYPTO_HASH_ENABLE << CRYPTO_WRITE_MASK_SHIFT) |
 			     CRYPTO_HASH_ENABLE, CRYPTO_HASH_CTL);
@@ -763,6 +763,11 @@ static void ccm_aad_padding(u32 aad_len, u8 *padding, u32 *padding_size)
 {
 	u32 i;
 
+	if (aad_len == 0) {
+		*padding_size = 0;
+		return;
+	}
+
 	i = aad_len < (0x10000 - 0x100) ? 2 : 6;
 
 	if (i == 2) {
@@ -779,7 +784,7 @@ static void ccm_aad_padding(u32 aad_len, u8 *padding, u32 *padding_size)
 	*padding_size = i;
 }
 
-static int ccm_compose_aad_iv(u8 *aad_iv, u32 data_len, u32 tag_size)
+static int ccm_compose_aad_iv(u8 *aad_iv, u32 data_len, u32 aad_len, u32 tag_size)
 {
 	aad_iv[0] |= ((u8)(((tag_size - 2) / 2) & 7) << 3);
 
@@ -788,7 +793,8 @@ static int ccm_compose_aad_iv(u8 *aad_iv, u32 data_len, u32 tag_size)
 	aad_iv[14] = (u8)(data_len >> 8);
 	aad_iv[15] = (u8)data_len;
 
-	aad_iv[0] |= 0x40;	//set aad flag
+	if (aad_len)
+		aad_iv[0] |= 0x40;	//set aad flag
 
 	return 0;
 }
@@ -925,12 +931,14 @@ static int hw_cipher_crypt(const u8 *in, u8 *out, u64 len,
 		data_desc->dma_ctrl |= LLI_DMA_CTRL_DST_DONE;
 	}
 
+	data_desc->user_define = LLI_USER_CIPHER_START |
+				 LLI_USER_STRING_START |
+				 LLI_USER_STRING_LAST |
+				 (key_chn << 4);
+	crypto_write((u32)virt_to_phys(data_desc), CRYPTO_DMA_LLI_ADDR);
+
 	if (rk_mode == RK_MODE_CCM || rk_mode == RK_MODE_GCM) {
 		u32 aad_tmp_len = 0;
-
-		data_desc->user_define = LLI_USER_STRING_START |
-					 LLI_USER_STRING_LAST |
-					 (key_chn << 4);
 
 		aad_desc = align_malloc(sizeof(*aad_desc), LLI_ADDR_ALIGN_SIZE);
 		if (!aad_desc)
@@ -938,7 +946,7 @@ static int hw_cipher_crypt(const u8 *in, u8 *out, u64 len,
 
 		memset(aad_desc, 0x00, sizeof(*aad_desc));
 		aad_desc->next_addr = (u32)virt_to_phys(data_desc);
-		aad_desc->user_define = LLI_USER_CPIHER_START |
+		aad_desc->user_define = LLI_USER_CIPHER_START |
 					 LLI_USER_STRING_START |
 					 LLI_USER_STRING_LAST |
 					 LLI_USER_STRING_AAD |
@@ -958,12 +966,15 @@ static int hw_cipher_crypt(const u8 *in, u8 *out, u64 len,
 			if (!aad_tmp)
 				goto exit;
 
-			/* read iv data from reg */
-			get_iv_reg(key_chn, aad_tmp, AES_BLOCK_SIZE);
-			ccm_compose_aad_iv(aad_tmp, tmp_len, tag_len);
-			memcpy(aad_tmp + AES_BLOCK_SIZE, padding, padding_size);
+			/* clear last block */
 			memset(aad_tmp + aad_tmp_len - AES_BLOCK_SIZE,
 			       0x00, AES_BLOCK_SIZE);
+
+			/* read iv data from reg */
+			get_iv_reg(key_chn, aad_tmp, AES_BLOCK_SIZE);
+			ccm_compose_aad_iv(aad_tmp, tmp_len, aad_len, tag_len);
+			memcpy(aad_tmp + AES_BLOCK_SIZE, padding, padding_size);
+
 			memcpy(aad_tmp + AES_BLOCK_SIZE + padding_size,
 			       aad, aad_len);
 		} else {
@@ -985,15 +996,15 @@ static int hw_cipher_crypt(const u8 *in, u8 *out, u64 len,
 
 		aad_desc->src_addr = (u32)virt_to_phys(aad_tmp);
 		aad_desc->src_len  = aad_tmp_len;
-		crypto_write((u32)virt_to_phys(aad_desc), CRYPTO_DMA_LLI_ADDR);
-		cache_op_inner(DCACHE_AREA_CLEAN, aad_tmp, aad_tmp_len);
-		cache_op_inner(DCACHE_AREA_CLEAN, aad_desc, sizeof(*aad_desc));
-	} else {
-		data_desc->user_define = LLI_USER_CPIHER_START |
-					 LLI_USER_STRING_START |
-					 LLI_USER_STRING_LAST |
-					 (key_chn << 4);
-		crypto_write((u32)virt_to_phys(data_desc), CRYPTO_DMA_LLI_ADDR);
+
+		if (aad_tmp_len) {
+			data_desc->user_define = LLI_USER_STRING_START |
+						 LLI_USER_STRING_LAST |
+						 (key_chn << 4);
+			crypto_write((u32)virt_to_phys(aad_desc), CRYPTO_DMA_LLI_ADDR);
+			cache_op_inner(DCACHE_AREA_CLEAN, aad_tmp, aad_tmp_len);
+			cache_op_inner(DCACHE_AREA_CLEAN, aad_desc, sizeof(*aad_desc));
+		}
 	}
 
 	cache_op_inner(DCACHE_AREA_CLEAN, data_desc, sizeof(*data_desc));
@@ -1236,6 +1247,9 @@ int rk_crypto_ae(struct udevice *dev, u32 algo, u32 mode,
 	int ret;
 
 	if (!IS_AE_MODE(rk_mode))
+		return -EINVAL;
+
+	if (len == 0)
 		return -EINVAL;
 
 	if (algo != CRYPTO_AES && algo != CRYPTO_SM4)
@@ -1556,6 +1570,10 @@ static const struct udevice_id rockchip_crypto_ids[] = {
 	{
 		.compatible = "rockchip,crypto-v3",
 		.data = (ulong)&soc_data_cryptov3
+	},
+	{
+		.compatible = "rockchip,crypto-v4",
+		.data = (ulong)&soc_data_cryptov3 /* reuse crypto v3 config */
 	},
 	{ }
 };

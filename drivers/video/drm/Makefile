@@ -4,8 +4,11 @@
 # SPDX-License-Identifier:	GPL-2.0+
 #
 
+obj-y += drm_modes.o
+
 obj-y += rockchip_display.o rockchip_crtc.o rockchip_phy.o rockchip_bridge.o \
-		rockchip_vop.o rockchip_vop_reg.o rockchip_vop2.o bmp_helper.o
+		rockchip_vop.o rockchip_vop_reg.o rockchip_vop2.o bmp_helper.o \
+		rockchip_connector.o
 
 obj-$(CONFIG_DRM_MIPI_DSI) += drm_mipi_dsi.o
 obj-$(CONFIG_DRM_DP_HELPER) += drm_dp_helper.o
@@ -13,6 +16,7 @@ obj-$(CONFIG_DRM_DSC) += drm_dsc.o
 obj-$(CONFIG_DRM_MAXIM_MAX96745) += max96745.o
 obj-$(CONFIG_DRM_MAXIM_MAX96752F) += max96752f.o
 obj-$(CONFIG_DRM_MAXIM_MAX96755F) += max96755f.o
+obj-$(CONFIG_DRM_PANEL_MAXIM_DESERIALIZER) += panel-maxim-deserializer.o
 obj-$(CONFIG_DRM_ROCKCHIP_DW_MIPI_DSI) += dw_mipi_dsi.o
 obj-$(CONFIG_DRM_ROCKCHIP_DW_MIPI_DSI2) += dw_mipi_dsi2.o
 obj-$(CONFIG_DRM_ROCKCHIP_DW_HDMI) += rockchip_dw_hdmi.o dw_hdmi.o
@@ -23,7 +27,7 @@ obj-$(CONFIG_DRM_ROCKCHIP_INNO_MIPI_PHY) += inno_mipi_phy.o
 obj-$(CONFIG_DRM_ROCKCHIP_INNO_VIDEO_PHY) += inno_video_phy.o
 obj-$(CONFIG_DRM_ROCKCHIP_INNO_VIDEO_COMBO_PHY) += inno_video_combo_phy.o
 obj-$(CONFIG_PHY_ROCKCHIP_SAMSUNG_HDPTX_HDMI) += phy-rockchip-samsung-hdptx-hdmi.o
-obj-$(CONFIG_ROCKCHIP_DRM_TVE) += rockchip_drm_tve.o
+obj-$(CONFIG_DRM_ROCKCHIP_TVE) += rockchip_tve.o
 obj-$(CONFIG_DRM_ROCKCHIP_ANALOGIX_DP) += analogix_dp.o analogix_dp_reg.o
 obj-$(CONFIG_DRM_ROCKCHIP_DW_DP) += dw-dp.o
 obj-$(CONFIG_DRM_ROCKCHIP_LVDS) += rockchip_lvds.o

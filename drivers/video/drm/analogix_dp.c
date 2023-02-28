@@ -22,7 +22,6 @@
 #include "rockchip_display.h"
 #include "rockchip_crtc.h"
 #include "rockchip_connector.h"
-#include "rockchip_panel.h"
 #include "analogix_dp.h"
 
 #define RK3588_GRF_VO1_CON0	0x0000
@@ -746,19 +745,10 @@ retry:
 	return retval;
 }
 
-static int analogix_dp_connector_pre_init(struct display_state *state)
+static int analogix_dp_connector_init(struct rockchip_connector *conn, struct display_state *state)
 {
 	struct connector_state *conn_state = &state->conn_state;
-
-	conn_state->type = DRM_MODE_CONNECTOR_eDP;
-
-	return 0;
-}
-
-static int analogix_dp_connector_init(struct display_state *state)
-{
-	struct connector_state *conn_state = &state->conn_state;
-	struct analogix_dp_device *dp = dev_get_priv(conn_state->dev);
+	struct analogix_dp_device *dp = dev_get_priv(conn->dev);
 
 	conn_state->output_if |= dp->id ? VOP_OUTPUT_IF_eDP1 : VOP_OUTPUT_IF_eDP0;
 	conn_state->output_mode = ROCKCHIP_OUT_MODE_AAAA;
@@ -776,10 +766,11 @@ static int analogix_dp_connector_init(struct display_state *state)
 	return 0;
 }
 
-static int analogix_dp_connector_get_edid(struct display_state *state)
+static int analogix_dp_connector_get_edid(struct rockchip_connector *conn,
+					  struct display_state *state)
 {
 	struct connector_state *conn_state = &state->conn_state;
-	struct analogix_dp_device *dp = dev_get_priv(conn_state->dev);
+	struct analogix_dp_device *dp = dev_get_priv(conn->dev);
 	int ret;
 
 	ret = analogix_dp_handle_edid(dp);
@@ -839,13 +830,14 @@ static int analogix_dp_link_power_down(struct analogix_dp_device *dp)
 	return 0;
 }
 
-static int analogix_dp_connector_enable(struct display_state *state)
+static int analogix_dp_connector_enable(struct rockchip_connector *conn,
+					struct display_state *state)
 {
 	struct connector_state *conn_state = &state->conn_state;
 	struct crtc_state *crtc_state = &state->crtc_state;
-	const struct rockchip_connector *connector = conn_state->connector;
-	const struct rockchip_dp_chip_data *pdata = connector->data;
-	struct analogix_dp_device *dp = dev_get_priv(conn_state->dev);
+	const struct rockchip_dp_chip_data *pdata =
+		(const struct rockchip_dp_chip_data *)dev_get_driver_data(conn->dev);
+	struct analogix_dp_device *dp = dev_get_priv(conn->dev);
 	struct video_info *video = &dp->video_info;
 	u32 val;
 	int ret;
@@ -918,12 +910,12 @@ static int analogix_dp_connector_enable(struct display_state *state)
 	return 0;
 }
 
-static int analogix_dp_connector_disable(struct display_state *state)
+static int analogix_dp_connector_disable(struct rockchip_connector *conn,
+					 struct display_state *state)
 {
-	struct connector_state *conn_state = &state->conn_state;
-	const struct rockchip_connector *connector = conn_state->connector;
-	const struct rockchip_dp_chip_data *pdata = connector->data;
-	struct analogix_dp_device *dp = dev_get_priv(conn_state->dev);
+	const struct rockchip_dp_chip_data *pdata =
+		(const struct rockchip_dp_chip_data *)dev_get_driver_data(conn->dev);
+	struct analogix_dp_device *dp = dev_get_priv(conn->dev);
 
 	if (!analogix_dp_get_plug_in_status(dp))
 		analogix_dp_link_power_down(dp);
@@ -935,43 +927,15 @@ static int analogix_dp_connector_disable(struct display_state *state)
 	return 0;
 }
 
-static int analogix_dp_connector_detect(struct display_state *state)
+static int analogix_dp_connector_detect(struct rockchip_connector *conn,
+					struct display_state *state)
 {
-	struct connector_state *conn_state = &state->conn_state;
-	struct panel_state *panel_state = &state->panel_state;
-	struct analogix_dp_device *dp = dev_get_priv(conn_state->dev);
-	int ret;
+	struct analogix_dp_device *dp = dev_get_priv(conn->dev);
 
-	if (panel_state->panel)
-		rockchip_panel_prepare(panel_state->panel);
-
-	if (!analogix_dp_detect(dp))
-		goto unprepare_panel;
-
-	ret = analogix_dp_read_byte_from_dpcd(dp, DP_MAX_LINK_RATE,
-					      &dp->link_train.link_rate);
-	if (ret < 0) {
-		dev_err(dp->dev, "failed to read link rate: %d\n", ret);
-		goto unprepare_panel;
-	}
-
-	ret = analogix_dp_read_byte_from_dpcd(dp, DP_MAX_LANE_COUNT,
-					      &dp->link_train.lane_count);
-	if (ret < 0) {
-		dev_err(dp->dev, "failed to read lane count: %d\n", ret);
-		goto unprepare_panel;
-	}
-
-	return true;
-
-unprepare_panel:
-	if (panel_state->panel)
-		rockchip_panel_unprepare(panel_state->panel);
-	return false;
+	return analogix_dp_detect(dp);
 }
 
 static const struct rockchip_connector_funcs analogix_dp_connector_funcs = {
-	.pre_init = analogix_dp_connector_pre_init,
 	.init = analogix_dp_connector_init,
 	.get_edid = analogix_dp_connector_get_edid,
 	.enable = analogix_dp_connector_enable,
@@ -984,10 +948,29 @@ static int analogix_dp_parse_dt(struct analogix_dp_device *dp)
 	struct udevice *dev = dp->dev;
 	int len;
 	u32 num_lanes;
+	u32 max_link_rate;
 	int ret;
 
 	dp->force_hpd = dev_read_bool(dev, "force-hpd");
 	dp->video_bist_enable = dev_read_bool(dev, "analogix,video-bist-enable");
+	dp->video_info.force_stream_valid =
+		dev_read_bool(dev, "analogix,force-stream-valid");
+
+	max_link_rate = dev_read_u32_default(dev, "max-link-rate", 0);
+	if (max_link_rate) {
+		switch (max_link_rate) {
+		case 1620:
+		case 2700:
+		case 5400:
+			dp->video_info.max_link_rate =
+				min_t(u8, dp->video_info.max_link_rate,
+				      drm_dp_link_rate_to_bw_code(max_link_rate * 100));
+			break;
+		default:
+			dev_err(dev, "invalid max-link-rate %d\n", max_link_rate);
+			break;
+		}
+	}
 
 	if (dev_read_prop(dev, "data-lanes", &len)) {
 		num_lanes = len / sizeof(u32);
@@ -1015,9 +998,8 @@ static int analogix_dp_parse_dt(struct analogix_dp_device *dp)
 static int analogix_dp_probe(struct udevice *dev)
 {
 	struct analogix_dp_device *dp = dev_get_priv(dev);
-	const struct rockchip_connector *connector =
-		(const struct rockchip_connector *)dev_get_driver_data(dev);
-	const struct rockchip_dp_chip_data *pdata = connector->data;
+	const struct rockchip_dp_chip_data *pdata =
+		(const struct rockchip_dp_chip_data *)dev_get_driver_data(dev);
 	struct udevice *syscon;
 	int ret;
 
@@ -1065,6 +1047,9 @@ static int analogix_dp_probe(struct udevice *dev)
 		return ret;
 	}
 
+	rockchip_connector_bind(&dp->connector, dev, dp->id, &analogix_dp_connector_funcs,
+				NULL, DRM_MODE_CONNECTOR_eDP);
+
 	return 0;
 }
 
@@ -1078,21 +1063,11 @@ static const struct rockchip_dp_chip_data rk3288_edp_platform_data = {
 	.max_lane_count = 4,
 };
 
-static const struct rockchip_connector rk3288_edp_driver_data = {
-	 .funcs = &analogix_dp_connector_funcs,
-	 .data = &rk3288_edp_platform_data,
-};
-
 static const struct rockchip_dp_chip_data rk3368_edp_platform_data = {
 	.chip_type = RK3368_EDP,
 
 	.max_link_rate = DP_LINK_BW_2_7,
 	.max_lane_count = 4,
-};
-
-static const struct rockchip_connector rk3368_edp_driver_data = {
-	 .funcs = &analogix_dp_connector_funcs,
-	 .data = &rk3368_edp_platform_data,
 };
 
 static const struct rockchip_dp_chip_data rk3399_edp_platform_data = {
@@ -1105,22 +1080,12 @@ static const struct rockchip_dp_chip_data rk3399_edp_platform_data = {
 	.max_lane_count = 4,
 };
 
-static const struct rockchip_connector rk3399_edp_driver_data = {
-	 .funcs = &analogix_dp_connector_funcs,
-	 .data = &rk3399_edp_platform_data,
-};
-
 static const struct rockchip_dp_chip_data rk3568_edp_platform_data = {
 	.chip_type = RK3568_EDP,
 	.ssc = true,
 
 	.max_link_rate = DP_LINK_BW_2_7,
 	.max_lane_count = 4,
-};
-
-static const struct rockchip_connector rk3568_edp_driver_data = {
-	 .funcs = &analogix_dp_connector_funcs,
-	 .data = &rk3568_edp_platform_data,
 };
 
 static const struct rockchip_dp_chip_data rk3588_edp_platform_data = {
@@ -1131,27 +1096,22 @@ static const struct rockchip_dp_chip_data rk3588_edp_platform_data = {
 	.max_lane_count = 4,
 };
 
-static const struct rockchip_connector rk3588_edp_driver_data = {
-	 .funcs = &analogix_dp_connector_funcs,
-	 .data = &rk3588_edp_platform_data,
-};
-
 static const struct udevice_id analogix_dp_ids[] = {
 	{
 		.compatible = "rockchip,rk3288-dp",
-		.data = (ulong)&rk3288_edp_driver_data,
+		.data = (ulong)&rk3288_edp_platform_data,
 	}, {
 		.compatible = "rockchip,rk3368-edp",
-		.data = (ulong)&rk3368_edp_driver_data,
+		.data = (ulong)&rk3368_edp_platform_data,
 	}, {
 		.compatible = "rockchip,rk3399-edp",
-		.data = (ulong)&rk3399_edp_driver_data,
+		.data = (ulong)&rk3399_edp_platform_data,
 	}, {
 		.compatible = "rockchip,rk3568-edp",
-		.data = (ulong)&rk3568_edp_driver_data,
+		.data = (ulong)&rk3568_edp_platform_data,
 	}, {
 		.compatible = "rockchip,rk3588-edp",
-		.data = (ulong)&rk3588_edp_driver_data,
+		.data = (ulong)&rk3588_edp_platform_data,
 	},
 	{}
 };

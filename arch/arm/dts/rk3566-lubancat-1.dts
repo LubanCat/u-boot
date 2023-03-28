@@ -417,7 +417,7 @@
 	phy-mode = "rgmii";
 	clock_in_out = "output";
 
-	snps,reset-gpio = <&gpio2 RK_PB0 GPIO_ACTIVE_LOW>;
+	// snps,reset-gpio = <&gpio2 RK_PB0 GPIO_ACTIVE_LOW>;
 	snps,reset-active-low;
 	/* Reset time is 75ms, 100ms */
 	snps,reset-delays-us = <0 75000 100000>;

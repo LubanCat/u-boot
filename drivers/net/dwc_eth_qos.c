@@ -1173,7 +1173,8 @@ int eqos_init(struct udevice *dev)
 	while (limit--) {
 		if (!(readl(&eqos->dma_regs->mode) & EQOS_DMA_MODE_SWR))
 			break;
-		mdelay(10);
+		// mdelay(10);
+		mdelay(1000);
 	}
 
 	if (limit < 0) {

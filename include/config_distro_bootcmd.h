@@ -345,40 +345,6 @@
 	"boot_scripts=boot.scr.uimg boot.scr\0" \
 	"boot_script_dhcp=boot.scr.uimg\0" \
 	BOOTENV_BOOT_TARGETS \
-	"loaduEnv=" \
-		"echo load ${devtype} ${devnum}:${distro_bootpart} ${env_addr_r} /uEnv/uEnv.txt ...; "\
-		"load ${devtype} ${devnum}:${distro_bootpart} ${env_addr_r} /uEnv/uEnv.txt;\0" \
-	\
-	"importbootenv=" \
-		"echo Importing environment from ${devtype} ...; " \
-		"env import -t ${env_addr_r} 0x8000 \0" \
-	\
-	"loadfdtb="    \
-		"if test -e ${devtype} "       \
-				"${devnum}:${distro_bootpart} "    \
-				"/dtb/${dtb}; then "  \
-				"echo loading /dtb/${dtb};" \
-				"load ${devtype} ${devnum}:${distro_bootpart} ${fdt_addr_r} /dtb/${dtb};" \
-			"else "      \
-				"echo no serch ${dtb}, loading default rk-kernel.dtb;"\
-				"load ${devtype} ${devnum}:${distro_bootpart} ${fdt_addr_r} /rk-kernel.dtb;"\
-		"fi\0"   \
-	\
-	"scan_dev_for_lubancat="     \
-		"echo run loaduEnv ...; "\
-		"if run loaduEnv; then " \
-			"run importbootenv;" \
-			"echo loading ${devtype} ${devnum}:${distro_bootpart} ${kernel_addr_r} /Image-${uname_r} ...; "\
-			"load ${devtype} ${devnum}:${distro_bootpart} ${kernel_addr_r} /Image-${uname_r};"\
-			"run loadfdtb;" \
-			"setenv dev_bootpart ${devnum}:${distro_bootpart};" \
-			"dtfile ${fdt_addr_r} ${fdt_over_addr}  /uEnv/uEnv.txt ${env_addr_r};"   \
-			"echo debug: [${devtype} ${devnum}:${distro_bootpart}] ... ;" \
-			"echo debug: [booti] ...  ;" \
-			"booti ${kernel_addr_r} - ${fdt_addr_r};"	\
-		"fi;"                    \
-		"echo SCRIPT FAILED: continuing...; \0"       \
-	\
 	"boot_extlinux="                                                  \
 		"sysboot ${devtype} ${devnum}:${distro_bootpart} any "    \
 			"${scriptaddr} ${prefix}extlinux/extlinux.conf\0" \
@@ -413,9 +379,8 @@
 		"echo Scanning ${devtype} "                               \
 				"${devnum}:${distro_bootpart}...; "       \
 		"for prefix in ${boot_prefixes}; do "                     \
-			"run scan_dev_for_lubancat; "                     \
-			"run scan_dev_for_extlinux; "                     \
 			"run scan_dev_for_scripts; "                      \
+			"run scan_dev_for_extlinux; "                     \
 		"done;"                                                   \
 		SCAN_DEV_FOR_EFI                                          \
 		"\0"                                                      \

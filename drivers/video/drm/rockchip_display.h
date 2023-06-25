@@ -354,6 +354,8 @@ bool drm_mode_is_420_also(const struct drm_display_info *display,
 			  struct drm_display_mode *mode);
 bool drm_mode_is_420(const struct drm_display_info *display,
 		     struct drm_display_mode *mode);
+bool drm_mode_is_420_only(const struct drm_display_info *display,
+		     struct drm_display_mode *mode);
 struct base2_disp_info *rockchip_get_disp_info(int type, int id);
 
 void drm_mode_max_resolution_filter(struct hdmi_edid_data *edid_data,

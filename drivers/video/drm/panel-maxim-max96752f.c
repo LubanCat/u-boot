@@ -219,8 +219,78 @@ static const struct panel_desc boe_av156fht_l83 = {
 	.backlight_disable	= boe_av156fht_l83_panel_backlight_disable,
 };
 
+static int hannstar_hsd123jpw3_a15_prepare(struct max96752f *max96752f)
+{
+	maxim_deserializer_write(max96752f, 0x0002, 0x43);
+	maxim_deserializer_write(max96752f, 0x0140, 0x20);
+	maxim_deserializer_write(max96752f, 0x01ce, 0x5e);
+
+	maxim_deserializer_write(max96752f, 0x0203, 0x83);	/* GPIO1  <- TP_INT */
+	maxim_deserializer_write(max96752f, 0x0206, 0x84);      /* GPIO2  -> TP_RST */
+	maxim_deserializer_write(max96752f, 0x0224, 0x84);	/* GPIO12 -> LCD_BL_PWM */
+
+	return 0;
+}
+
+static int hannstar_hsd123jpw3_a15_unprepare(struct max96752f *max96752f)
+{
+	return 0;
+}
+
+static int hannstar_hsd123jpw3_a15_enable(struct max96752f *max96752f)
+{
+	maxim_deserializer_write(max96752f, 0x0221, 0x10);	/* GPIO11 -> LCD_RESET */
+	mdelay(20);
+
+	return 0;
+}
+
+static int hannstar_hsd123jpw3_a15_disable(struct max96752f *max96752f)
+{
+	maxim_deserializer_write(max96752f, 0x0221, 0x00);	/* GPIO11 -> LCD_RESET */
+	mdelay(20);
+
+	return 0;
+}
+
+static const struct panel_desc hannstar_hsd123jpw3_a15 = {
+	.name			= "hannstar,hsd123jpw3-a15",
+	.prepare		= hannstar_hsd123jpw3_a15_prepare,
+	.unprepare		= hannstar_hsd123jpw3_a15_unprepare,
+	.enable			= hannstar_hsd123jpw3_a15_enable,
+	.disable		= hannstar_hsd123jpw3_a15_disable,
+};
+
+static int ogm_101fhbllm01_prepare(struct max96752f *max96752f)
+{
+	maxim_deserializer_write(max96752f, 0x01ce, 0x5e);
+
+	maxim_deserializer_write(max96752f, 0x0203, 0x84);	/* GPIO1 -> BL_PWM */
+	maxim_deserializer_write(max96752f, 0x0206, 0x84);	/* GPIO2 -> TP_RST */
+	maxim_deserializer_write(max96752f, 0x0209, 0x83);	/* GPIO3 <- TP_INT */
+
+	maxim_deserializer_write(max96752f, 0x0001, 0x02);
+
+	return 0;
+}
+
+static int ogm_101fhbllm01_unprepare(struct max96752f *max96752f)
+{
+	maxim_deserializer_write(max96752f, 0x0001, 0x01);
+
+	return 0;
+}
+
+static const struct panel_desc ogm_101fhbllm01 = {
+	.name			= "ogm,101fhbllm01",
+	.prepare		= ogm_101fhbllm01_prepare,
+	.unprepare		= ogm_101fhbllm01_unprepare,
+};
+
 static const struct udevice_id max96752f_of_match[] = {
 	{ .compatible = "boe,av156fht-l83", .data = (ulong)&boe_av156fht_l83 },
+	{ .compatible = "hannstar,hsd123jpw3-a15", .data = (ulong)&hannstar_hsd123jpw3_a15 },
+	{ .compatible = "ogm,101fhbllm01", .data = (ulong)&ogm_101fhbllm01 },
 	{}
 };
 

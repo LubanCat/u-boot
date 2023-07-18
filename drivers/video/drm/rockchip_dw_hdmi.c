@@ -188,7 +188,7 @@ static const struct dw_hdmi_curr_ctrl rockchip_cur_ctr[] = {
 	}
 };
 
-static const struct dw_hdmi_phy_config rockchip_phy_config[] = {
+static struct dw_hdmi_phy_config rockchip_phy_config[] = {
 	/*pixelclk   symbol   term   vlev*/
 	{ 74250000,  0x8009, 0x0004, 0x0272},
 	{ 165000000, 0x802b, 0x0004, 0x0209},
@@ -478,6 +478,7 @@ void dw_hdmi_set_iomux(void *grf, void *gpio_base, struct gpio_desc *hpd_gpiod,
 		       int dev_type)
 {
 	u32 val = 0;
+	int i = 400;
 
 	switch (dev_type) {
 	case RK3328_HDMI:
@@ -498,8 +499,14 @@ void dw_hdmi_set_iomux(void *grf, void *gpio_base, struct gpio_desc *hpd_gpiod,
 		/* gpio0_a2's input enable is controlled by gpio output data bit */
 		writel(RK3528_GPIO0_A2_DR, gpio_base + RK3528_GPIO_SWPORT_DR_L);
 
-		if (dm_gpio_is_valid(hpd_gpiod))
-			val = dm_gpio_get_value(hpd_gpiod);
+		if (dm_gpio_is_valid(hpd_gpiod)) {
+			while (i--) {
+				val = dm_gpio_get_value(hpd_gpiod);
+				if (val)
+					break;
+				mdelay(5);
+			}
+		}
 
 		if (val)
 			val = RK3528_HDMI_SNKDET | BIT(5);

@@ -155,6 +155,7 @@ struct base2_disp_info *rockchip_get_disp_info(int type, int id)
 	struct base2_disp_header *disp_header;
 	int i = 0, offset = -1;
 	u32 crc_val;
+	u32 base2_length;
 	void *base_parameter_addr = (void *)&base_parameter;
 
 	for (i = 0; i < 8; i++) {
@@ -181,11 +182,23 @@ struct base2_disp_info *rockchip_get_disp_info(int type, int id)
 	if (strncasecmp(disp_info->disp_head_flag, "DISP", 4))
 		return NULL;
 
-	crc_val = rockchip_display_crc32c_cal((unsigned char *)disp_info, sizeof(struct base2_disp_info) - 4);
-
-	if (crc_val != disp_info->crc) {
-		printf("error: connector type[%d], id[%d] disp info crc check error\n", type, id);
-		return NULL;
+	if (base_parameter.major_version == 3 && base_parameter.minor_version == 0) {
+		crc_val = rockchip_display_crc32c_cal((unsigned char *)disp_info,
+						      sizeof(struct base2_disp_info) - 4);
+		if (crc_val != disp_info->crc2) {
+			printf("error: connector type[%d], id[%d] disp info crc2 check error\n",
+			       type, id);
+			return NULL;
+		}
+	} else {
+		base2_length = sizeof(struct base2_disp_info) - sizeof(struct csc_info) -
+			       sizeof(struct acm_data) - 10 * 1024 - 4;
+		crc_val = rockchip_display_crc32c_cal((unsigned char *)disp_info, base2_length - 4);
+		if (crc_val != disp_info->crc) {
+			printf("error: connector type[%d], id[%d] disp info crc check error\n",
+			       type, id);
+			return NULL;
+		}
 	}
 
 	return disp_info;
@@ -462,11 +475,20 @@ static int display_get_timing_from_dts(struct rockchip_panel *panel,
 				       struct drm_display_mode *mode)
 {
 	struct ofnode_phandle_args args;
-	ofnode dt, timing;
+	ofnode dt, timing, mcu_panel;
 	int ret;
 
+	mcu_panel = dev_read_subnode(panel->dev, "mcu-panel");
 	dt = dev_read_subnode(panel->dev, "display-timings");
 	if (ofnode_valid(dt)) {
+		ret = ofnode_parse_phandle_with_args(dt, "native-mode", NULL,
+						     0, 0, &args);
+		if (ret)
+			return ret;
+
+		timing = args.node;
+	} else if (ofnode_valid(mcu_panel)) {
+		dt = ofnode_find_subnode(mcu_panel, "display-timings");
 		ret = ofnode_parse_phandle_with_args(dt, "native-mode", NULL,
 						     0, 0, &args);
 		if (ret)
@@ -733,6 +755,31 @@ static int display_get_edid_mode(struct display_state *state)
 	return ret;
 }
 
+static int display_mode_valid(struct display_state *state)
+{
+	struct connector_state *conn_state = &state->conn_state;
+	struct rockchip_connector *conn = conn_state->connector;
+	const struct rockchip_connector_funcs *conn_funcs = conn->funcs;
+	struct crtc_state *crtc_state = &state->crtc_state;
+	const struct rockchip_crtc *crtc = crtc_state->crtc;
+	const struct rockchip_crtc_funcs *crtc_funcs = crtc->funcs;
+	int ret;
+
+	if (conn_funcs->mode_valid) {
+		ret = conn_funcs->mode_valid(conn, state);
+		if (ret)
+			return ret;
+	}
+
+	if (crtc_funcs->mode_valid) {
+		ret = crtc_funcs->mode_valid(state);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 static int display_init(struct display_state *state)
 {
 	struct connector_state *conn_state = &state->conn_state;
@@ -855,6 +902,9 @@ static int display_init(struct display_state *state)
 		goto deinit;
 	if (state->force_output)
 		display_use_force_mode(state);
+
+	if (display_mode_valid(state))
+		goto deinit;
 
 	/* rk356x series drive mipi pixdata on posedge */
 	compatible = dev_read_string(conn->dev, "compatible");
@@ -1081,38 +1131,6 @@ check_fail:
 	return ret;
 }
 
-static int display_mode_valid(struct display_state *state)
-{
-	struct connector_state *conn_state = &state->conn_state;
-	struct rockchip_connector *conn = conn_state->connector;
-	const struct rockchip_connector_funcs *conn_funcs = conn->funcs;
-	struct crtc_state *crtc_state = &state->crtc_state;
-	const struct rockchip_crtc *crtc = crtc_state->crtc;
-	const struct rockchip_crtc_funcs *crtc_funcs = crtc->funcs;
-	int ret;
-
-	if (!state->is_init)
-		return 0;
-
-	if (conn_funcs->mode_valid) {
-		ret = conn_funcs->mode_valid(conn, state);
-		if (ret)
-			goto invalid_mode;
-	}
-
-	if (crtc_funcs->mode_valid) {
-		ret = crtc_funcs->mode_valid(state);
-		if (ret)
-			goto invalid_mode;
-	}
-
-	return 0;
-
-invalid_mode:
-	state->is_init = false;
-	return ret;
-}
-
 static int display_logo(struct display_state *state)
 {
 	struct crtc_state *crtc_state = &state->crtc_state;
@@ -1173,7 +1191,6 @@ static int display_logo(struct display_state *state)
 		}
 	}
 
-	display_mode_valid(state);
 	display_check(state);
 	display_set_plane(state);
 	display_enable(state);
@@ -1592,6 +1609,35 @@ int rockchip_show_logo(void)
 	return ret;
 }
 
+int rockchip_vop_dump(const char *cmd)
+{
+	struct display_state *state;
+	struct crtc_state *crtc_state;
+	struct rockchip_crtc *crtc;
+	const struct rockchip_crtc_funcs *crtc_funcs;
+	int ret = -EINVAL;
+
+	list_for_each_entry(state, &rockchip_display_list, head) {
+		if (!state->is_init)
+			continue;
+		crtc_state = &state->crtc_state;
+		crtc = crtc_state->crtc;
+		crtc_funcs = crtc->funcs;
+
+		if (!cmd)
+			ret = crtc_funcs->active_regs_dump(state);
+		else if (!strcmp(cmd, "a") || !strcmp(cmd, "all"))
+			ret = crtc_funcs->regs_dump(state);
+		if (!ret)
+			break;
+	}
+
+	if (ret)
+		ret = CMD_RET_USAGE;
+
+	return ret;
+}
+
 enum {
 	PORT_DIR_IN,
 	PORT_DIR_OUT,
@@ -1633,13 +1679,12 @@ static const struct device_node *rockchip_of_graph_get_port_parent(ofnode port)
 	return ofnode_to_np(parent);
 }
 
-static const struct device_node *rockchip_of_graph_get_remote_node(ofnode node, int port,
-								   int endpoint)
+const struct device_node *
+rockchip_of_graph_get_endpoint_by_regs(ofnode node, int port, int endpoint)
 {
 	const struct device_node *port_node;
 	ofnode ep;
 	u32 reg;
-	uint phandle;
 
 	port_node = rockchip_of_graph_get_port_by_id(node, port);
 	if (!port_node)
@@ -1655,7 +1700,21 @@ static const struct device_node *rockchip_of_graph_get_remote_node(ofnode node, 
 	if (!ofnode_valid(ep))
 		return NULL;
 
-	if (ofnode_read_u32(ep, "remote-endpoint", &phandle))
+	return ofnode_to_np(ep);
+}
+
+static const struct device_node *
+rockchip_of_graph_get_remote_node(ofnode node, int port, int endpoint)
+{
+	const struct device_node *ep_node;
+	ofnode ep;
+	uint phandle;
+
+	ep_node = rockchip_of_graph_get_endpoint_by_regs(node, port, endpoint);
+	if (!ep_node)
+		return NULL;
+
+	if (ofnode_read_u32(np_to_ofnode(ep_node), "remote-endpoint", &phandle))
 		return NULL;
 
 	ep = ofnode_get_by_phandle(phandle);
@@ -1739,6 +1798,10 @@ static int rockchip_of_find_panel_or_bridge(struct udevice *dev, struct rockchip
 					    struct rockchip_bridge **bridge)
 {
 	int ret = 0;
+
+	if (*panel)
+		return 0;
+
 	*panel = NULL;
 	*bridge = NULL;
 
@@ -2206,12 +2269,21 @@ void rockchip_display_fixup(void *blob)
 	const struct rockchip_crtc *crtc;
 	struct display_state *s;
 	int offset;
+	int ret;
 	const struct device_node *np;
 	const char *path;
+	const char *cacm_header;
 
 	if (fdt_node_offset_by_compatible(blob, 0, "rockchip,drm-logo") >= 0) {
-		list_for_each_entry(s, &rockchip_display_list, head)
-			load_bmp_logo(&s->logo, s->klogo_name);
+		list_for_each_entry(s, &rockchip_display_list, head) {
+			ret = load_bmp_logo(&s->logo, s->klogo_name);
+			if (ret < 0) {
+				s->is_klogo_valid = false;
+				printf("VP%d fail to load kernel logo\n", s->crtc_state.crtc_id);
+			} else {
+				s->is_klogo_valid = true;
+			}
+		}
 
 		if (!get_display_size())
 			return;
@@ -2242,7 +2314,14 @@ void rockchip_display_fixup(void *blob)
 	}
 
 	list_for_each_entry(s, &rockchip_display_list, head) {
-		if (!s->is_init)
+		/*
+		 * If plane mask is not set in dts, fixup dts to assign it
+		 * whether crtc is initialized or not.
+		 */
+		if (s->crtc_state.crtc->funcs->fixup_dts && !s->crtc_state.crtc->assign_plane)
+			s->crtc_state.crtc->funcs->fixup_dts(s, blob);
+
+		if (!s->is_init || !s->is_klogo_valid)
 			continue;
 
 		conn = s->conn_state.connector;
@@ -2268,9 +2347,6 @@ void rockchip_display_fixup(void *blob)
 			printf("failed to get exist crtc\n");
 			continue;
 		}
-
-		if (crtc_funcs->fixup_dts)
-			crtc_funcs->fixup_dts(s, blob);
 
 		np = ofnode_to_np(s->node);
 		path = np->full_name;
@@ -2300,10 +2376,37 @@ void rockchip_display_fixup(void *blob)
 		FDT_SET_U32("overscan,bottom_margin", s->conn_state.overscan.bottom_margin);
 
 		if (s->conn_state.disp_info) {
+			cacm_header = (const char*)&s->conn_state.disp_info->cacm_header;
+
 			FDT_SET_U32("bcsh,brightness", s->conn_state.disp_info->bcsh_info.brightness);
 			FDT_SET_U32("bcsh,contrast", s->conn_state.disp_info->bcsh_info.contrast);
 			FDT_SET_U32("bcsh,saturation", s->conn_state.disp_info->bcsh_info.saturation);
 			FDT_SET_U32("bcsh,hue", s->conn_state.disp_info->bcsh_info.hue);
+
+			if (!strncasecmp(cacm_header, "CACM", 4)) {
+				FDT_SET_U32("post_csc,hue",
+					    s->conn_state.disp_info->csc_info.hue);
+				FDT_SET_U32("post_csc,saturation",
+					    s->conn_state.disp_info->csc_info.saturation);
+				FDT_SET_U32("post_csc,contrast",
+					    s->conn_state.disp_info->csc_info.contrast);
+				FDT_SET_U32("post_csc,brightness",
+					    s->conn_state.disp_info->csc_info.brightness);
+				FDT_SET_U32("post_csc,r_gain",
+					    s->conn_state.disp_info->csc_info.r_gain);
+				FDT_SET_U32("post_csc,g_gain",
+					    s->conn_state.disp_info->csc_info.g_gain);
+				FDT_SET_U32("post_csc,b_gain",
+					    s->conn_state.disp_info->csc_info.b_gain);
+				FDT_SET_U32("post_csc,r_offset",
+					    s->conn_state.disp_info->csc_info.r_offset);
+				FDT_SET_U32("post_csc,g_offset",
+					    s->conn_state.disp_info->csc_info.g_offset);
+				FDT_SET_U32("post_csc,b_offset",
+					    s->conn_state.disp_info->csc_info.b_offset);
+				FDT_SET_U32("post_csc,csc_enable",
+					    s->conn_state.disp_info->csc_info.csc_enable);
+			}
 		}
 
 		if (s->conn_state.disp_info->cubic_lut_data.size &&
@@ -2358,6 +2461,19 @@ static int do_rockchip_show_bmp(cmd_tbl_t *cmdtp, int flag, int argc,
 	return 0;
 }
 
+static int do_rockchip_vop_dump(cmd_tbl_t *cmdtp, int flag, int argc,
+				char *const argv[])
+{
+	int ret;
+
+	if (argc < 1 || argc > 2)
+		return CMD_RET_USAGE;
+
+	ret = rockchip_vop_dump(argv[1]);
+
+	return ret;
+}
+
 U_BOOT_CMD(
 	rockchip_show_logo, 1, 1, do_rockchip_logo_show,
 	"load and display log from resource partition",
@@ -2368,4 +2484,10 @@ U_BOOT_CMD(
 	rockchip_show_bmp, 2, 1, do_rockchip_show_bmp,
 	"load and display bmp from resource partition",
 	"    <bmp_name>"
+);
+
+U_BOOT_CMD(
+	vop_dump, 2, 1, do_rockchip_vop_dump,
+	"dump vop regs",
+	" [a/all]"
 );

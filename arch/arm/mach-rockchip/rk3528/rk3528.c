@@ -14,11 +14,13 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 #define FIREWALL_DDR_BASE	0xff2e0000
+#define FW_DDR_MST1_REG 	0x44
 #define FW_DDR_MST6_REG 	0x58
 #define FW_DDR_MST7_REG 	0x5c
 #define FW_DDR_MST11_REG 	0x6c
 #define FW_DDR_MST14_REG	0x78
 #define FW_DDR_MST16_REG 	0x80
+#define FW_DDR_MST_REG		0xf0
 
 #define PMU_SGRF_BASE		0xff440000
 #define PMU_SGRF_SOC_CON4	0x10
@@ -31,10 +33,9 @@ DECLARE_GLOBAL_DATA_PTR;
 #define PMU_CRU_GATE_CON00	0x800
 #define PMU_CRU_SOFTRST_CON00	0xa00
 
-#define VPU_IOC_BASE		0xff560000
-#define GPIO1C_IOMUX_SEL_1	0x034
-#define GPIO1D_IOMUX_SEL_0	0x038
-#define GPIO1D_IOMUX_SEL_1	0x03c
+#define GPIO1C_IOMUX_SEL_H	0x034
+#define GPIO1D_IOMUX_SEL_L	0x038
+#define GPIO1D_IOMUX_SEL_H	0x03c
 
 #define CPU_PRIORITY_REG	0xff210008
 #define QOS_PRIORITY_LEVEL(h, l)	((((h) & 7) << 8) | ((l) & 7))
@@ -70,6 +71,13 @@ struct mm_region *mem_map = rk3528_mem_map;
 #define	GPIO2_IOC_BASE			0xFF570000
 #define	GPIO3_IOC_BASE			0xFF560000
 #define	GPIO4_IOC_BASE			0xFF550000
+
+#define GPIO1_IOC_GPIO1D_IOMUX_SEL_L	(GPIO1_IOC_BASE + 0x38)
+#define GPIO1_IOC_GPIO1C_DS_2		(GPIO1_IOC_BASE + 0x148)
+#define GPIO1_IOC_GPIO1C_DS_3		(GPIO1_IOC_BASE + 0x14C)
+#define GPIO1_IOC_GPIO1D_DS_0		(GPIO1_IOC_BASE + 0x150)
+#define GPIO1_IOC_GPIO1D_DS_1		(GPIO1_IOC_BASE + 0x154)
+#define GPIO1_IOC_GPIO1D_DS_2		(GPIO1_IOC_BASE + 0x158)
 
 /* uart0 iomux */
 /* gpio4c7 */
@@ -378,6 +386,10 @@ int arch_cpu_init(void)
 	val = readl(FIREWALL_DDR_BASE + FW_DDR_MST14_REG);
 	writel(val & 0x0000ffff, FIREWALL_DDR_BASE + FW_DDR_MST14_REG);
 
+	/* Set the crypto to access ddr memory */
+	val = readl(FIREWALL_DDR_BASE + FW_DDR_MST1_REG);
+	writel(val & 0x0000ffff, FIREWALL_DDR_BASE + FW_DDR_MST1_REG);
+
 #if defined(CONFIG_ROCKCHIP_SFC)
 	/* Set the fspi to access ddr memory */
 	val = readl(FIREWALL_DDR_BASE + FW_DDR_MST7_REG);
@@ -390,6 +402,20 @@ int arch_cpu_init(void)
 	 */
 	writel(QOS_PRIORITY_LEVEL(2, 2), CPU_PRIORITY_REG);
 #endif
+
+	if (readl(GPIO1_IOC_GPIO1D_IOMUX_SEL_L) == 0x1111) {
+	       /*
+		* set the emmc io drive strength:
+		* data and cmd: level 3
+		* clock: level 5
+		*/
+	       writel(0x3F3F0F0F, GPIO1_IOC_GPIO1C_DS_2);
+	       writel(0x3F3F0F0F, GPIO1_IOC_GPIO1C_DS_3);
+	       writel(0x3F3F0F0F, GPIO1_IOC_GPIO1D_DS_0);
+	       writel(0x3F3F0F0F, GPIO1_IOC_GPIO1D_DS_1);
+	       writel(0x3F3F3F0F, GPIO1_IOC_GPIO1D_DS_2);
+	}
+
 #elif defined(CONFIG_SUPPORT_USBPLUG)
 	u32 val;
 
@@ -402,9 +428,9 @@ int arch_cpu_init(void)
 	writel(val & 0x0000ffff, FIREWALL_DDR_BASE + FW_DDR_MST6_REG);
 
 	/* Set emmc iomux */
-	writel(0xffff1111, VPU_IOC_BASE + GPIO1C_IOMUX_SEL_1);
-	writel(0xffff1111, VPU_IOC_BASE + GPIO1D_IOMUX_SEL_0);
-	writel(0xffff1111, VPU_IOC_BASE + GPIO1D_IOMUX_SEL_1);
+	writel(0xffff1111, GPIO1_IOC_BASE + GPIO1C_IOMUX_SEL_H);
+	writel(0xffff1111, GPIO1_IOC_BASE + GPIO1D_IOMUX_SEL_L);
+	writel(0xffff1111, GPIO1_IOC_BASE + GPIO1D_IOMUX_SEL_H);
 
 #if defined(CONFIG_ROCKCHIP_SFC)
 	/* Set the fspi to access ddr memory */
@@ -412,9 +438,9 @@ int arch_cpu_init(void)
 	writel(val & 0xFFFF0000uL, FIREWALL_DDR_BASE + FW_DDR_MST7_REG);
 
 	/* Set fspi iomux */
-	writel(0xffff2222, VPU_IOC_BASE + GPIO1C_IOMUX_SEL_1);
-	writel(0x000f0002, VPU_IOC_BASE + GPIO1D_IOMUX_SEL_0);
-	writel(0x00f00020, VPU_IOC_BASE + GPIO1D_IOMUX_SEL_1);
+	writel(0xffff2222, GPIO1_IOC_BASE + GPIO1C_IOMUX_SEL_H);
+	writel(0x000f0002, GPIO1_IOC_BASE + GPIO1D_IOMUX_SEL_L);
+	writel(0x00f00020, GPIO1_IOC_BASE + GPIO1D_IOMUX_SEL_H);
 #endif
 
 #endif
@@ -431,14 +457,15 @@ int spl_fit_standalone_release(char *id, uintptr_t entry_point)
 	/* set the mcu to access ddr memory */
 	val = readl(FIREWALL_DDR_BASE + FW_DDR_MST11_REG);
 	writel(val & 0x0000ffff, FIREWALL_DDR_BASE + FW_DDR_MST11_REG);
+	/* writel(0x00000000, FIREWALL_DDR_BASE + FW_DDR_MST_REG); */
 	/* set the mcu to secure */
 	writel(0x00200000, PMU_SGRF_BASE + PMU_SGRF_SOC_CON4);
 	/* open mcu_debug_en / mcu_dclk_en / mcu_hclk_en / mcu_sclk_en */
 	writel(0x000f000f, PMU_SGRF_BASE + PMU_SGRF_SOC_CON5);
 	/* set start addr, mcu_code_addr_start */
 	writel(0xffff0000 | (entry_point >> 16), PMU_SGRF_BASE + PMU_SGRF_SOC_CON6);
-	/* mcu_tcm_addr_start */
-	writel(0xffff2000, PMU_SGRF_BASE + PMU_SGRF_SOC_CON11);
+	/* mcu_tcm_addr_start, multiplex pmu sram address */
+	writel(0xffffff10, PMU_SGRF_BASE + PMU_SGRF_SOC_CON11);
 	/* jtag_mcu_m0 gpio2a4/gpio2a5 iomux */
 	/* writel(0x00ff0022, GPIO2_IOC_BASE + 0x44); */
 	/* release the mcu */
@@ -447,3 +474,4 @@ int spl_fit_standalone_release(char *id, uintptr_t entry_point)
 	return 0;
 }
 #endif
+

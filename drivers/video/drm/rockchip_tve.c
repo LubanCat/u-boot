@@ -93,7 +93,7 @@ static struct env_config pal_tve_config[] = {
 	{ TVE_MODE_CTRL, 0x010ab906 },
 	{ TVE_HOR_TIMING1, 0x00c28381 },
 	{ TVE_HOR_TIMING2, 0x267d111d },
-	{ TVE_HOR_TIMING3, 0x76c00880 },
+	{ TVE_HOR_TIMING3, 0x66c00880 },
 	{ TVE_SUB_CAR_FRQ, 0x2a098acb },
 	{ TVE_IMAGE_POSITION, 0x001500f6 },
 	{ TVE_ROUTING, 0x10008882 },
@@ -103,9 +103,9 @@ static struct env_config pal_tve_config[] = {
 	{ TVE_INTR_STATUS, 0x00000000 },
 	{ TVE_INTR_EN, 0x00000000 },
 	{ TVE_INTR_CLR, 0x00000000 },
-	{ TVE_COLOR_BUSRT_SAT, 0x00366044 },
+	{ TVE_COLOR_BUSRT_SAT, 0x00356245 },
 	{ TVE_CHROMA_BANDWIDTH, 0x00000022 },
-	{ TVE_BRIGHTNESS_CONTRAST, 0x0000a300 },
+	{ TVE_BRIGHTNESS_CONTRAST, 0x0000aa00 },
 	{ TVE_CLAMP, 0x00000000 },
 };
 
@@ -300,6 +300,8 @@ static void dac_enable(struct rockchip_tve *tve, bool enable)
 			tve_dac_writel(VDAC_CLK_RST, v_ANALOG_RST(0) | v_DIGITAL_RST(0));
 			mdelay(20);
 			tve_dac_writel(VDAC_CLK_RST, v_ANALOG_RST(1) | v_DIGITAL_RST(1));
+
+			tve_dac_writel(VDAC_CURRENT_CTRL, v_OUT_CURRENT(0xd2));
 
 			val = v_REF_VOLTAGE(7) | v_DAC_PWN(1) | v_BIAS_PWN(1);
 			offset = VDAC_PWM_REF_CTRL;
@@ -555,6 +557,8 @@ static int rockchip_drm_tve_init(struct rockchip_connector *conn, struct display
 		conn_state->output_if |= VOP_OUTPUT_IF_BT656;
 	conn_state->color_space = V4L2_COLORSPACE_SMPTE170M;
 
+	conn_state->disp_info = rockchip_get_disp_info(conn_state->type, 0);
+
 	if (tve->soc_type == SOC_RK3528)
 		ret = tve_parse_dt(tve);
 	else
@@ -638,19 +642,24 @@ static int rockchip_drm_tve_detect(struct rockchip_connector *conn, struct displ
 	return 1;
 }
 
-static void tve_selete_output(struct rockchip_tve *tve, struct overscan *overscan,
+static void tve_select_output(struct rockchip_tve *tve, struct connector_state *conn_state,
 			      struct drm_display_mode *mode)
 {
 	int ret, i, screen_size;
 	struct base_screen_info *screen_info = NULL;
+	struct base2_screen_info *screen_info2 = NULL;
 	struct base_disp_info base_parameter;
+	struct base2_disp_info *base2_parameter = conn_state->disp_info;
 	struct drm_display_mode modes[2];
 	const struct base_overscan *scan;
+	struct overscan *overscan = &conn_state->overscan;
 	char baseparameter_buf[8 * RK_BLK_SIZE] __aligned(ARCH_DMA_MINALIGN);
 	struct blk_desc *dev_desc;
 	disk_partition_t part_info;
 	int max_scan = 100;
 	int min_scan = 50;
+	int offset = 0;
+	bool found = false;
 
 	for (i = 0; i < 2; i++) {
 		modes[i] = tve_modes[i];
@@ -659,54 +668,97 @@ static void tve_selete_output(struct rockchip_tve *tve, struct overscan *oversca
 	}
 	*mode = modes[tve->preferred_mode];
 
-	dev_desc = rockchip_get_bootdev();
-	if (!dev_desc) {
-		printf("%s: Could not find device\n", __func__);
-		return;
-	}
-
-	if (part_get_info_by_name(dev_desc, "baseparameter", &part_info) < 0) {
-		printf("Could not find baseparameter partition\n");
-		return;
-	}
-
-	ret = blk_dread(dev_desc, part_info.start, 1, (void *)baseparameter_buf);
-	if (ret < 0) {
-		printf("read baseparameter failed\n");
-		return;
-	}
-
-	memcpy(&base_parameter, baseparameter_buf, sizeof(base_parameter));
-	scan = &base_parameter.scan;
-
-	screen_size = sizeof(base_parameter.screen_list) / sizeof(base_parameter.screen_list[0]);
-
-	for (i = 0; i < screen_size; i++) {
-		if (base_parameter.screen_list[i].type == DRM_MODE_CONNECTOR_TV) {
-			screen_info = &base_parameter.screen_list[i];
-			break;
+	if (!base2_parameter) {
+		dev_desc = rockchip_get_bootdev();
+		if (!dev_desc) {
+			printf("%s: Could not find device\n", __func__);
+			goto null_basep;
 		}
+
+		ret = part_get_info_by_name(dev_desc, "baseparameter",
+					    &part_info);
+		if (ret < 0) {
+			printf("Could not find baseparameter partition\n");
+			goto null_basep;
+		}
+
+read_aux:
+		ret = blk_dread(dev_desc, part_info.start + offset, 1,
+				(void *)baseparameter_buf);
+		if (ret < 0) {
+			printf("read baseparameter failed\n");
+			goto null_basep;
+		}
+
+		memcpy(&base_parameter, baseparameter_buf,
+		       sizeof(base_parameter));
+		scan = &base_parameter.scan;
+
+		screen_size = sizeof(base_parameter.screen_list) /
+			sizeof(base_parameter.screen_list[0]);
+
+		for (i = 0; i < screen_size; i++) {
+			if (base_parameter.screen_list[i].type ==
+			    DRM_MODE_CONNECTOR_TV) {
+				found = true;
+				screen_info = &base_parameter.screen_list[i];
+				break;
+			}
+		}
+
+		if (!found && !offset) {
+			printf("cvbs info isn't saved in main block\n");
+			offset += 16;
+			goto read_aux;
+		}
+	} else {
+		scan = &base2_parameter->overscan_info;
+		screen_size = sizeof(base2_parameter->screen_info) /
+			sizeof(base2_parameter->screen_info[0]);
+
+		for (i = 0; i < screen_size; i++) {
+			if (base2_parameter->screen_info[i].type ==
+			    DRM_MODE_CONNECTOR_TV) {
+				screen_info2 =
+					&base2_parameter->screen_info[i];
+				break;
+			}
+		}
+		screen_info = malloc(sizeof(*screen_info));
+
+		screen_info->type = screen_info2->type;
+		screen_info->mode = screen_info2->resolution;
+		screen_info->format = screen_info2->format;
+		screen_info->depth = screen_info2->depthc;
+		screen_info->feature = screen_info2->feature;
 	}
 
-	if (scan->leftscale < min_scan || scan->leftscale > max_scan)
-		overscan->left_margin = max_scan;
-	else
+	if (scan->leftscale < min_scan && scan->leftscale > 0)
+		overscan->left_margin = min_scan;
+	else if (scan->leftscale < max_scan && scan->leftscale > 0)
 		overscan->left_margin = scan->leftscale;
 
-	if (scan->rightscale < min_scan || scan->rightscale > max_scan)
-		overscan->right_margin = max_scan;
-	else
+	if (scan->rightscale < min_scan && scan->rightscale > 0)
+		overscan->right_margin = min_scan;
+	else if (scan->rightscale < max_scan && scan->rightscale > 0)
 		overscan->right_margin = scan->rightscale;
 
-	if (scan->topscale < min_scan || scan->topscale > max_scan)
-		overscan->top_margin = max_scan;
-	else
+	if (scan->topscale < min_scan && scan->topscale > 0)
+		overscan->top_margin = min_scan;
+	else if (scan->topscale < max_scan && scan->topscale > 0)
 		overscan->top_margin = scan->topscale;
 
-	if (scan->bottomscale < min_scan || scan->bottomscale > max_scan)
-		overscan->bottom_margin = max_scan;
-	else
+	if (scan->bottomscale < min_scan && scan->bottomscale > 0)
+		overscan->bottom_margin = min_scan;
+	else if (scan->bottomscale < max_scan && scan->bottomscale > 0)
 		overscan->bottom_margin = scan->bottomscale;
+
+null_basep:
+
+	if (screen_info)
+		printf("cvbs base_parameter.mode:%dx%d\n",
+		       screen_info->mode.hdisplay,
+		       screen_info->mode.vdisplay);
 
 	if (screen_info &&
 	    (screen_info->mode.hdisplay == 720 &&
@@ -716,10 +768,6 @@ static void tve_selete_output(struct rockchip_tve *tve, struct overscan *oversca
 		 (screen_info->mode.hdisplay == 720 &&
 		  screen_info->mode.vdisplay == 480))
 		*mode = modes[1];
-
-	if (screen_info)
-		printf("base_parameter mode: %dx%d\n",
-		       screen_info->mode.hdisplay, screen_info->mode.vdisplay);
 }
 
 static int rockchip_drm_tve_get_timing(struct rockchip_connector *conn, struct display_state *state)
@@ -728,7 +776,7 @@ static int rockchip_drm_tve_get_timing(struct rockchip_connector *conn, struct d
 	struct connector_state *conn_state = &state->conn_state;
 	struct drm_display_mode *mode = &conn_state->mode;
 
-	tve_selete_output(tve, &conn_state->overscan, mode);
+	tve_select_output(tve, conn_state, mode);
 
 	return 0;
 }

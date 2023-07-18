@@ -1351,7 +1351,9 @@ static inline int fit_image_check_target_arch(const void *fdt, int node)
 
 struct andr_img_hdr;
 u32 android_bcb_msg_sector_offset(void);
-u32 android_image_major_version(void);
+int android_image_init_resource(struct blk_desc *desc,
+				disk_partition_t *out_part,
+				ulong *out_blk_offset);
 int android_image_check_header(const struct andr_img_hdr *hdr);
 int android_image_get_kernel(const struct andr_img_hdr *hdr, int verify,
 			     ulong *os_data, ulong *os_len);
@@ -1398,6 +1400,9 @@ long android_image_load(struct blk_desc *dev_desc,
 int android_image_load_by_partname(struct blk_desc *dev_desc,
 				   const char *boot_partname,
 				   unsigned long *load_address);
+
+int android_image_verify_resource(const char *boot_part, ulong *resc_buf);
+
 #endif /* CONFIG_ANDROID_BOOT_IMAGE */
 
 int bootm_parse_comp(const unsigned char *hdr);

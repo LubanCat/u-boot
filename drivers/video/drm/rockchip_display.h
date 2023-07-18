@@ -81,6 +81,7 @@ enum rockchip_mcu_cmd {
 #define ROCKCHIP_OUT_MODE_P565		2
 #define ROCKCHIP_OUT_MODE_BT656		5
 #define ROCKCHIP_OUT_MODE_S888		8
+#define ROCKCHIP_OUT_MODE_YUV422	9
 #define ROCKCHIP_OUT_MODE_S888_DUMMY	12
 #define ROCKCHIP_OUT_MODE_YUV420	14
 /* for use special outface */
@@ -175,6 +176,7 @@ struct crtc_state {
 	bool post_y2r_en;
 	bool bcsh_en;
 	bool splice_mode;
+	bool soft_te;
 	u8 splice_crtc_id;
 	u8 dsc_id;
 	u8 dsc_enable;
@@ -238,6 +240,8 @@ struct connector_state {
 	u64 dsc_cds_clk;
 	struct rockchip_dsc_sink_cap dsc_sink_cap;
 	struct drm_dsc_picture_parameter_set pps;
+
+	struct gpio_desc *te_gpio;
 
 	struct {
 		u32 *lut;

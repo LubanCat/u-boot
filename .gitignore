@@ -90,3 +90,5 @@ GTAGS
 
 spi.ini
 trust.ini
+
+examples/standalone/rkspi

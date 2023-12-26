@@ -1,0 +1,57 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+#ifndef __DT_BINDINGS_POWER_RK3576_POWER_H__
+#define __DT_BINDINGS_POWER_RK3576_POWER_H__
+
+/* VD_LITCORE */
+#define RK3576_PD_CPU_0		0
+#define RK3576_PD_CPU_1		1
+#define RK3576_PD_CPU_2		2
+#define RK3576_PD_CPU_3		3
+#define RK3576_PD_LITCORE	4
+#define RK3576_PD_CCI		5
+
+/* VD_BIGCORE */
+#define RK3576_PD_CPU_4		6
+#define RK3576_PD_CPU_5		7
+#define RK3576_PD_CPU_6		8
+#define RK3576_PD_CPU_7		9
+#define RK3576_PD_BIGCORE	10
+
+/* VD_NPU */
+#define RK3576_PD_NPU		11
+#define RK3576_PD_NPUTOP	12
+#define RK3576_PD_NPU0		13
+#define RK3576_PD_NPU1		14
+
+/* VD_GPU */
+#define RK3576_PD_GPU		15
+
+/* VD_DDR */
+#define RK3576_PD_DDR		16
+
+/* VD_PMU */
+#define RK3576_PD_PMU1		17
+#define RK3576_PD_PMU0		18
+
+/* VD_LOGIC */
+#define RK3576_PD_CENTER	19
+#define RK3576_PD_NVM		20
+#define RK3576_PD_SDGMAC	21
+#define RK3576_PD_USB		22
+#define RK3576_PD_PHP		23
+#define RK3576_PD_SUBPHP	24
+#define RK3576_PD_AUDIO		25
+#define RK3576_PD_VEPU0		26
+#define RK3576_PD_VEPU1		27
+#define RK3576_PD_VPU		28
+#define RK3576_PD_VDEC		29
+#define RK3576_PD_VI		30
+#define RK3576_PD_VO0		31
+#define RK3576_PD_VO1		32
+#define RK3576_PD_VOP		33
+#define RK3576_PD_VOP_SMART	34
+#define RK3576_PD_VOP_CLUSTER	35
+#define RK3576_PD_BUS		36
+#define RK3576_PD_SECURE	37
+
+#endif

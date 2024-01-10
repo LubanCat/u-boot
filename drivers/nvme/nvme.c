@@ -682,8 +682,13 @@ int nvme_scan_namespace(void)
 
 	uclass_foreach_dev(dev, uc) {
 		ret = device_probe(dev);
-		if (ret)
-			return ret;
+		if (ret) {
+			printf("Failed to probe '%s': err=%dE\n", dev->name,
+				ret);
+			/* Bail if we ran out of memory, else keep trying */
+			if (ret != -EBUSY)
+				return ret;
+		}
 	}
 
 	return 0;

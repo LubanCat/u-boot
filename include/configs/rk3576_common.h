@@ -24,21 +24,23 @@
 #define CONFIG_SYS_CBSIZE		1024
 
 #ifdef CONFIG_SUPPORT_USBPLUG
-#define CONFIG_SYS_TEXT_BASE		0x00000000
+#define CONFIG_SYS_TEXT_BASE		0x40000000
 #else
 #define CONFIG_SYS_TEXT_BASE		0x40200000
 #endif
 
 #define CONFIG_SYS_INIT_SP_ADDR		0x40400000
-#define CONFIG_SYS_LOAD_ADDR		0x40708000
+#define CONFIG_SYS_LOAD_ADDR		0x40700800
 #define CONFIG_SYS_BOOTM_LEN		(64 << 20)	/* 64M */
 #define COUNTER_FREQUENCY		24000000
+
+#define GICD_BASE			0x2a701000
+#define GICC_BASE			0x2a702000
 
 #define CONFIG_BOUNCE_BUFFER
 #define CONFIG_SYS_SDRAM_BASE		0x40000000
 #define SDRAM_MAX_SIZE			(0x100000000 - CONFIG_SYS_SDRAM_BASE)	/* max 4G */
 #define CONFIG_SYS_NONCACHED_MEMORY	(1 << 20)	/* 1M */
-#define CONFIG_SYS_MMC_ENV_DEV	0
 
 /* env used only in U-Boot */
 #ifndef CONFIG_SPL_BUILD
@@ -47,20 +49,16 @@
 #define CONFIG_ROCKUSB_G_DNL_PID	0x350e
 
 /*
- * decompressed kernel:  7M ~ 80M
- * compressed kernel:    80M ~ 120M
- * compressed ramdisk:   120M ~ 160M
- * kernel fdt:           160M ~ 162M
- * uncompressed ramdisk: 162M ~ max
+ * DDR layout mainly follow rk3588 Soc
  */
 #define ENV_MEM_LAYOUT_SETTINGS \
 	"scriptaddr=0x40500000\0" \
 	"pxefile_addr_r=0x40600000\0" \
-	"fdt_addr_r=0x4a000000\0" \
-	"kernel_addr_r=0x40700000\0" \
-	"kernel_addr_c=0x45000000\0" \
-	"ramdisk_addr_r=0x4a200000\0" \
-	"ramdisk_addr_c=0x47800000\0"
+	"fdt_addr_r=0x48300000\0" \
+	"kernel_addr_r=0x40400000\0" \
+	"kernel_addr_c=0x45480000\0" \
+	"ramdisk_addr_r=0x4a200000\0"
+
 #include <config_distro_bootcmd.h>
 
 #define CONFIG_EXTRA_ENV_SETTINGS \

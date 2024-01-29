@@ -28,7 +28,17 @@ static const struct bootdev_list dev_list[] = {
 	{IF_TYPE_MTD, 2, 0}, /* BLK_MTD_SPI_NOR FSPI M0 */
 	{IF_TYPE_MTD, 2, 1}, /* BLK_MTD_SPI_NOR FSPI M1 */
 	{IF_TYPE_MTD, 2, 2}, /* BLK_MTD_SPI_NOR FSPI M2 */
-	{IF_TYPE_RKNAND, 2, 0},
+};
+#elif CONFIG_IS_ENABLED(ROCKCHIP_RK3576)
+static const struct bootdev_list dev_list[] = {
+	{IF_TYPE_MMC, 0, 0},
+	{IF_TYPE_MTD, 0, 0}, /* BLK_MTD_NAND */
+	{IF_TYPE_MTD, 1, 0}, /* BLK_MTD_SPI_NAND FSPI0 M0 */
+	{IF_TYPE_MTD, 1, 1}, /* BLK_MTD_SPI_NAND FSPI1 M0 */
+	{IF_TYPE_MTD, 1, 2}, /* BLK_MTD_SPI_NAND FSPI1 M1 */
+	{IF_TYPE_MTD, 2, 0}, /* BLK_MTD_SPI_NOR FSPI0 M0 */
+	{IF_TYPE_MTD, 2, 1}, /* BLK_MTD_SPI_NOR FSPI1 M0 */
+	{IF_TYPE_MTD, 2, 2}, /* BLK_MTD_SPI_NOR FSPI1 M0 */
 };
 #else
 static const struct bootdev_list dev_list[] = {

@@ -468,57 +468,6 @@ static void rk8xx_plug_out_handler(int irq, void *data)
 }
 #endif
 
-static int rk8xx_ofdata_to_platdata(struct udevice *dev)
-{
-	struct rk8xx_priv *rk8xx = dev_get_priv(dev);
-	u32 interrupt, phandle, val;
-	int ret;
-
-	phandle = dev_read_u32_default(dev, "interrupt-parent", -ENODATA);
-	if (phandle == -ENODATA) {
-		printf("Read 'interrupt-parent' failed, ret=%d\n", phandle);
-		return phandle;
-	}
-
-	ret = dev_read_u32_array(dev, "interrupts", &interrupt, 1);
-	if (ret) {
-		printf("Read 'interrupts' failed, ret=%d\n", ret);
-		return ret;
-	}
-
-	rk8xx->irq = phandle_gpio_to_irq(phandle, interrupt);
-	if (rk8xx->irq < 0) {
-		printf("Failed to request rk8xx irq, ret=%d\n", rk8xx->irq);
-		return rk8xx->irq;
-	}
-
-	val = dev_read_u32_default(dev, "long-press-off-time-sec", 0);
-	if (val <= 6)
-		rk8xx->lp_off_time = RK8XX_LP_TIME_6S;
-	else if (val <= 8)
-		rk8xx->lp_off_time = RK8XX_LP_TIME_8S;
-	else if (val <= 10)
-		rk8xx->lp_off_time = RK8XX_LP_TIME_10S;
-	else
-		rk8xx->lp_off_time = RK8XX_LP_TIME_12S;
-
-	val = dev_read_u32_default(dev, "long-press-restart", 0);
-	if (val)
-		rk8xx->lp_action = RK8XX_LP_RESTART;
-	else
-		rk8xx->lp_action = RK8XX_LP_OFF;
-
-	val = dev_read_u32_default(dev, "not-save-power-en", 0);
-	rk8xx->not_save_power_en = val;
-
-	val = dev_read_bool(dev, "vsys-off-shutdown");
-	rk8xx->sys_can_sd = val;
-
-	rk8xx->rst_fun = dev_read_u32_default(dev, "pmic-reset-func", 0);
-
-	return 0;
-}
-
 static int rk8xx_irq_chip_init(struct udevice *dev)
 {
 	struct rk8xx_priv *priv = dev_get_priv(dev);
@@ -580,9 +529,56 @@ static int rk8xx_irq_chip_init(struct udevice *dev)
 	return 0;
 }
 #else
-static inline int rk8xx_ofdata_to_platdata(struct udevice *dev) { return 0; }
 static inline int rk8xx_irq_chip_init(struct udevice *dev) { return 0; }
 #endif
+
+static int rk8xx_ofdata_to_platdata(struct udevice *dev)
+{
+	struct rk8xx_priv *rk8xx = dev_get_priv(dev);
+	u32 interrupt, phandle, val;
+	int ret;
+
+	phandle = dev_read_u32_default(dev, "interrupt-parent", -ENODATA);
+	if (phandle == -ENODATA) {
+		printf("Read 'interrupt-parent' failed, ret=%d\n", phandle);
+		return phandle;
+	}
+
+	ret = dev_read_u32_array(dev, "interrupts", &interrupt, 1);
+	if (ret) {
+		printf("Read 'interrupts' failed, ret=%d\n", ret);
+		return ret;
+	}
+
+#if CONFIG_IS_ENABLED(IRQ)
+	rk8xx->irq = phandle_gpio_to_irq(phandle, interrupt);
+	if (rk8xx->irq < 0) {
+		printf("Failed to request rk8xx irq, ret=%d\n", rk8xx->irq);
+		return rk8xx->irq;
+	}
+#endif
+	val = dev_read_u32_default(dev, "long-press-off-time-sec", 0);
+	if (val <= 6)
+		rk8xx->lp_off_time = RK8XX_LP_TIME_6S;
+	else if (val <= 8)
+		rk8xx->lp_off_time = RK8XX_LP_TIME_8S;
+	else if (val <= 10)
+		rk8xx->lp_off_time = RK8XX_LP_TIME_10S;
+	else
+		rk8xx->lp_off_time = RK8XX_LP_TIME_12S;
+
+	val = dev_read_u32_default(dev, "long-press-restart", 0);
+	if (val)
+		rk8xx->lp_action = RK8XX_LP_RESTART;
+	else
+		rk8xx->lp_action = RK8XX_LP_OFF;
+
+	rk8xx->not_save_power_en = dev_read_u32_default(dev, "not-save-power-en", 0);
+	rk8xx->sys_can_sd = dev_read_bool(dev, "vsys-off-shutdown");
+	rk8xx->rst_fun = dev_read_u32_default(dev, "pmic-reset-func", 0);
+
+	return 0;
+}
 
 static int rk8xx_probe(struct udevice *dev)
 {

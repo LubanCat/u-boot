@@ -272,6 +272,7 @@ enum {
 #define RK806_GPIO_INT_CONFIG		0x7B
 #define RK806_ON_SOURCE			0x74
 #define RK806_OFF_SOURCE		0x75
+#define RK806_BUCK_RSERVE_REG3	0xfd
 
 #define RK806_IRQ_PWRON_FALL_MSK	BIT(0)
 #define RK806_IRQ_PWRON_RISE_MSK	BIT(1)
@@ -287,6 +288,7 @@ enum {
 #define RK806_ABNORDET_EN		0x80
 #define RK806_VERSION_MSK		0x0f
 #define RK806_RESET_FUN_CLR		0x3f
+#define RK806_BUCK5_EX_RES_EN		0x10
 
 /* RK806 buck*/
 #define RK806_BUCK_ON_VSEL(n)		(0x1a + n - 1)
@@ -374,6 +376,7 @@ struct rk8xx_priv {
 	uint8_t rst_fun;
 	int not_save_power_en;
 	int sys_can_sd;
+	int buck5_feedback_dis;
 };
 
 int rk8xx_spl_configure_buck(struct udevice *pmic, int buck, int uvolt);

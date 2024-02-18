@@ -576,6 +576,8 @@ static int rk8xx_ofdata_to_platdata(struct udevice *dev)
 	rk8xx->not_save_power_en = dev_read_u32_default(dev, "not-save-power-en", 0);
 	rk8xx->sys_can_sd = dev_read_bool(dev, "vsys-off-shutdown");
 	rk8xx->rst_fun = dev_read_u32_default(dev, "pmic-reset-func", 0);
+	/* buck5 external feedback resister disable */
+	rk8xx->buck5_feedback_dis = dev_read_bool(dev, "buck5-feedback-disable");
 
 	return 0;
 }
@@ -645,6 +647,12 @@ static int rk8xx_probe(struct udevice *dev)
 				value |= (RK806_RST_MODE2 << 6);
 				rk8xx_write(dev, RK806_SYS_CFG3, &value, 1);
 			}
+		}
+
+		if (priv->buck5_feedback_dis) {
+			rk8xx_read(dev, RK806_BUCK_RSERVE_REG3, &value, 1);
+			value &=( ~RK806_BUCK5_EX_RES_EN);
+			rk8xx_write(dev, RK806_BUCK_RSERVE_REG3, &value, 1);
 		}
 		break;
 	case RK808_ID:

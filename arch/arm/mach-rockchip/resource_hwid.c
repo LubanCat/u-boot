@@ -154,6 +154,8 @@ static int hwid_adc_find_dtb(const char *file_name)
 		 */
 		if (adc_record[channel] == 0) {
 			ret = adc_channel_single_shot(dev_name, channel, &raw_adc);
+			if (ret)
+				ret = adc_channel_single_shot("adc", channel, &raw_adc);
 			if (ret) {
 				debug("   - failed to read adc, ret=%d\n", ret);
 				return 0;

@@ -313,6 +313,8 @@ __weak int rockchip_dnl_key_pressed(void)
 	}
 
 	ret = adc_channel_single_shot("saradc", channel, &val);
+	if (ret)
+		ret = adc_channel_single_shot("adc", channel, &val);
 	if (ret) {
 		printf("%s: Failed to read saradc, ret=%d\n", __func__, ret);
 		return 0;

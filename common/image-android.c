@@ -773,7 +773,12 @@ static int android_image_separate(struct andr_img_hdr *hdr,
 			print_hash("Hash real", (u8 *)hash, 20);
 			return -EBADFD;
 		} else {
-			printf("ANDROID: Hash OK\n");
+			int i;
+
+			printf("ANDROID: sha1(");
+			for (i = 0; i < 5; i++)
+				printf("%02x", hash[i]);
+			printf("...) + OK\n");
 		}
 	} else
 #endif

@@ -37,6 +37,8 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define VCCIO6_IOC_BASE		0x2604a000
 #define VCCIO7_IOC_BASE		0x2604b000
+#define VCCIO7_IOC_GPIO4D_IOMUX_SEL_L	0x0398
+#define VCCIO7_IOC_XIN_UFS_CON	0x0400
 
 #define PMU1_SGRF_BASE		0x26002000
 #define PMU1_SGRF_SOC_CON10	0x0028
@@ -48,6 +50,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define FW_SYS_SGRF_BASE	0x26005000
 #define SGRF_DOMAIN_CON2	0x8
+#define SGRF_DOMAIN_CON3	0xc
 #define SGRF_DOMAIN_CON4	0x10
 #define SGRF_DOMAIN_CON5	0x14
 
@@ -69,6 +72,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define PHPPHYSOFTRST_CON01	0x8a04
 
 #define PMU1_CRU_BASE		0x27220000
+#define PMU1_CRU_CLKSEL_CON03	0x030c
 #define PMU1_CRU_GATE_CON03	0x080C
 #define PMU1_CRU_SOFTRST_CON03	0x0a0C
 
@@ -234,12 +238,25 @@ int arch_cpu_init(void)
 	val = readl(FW_SYS_SGRF_BASE + SGRF_DOMAIN_CON5);
 	writel(val | 0x700, FW_SYS_SGRF_BASE + SGRF_DOMAIN_CON5);
 
+	/* Set the UFS to access ddr memory */
+	val = readl(FW_SYS_SGRF_BASE + SGRF_DOMAIN_CON3);
+	writel(val | 0x70000, FW_SYS_SGRF_BASE + SGRF_DOMAIN_CON3);
+
 	/* Set the fspi0 and fspi1 to access ddr memory */
 	val = readl(FW_SYS_SGRF_BASE + SGRF_DOMAIN_CON4);
 	writel(val | 0x7700, FW_SYS_SGRF_BASE + SGRF_DOMAIN_CON4);
 
 	/* Set the sdmmc0 iomux */
 	board_set_iomux(IF_TYPE_MMC, 1, 0);
+
+	/* UFS PHY select 26M from ppll */
+	writel(0x00030002, PMU1_CRU_BASE + PMU1_CRU_CLKSEL_CON03);
+
+	/* set iomux UFS_REFCLK, UFS_RSTN */
+	writel(0x00FF0011, VCCIO7_IOC_BASE + VCCIO7_IOC_GPIO4D_IOMUX_SEL_L);
+	/* set UFS_RSTN to high */
+	udelay(20);
+	writel(0x00100010, VCCIO7_IOC_BASE + VCCIO7_IOC_XIN_UFS_CON);
 
 	/*
 	 * Set the GPIO0B0~B3 pull up and input enable.

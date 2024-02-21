@@ -1320,13 +1320,44 @@ static int rockchip_dpphy_probe(struct udevice *dev)
 	return 0;
 }
 
-static const char * const rk3588_udphy_rst_l[] = {
+static const char * const udphy_rst_list[] = {
 	"init", "cmn", "lane", "pcs_apb", "pma_apb"
 };
 
+static const struct rockchip_udphy_cfg rk3576_udphy_cfgs = {
+	.num_rsts = ARRAY_SIZE(udphy_rst_list),
+	.rst_list = udphy_rst_list,
+	.grfcfg	= {
+		/* u2phy-grf */
+		.bvalid_phy_con		= { 0x0010, 1, 0, 0x2, 0x3 },
+		.bvalid_grf_con		= { 0x0000, 15, 14, 0x1, 0x3 },
+
+		/* usb-grf */
+		.usb3otg0_cfg		= { 0x0030, 15, 0, 0x1100, 0x0188 },
+
+		/* usbdpphy-grf */
+		.low_pwrn		= { 0x0004, 13, 13, 0, 1 },
+		.rx_lfps		= { 0x0004, 14, 14, 0, 1 },
+	},
+	.vogrfcfg = {
+		{
+			.dp_lane_reg	= 0x0000,
+		},
+		{
+			.dp_lane_reg	= 0x0008,
+		},
+	},
+	.dp_tx_ctrl_cfg = {
+		rk3588_dp_tx_drv_ctrl_rbr_hbr,
+		rk3588_dp_tx_drv_ctrl_rbr_hbr,
+		rk3588_dp_tx_drv_ctrl_hbr2,
+		rk3588_dp_tx_drv_ctrl_hbr3,
+	},
+};
+
 static const struct rockchip_udphy_cfg rk3588_udphy_cfgs = {
-	.num_rsts = ARRAY_SIZE(rk3588_udphy_rst_l),
-	.rst_list = rk3588_udphy_rst_l,
+	.num_rsts = ARRAY_SIZE(udphy_rst_list),
+	.rst_list = udphy_rst_list,
 	.grfcfg	= {
 		/* u2phy-grf */
 		.bvalid_phy_con		= { 0x0008, 1, 0, 0x2, 0x3 },
@@ -1357,6 +1388,10 @@ static const struct rockchip_udphy_cfg rk3588_udphy_cfgs = {
 };
 
 static const struct udevice_id rockchip_udphy_dt_match[] = {
+	{
+		.compatible = "rockchip,rk3576-usbdp-phy",
+		.data = (ulong)&rk3576_udphy_cfgs
+	},
 	{
 		.compatible = "rockchip,rk3588-usbdp-phy",
 		.data = (ulong)&rk3588_udphy_cfgs

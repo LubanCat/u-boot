@@ -1324,6 +1324,7 @@ static const char * const udphy_rst_list[] = {
 	"init", "cmn", "lane", "pcs_apb", "pma_apb"
 };
 
+#ifdef CONFIG_ROCKCHIP_RK3576
 static const struct rockchip_udphy_cfg rk3576_udphy_cfgs = {
 	.num_rsts = ARRAY_SIZE(udphy_rst_list),
 	.rst_list = udphy_rst_list,
@@ -1354,7 +1355,9 @@ static const struct rockchip_udphy_cfg rk3576_udphy_cfgs = {
 		rk3588_dp_tx_drv_ctrl_hbr3,
 	},
 };
+#endif
 
+#ifdef CONFIG_ROCKCHIP_RK3588
 static const struct rockchip_udphy_cfg rk3588_udphy_cfgs = {
 	.num_rsts = ARRAY_SIZE(udphy_rst_list),
 	.rst_list = udphy_rst_list,
@@ -1386,16 +1389,21 @@ static const struct rockchip_udphy_cfg rk3588_udphy_cfgs = {
 		rk3588_dp_tx_drv_ctrl_hbr3,
 	},
 };
+#endif
 
 static const struct udevice_id rockchip_udphy_dt_match[] = {
+#ifdef CONFIG_ROCKCHIP_RK3576
 	{
 		.compatible = "rockchip,rk3576-usbdp-phy",
 		.data = (ulong)&rk3576_udphy_cfgs
 	},
+#endif
+#ifdef CONFIG_ROCKCHIP_RK3588
 	{
 		.compatible = "rockchip,rk3588-usbdp-phy",
 		.data = (ulong)&rk3588_udphy_cfgs
 	},
+#endif
 	{ /* sentinel */ }
 };
 

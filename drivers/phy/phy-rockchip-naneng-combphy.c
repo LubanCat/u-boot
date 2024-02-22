@@ -365,6 +365,7 @@ static int rockchip_combphy_probe(struct udevice *udev)
 	return rockchip_combphy_parse_dt(udev, priv);
 }
 
+#ifdef CONFIG_ROCKCHIP_RK3528
 static int rk3528_combphy_cfg(struct rockchip_combphy_priv *priv)
 {
 	const struct rockchip_combphy_grfcfg *cfg = priv->cfg->grfcfg;
@@ -456,7 +457,9 @@ static const struct rockchip_combphy_cfg rk3528_combphy_cfgs = {
 	.grfcfg		= &rk3528_combphy_grfcfgs,
 	.combphy_cfg	= rk3528_combphy_cfg,
 };
+#endif
 
+#ifdef CONFIG_ROCKCHIP_RK3562
 static int rk3562_combphy_cfg(struct rockchip_combphy_priv *priv)
 {
 	const struct rockchip_combphy_grfcfg *cfg = priv->cfg->grfcfg;
@@ -583,7 +586,9 @@ static const struct rockchip_combphy_cfg rk3562_combphy_cfgs = {
 	.grfcfg		= &rk3562_combphy_grfcfgs,
 	.combphy_cfg	= rk3562_combphy_cfg,
 };
+#endif
 
+#ifdef CONFIG_ROCKCHIP_RK3568
 static int rk3568_combphy_cfg(struct rockchip_combphy_priv *priv)
 {
 	const struct rockchip_combphy_grfcfg *cfg = priv->cfg->grfcfg;
@@ -723,7 +728,9 @@ static const struct rockchip_combphy_cfg rk3568_combphy_cfgs = {
 	.grfcfg		= &rk3568_combphy_grfcfgs,
 	.combphy_cfg	= rk3568_combphy_cfg,
 };
+#endif
 
+#ifdef CONFIG_ROCKCHIP_RK3588
 static int rk3588_combphy_cfg(struct rockchip_combphy_priv *priv)
 {
 	const struct rockchip_combphy_grfcfg *cfg = priv->cfg->grfcfg;
@@ -857,24 +864,33 @@ static const struct rockchip_combphy_cfg rk3588_combphy_cfgs = {
 	.grfcfg		= &rk3588_combphy_grfcfgs,
 	.combphy_cfg	= rk3588_combphy_cfg,
 };
+#endif
 
 static const struct udevice_id rockchip_combphy_ids[] = {
+#ifdef CONFIG_ROCKCHIP_RK3528
 	{
 		.compatible = "rockchip,rk3528-naneng-combphy",
 		.data = (ulong)&rk3528_combphy_cfgs
 	},
+#endif
+#ifdef CONFIG_ROCKCHIP_RK3562
 	{
 		.compatible = "rockchip,rk3562-naneng-combphy",
 		.data = (ulong)&rk3562_combphy_cfgs
 	},
+#endif
+#ifdef CONFIG_ROCKCHIP_RK3568
 	{
 		.compatible = "rockchip,rk3568-naneng-combphy",
 		.data = (ulong)&rk3568_combphy_cfgs
 	},
+#endif
+#ifdef CONFIG_ROCKCHIP_RK3588
 	{
 		.compatible = "rockchip,rk3588-naneng-combphy",
 		.data = (ulong)&rk3588_combphy_cfgs
 	},
+#endif
 	{ }
 };
 

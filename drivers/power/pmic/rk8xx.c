@@ -186,11 +186,22 @@ static struct reg_data rk818_init_current[] = {
 	{ REG_USB_CTRL, 0x07, 0x0f}, /* 2A */
 };
 
+/*
+ * Order WARNING: Must put "LDO" after the "NLDO" and "PLDO" !
+ *
+ * See: pmic_bind_children()
+ *	    if (!strstr(node_name, info->prefix)) {
+ *		    ......
+ *	    }
+ *
+ * Without this order, the prefix "LDO" will be matched if a regulator
+ * dts node name contains "NLDO" or "PLDO".
+ */
 static const struct pmic_child_info pmic_children_info[] = {
 	{ .prefix = "DCDC", .driver = "rk8xx_buck"},
-	{ .prefix = "LDO", .driver = "rk8xx_ldo"},
 	{ .prefix = "NLDO", .driver = "rk8xx_ldo"},
 	{ .prefix = "PLDO", .driver = "rk8xx_pldo"},
+	{ .prefix = "LDO", .driver = "rk8xx_ldo"},
 	{ .prefix = "SWITCH", .driver = "rk8xx_switch"},
 	{ },
 };

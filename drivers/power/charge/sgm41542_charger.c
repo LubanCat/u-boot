@@ -470,6 +470,10 @@ __retry:
 		sgm41542_read(charger, i, &value);
 		SGM_DBG("[%d]: 0x%x\n", i, value);
 	}
+
+	if (!state_of_charger)
+		state_of_charger = sgm41542_get_usb_type();
+
 	return state_of_charger;
 }
 

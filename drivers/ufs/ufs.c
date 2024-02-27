@@ -315,7 +315,7 @@ static int ufshcd_disable_tx_lcc(struct ufs_hba *hba, bool peer)
 					UIC_ARG_MPHY_TX_GEN_SEL_INDEX(i)),
 					0);
 		if (err) {
-			dev_err(hba->dev, "%s: TX LCC Disable failed, peer = %d, lane = %d, err = %d",
+			dev_err(hba->dev, "%s: TX LCC Disable failed, peer = %d, lane = %d, err = %d\n",
 				__func__, peer, i, err);
 			break;
 		}
@@ -344,6 +344,34 @@ static int ufshcd_dme_link_startup(struct ufs_hba *hba)
 	if (ret)
 		dev_dbg(hba->dev,
 			"dme-link-startup: error code %d\n", ret);
+	return ret;
+}
+
+int ufshcd_dme_enable(struct ufs_hba *hba)
+{
+	struct uic_command uic_cmd = {0};
+	int ret;
+
+	uic_cmd.command = UIC_CMD_DME_ENABLE;
+
+	ret = ufshcd_send_uic_cmd(hba, &uic_cmd);
+	if (ret)
+		dev_err(hba->dev,
+			"dme-enable: error code %d\n", ret);
+	return ret;
+}
+
+int ufshcd_dme_reset(struct ufs_hba *hba)
+{
+	struct uic_command uic_cmd = {0};
+	int ret;
+
+	uic_cmd.command = UIC_CMD_DME_RESET;
+
+	ret = ufshcd_send_uic_cmd(hba, &uic_cmd);
+	if (ret)
+		dev_err(hba->dev,
+			"dme-reset: error code %d\n", ret);
 	return ret;
 }
 
@@ -436,7 +464,7 @@ static int ufshcd_make_hba_operational(struct ufs_hba *hba)
 		ufshcd_enable_run_stop_reg(hba);
 	} else {
 		dev_err(hba->dev,
-			"Host controller not ready to process requests");
+			"Host controller not ready to process requests\n");
 		err = -EIO;
 		goto out;
 	}
@@ -644,6 +672,12 @@ static int ufshcd_memory_alloc(struct ufs_hba *hba)
 		return -ENOMEM;
 	}
 
+	hba->dev_desc = memalign(ARCH_DMA_MINALIGN, sizeof(struct ufs_device_descriptor));
+	if (!hba->dev_desc) {
+		dev_err(hba->dev, "memory allocation failed\n");
+		return -ENOMEM;
+	}
+
 	return 0;
 }
 
@@ -775,8 +809,9 @@ static void ufshcd_prepare_utp_query_req_upiu(struct ufs_hba *hba,
 
 	/* Copy the Descriptor */
 	if (query->request.upiu_req.opcode == UPIU_QUERY_OPCODE_WRITE_DESC) {
-		memcpy(ucd_req_ptr + 1, query->descriptor, len);
-		ufshcd_cache_flush_and_invalidate(ucd_req_ptr, 2 * sizeof(*ucd_req_ptr));
+ 		memcpy(ucd_req_ptr + 1, query->descriptor, len);
+		ufshcd_cache_flush_and_invalidate(ucd_req_ptr,
+				ALIGN(sizeof(*ucd_req_ptr) + len, ARCH_DMA_MINALIGN));
 	} else {
 		ufshcd_cache_flush_and_invalidate(ucd_req_ptr, sizeof(*ucd_req_ptr));
 	}
@@ -920,6 +955,9 @@ static int ufshcd_copy_query_response(struct ufs_hba *hba)
 		buf_len =
 			be16_to_cpu(hba->dev_cmd.query.request.upiu_req.length);
 		if (likely(buf_len >= resp_len)) {
+			int size = ALIGN(GENERAL_UPIU_REQUEST_SIZE + resp_len, ARCH_DMA_MINALIGN);
+
+			invalidate_dcache_range((uintptr_t)hba->ucd_rsp_ptr, (uintptr_t)hba->ucd_rsp_ptr + size);
 			memcpy(hba->dev_cmd.query.descriptor, descp, resp_len);
 		} else {
 			dev_warn(hba->dev,
@@ -927,6 +965,12 @@ static int ufshcd_copy_query_response(struct ufs_hba *hba)
 				 __func__);
 			return -EINVAL;
 		}
+	} else if (hba->dev_cmd.query.descriptor && hba->ucd_rsp_ptr->qr.opcode == UPIU_QUERY_OPCODE_READ_ATTR) {
+		u8 *value = (u8 *)&query_res->upiu_res.value;
+		hba->dev_cmd.query.descriptor[0] = value[11];
+		hba->dev_cmd.query.descriptor[1] = value[10];
+		hba->dev_cmd.query.descriptor[2] = value[9];
+		hba->dev_cmd.query.descriptor[3] = value[8];
 	}
 
 	return 0;
@@ -1016,8 +1060,10 @@ int ufshcd_query_flag(struct ufs_hba *hba, enum query_opcode opcode,
 	case UPIU_QUERY_OPCODE_SET_FLAG:
 	case UPIU_QUERY_OPCODE_CLEAR_FLAG:
 	case UPIU_QUERY_OPCODE_TOGGLE_FLAG:
+	case UPIU_QUERY_OPCODE_WRITE_ATTR:
 		request->query_func = UPIU_QUERY_FUNC_STANDARD_WRITE_REQUEST;
 		break;
+	case UPIU_QUERY_OPCODE_READ_ATTR:
 	case UPIU_QUERY_OPCODE_READ_FLAG:
 		request->query_func = UPIU_QUERY_FUNC_STANDARD_READ_REQUEST;
 		if (!flag_res) {
@@ -1100,15 +1146,17 @@ static int __ufshcd_query_descriptor(struct ufs_hba *hba,
 		goto out;
 	}
 
-	ufshcd_init_query(hba, &request, &response, opcode, idn, index,
-			  selector);
+	ufshcd_init_query(hba, &request, &response, opcode, idn, index, selector);
 	hba->dev_cmd.query.descriptor = desc_buf;
 	request->upiu_req.length = cpu_to_be16(*buf_len);
 
 	switch (opcode) {
+	case UPIU_QUERY_OPCODE_WRITE_ATTR:
+		request->upiu_req.value = (desc_buf[0] << 24 | desc_buf[1] << 16 | desc_buf[2] << 8 | desc_buf[3]);
 	case UPIU_QUERY_OPCODE_WRITE_DESC:
 		request->query_func = UPIU_QUERY_FUNC_STANDARD_WRITE_REQUEST;
 		break;
+	case UPIU_QUERY_OPCODE_READ_ATTR:
 	case UPIU_QUERY_OPCODE_READ_DESC:
 		request->query_func = UPIU_QUERY_FUNC_STANDARD_READ_REQUEST;
 		break;
@@ -1157,7 +1205,7 @@ int ufshcd_query_descriptor_retry(struct ufs_hba *hba, enum query_opcode opcode,
 /**
  * ufshcd_read_desc_length - read the specified descriptor length from header
  */
-static int ufshcd_read_desc_length(struct ufs_hba *hba, enum desc_idn desc_id,
+int ufshcd_read_desc_length(struct ufs_hba *hba, enum desc_idn desc_id,
 				   int desc_index, int *desc_length)
 {
 	int ret;
@@ -1172,11 +1220,11 @@ static int ufshcd_read_desc_length(struct ufs_hba *hba, enum desc_idn desc_id,
 					    &header_len);
 
 	if (ret) {
-		dev_err(hba->dev, "%s: Failed to get descriptor header id %d",
+		dev_err(hba->dev, "%s: Failed to get descriptor header id %d\n",
 			__func__, desc_id);
 		return ret;
 	} else if (desc_id != header[QUERY_DESC_DESC_TYPE_OFFSET]) {
-		dev_warn(hba->dev, "%s: descriptor header id %d and desc_id %d mismatch",
+		dev_warn(hba->dev, "%s: descriptor header id %d and desc_id %d mismatch\n",
 			 __func__, header[QUERY_DESC_DESC_TYPE_OFFSET],
 			 desc_id);
 		ret = -EINVAL;
@@ -1295,7 +1343,7 @@ int ufshcd_read_desc_param(struct ufs_hba *hba, enum desc_idn desc_id,
 
 	/* Sanity checks */
 	if (ret || !buff_len) {
-		dev_err(hba->dev, "%s: Failed to get full descriptor length",
+		dev_err(hba->dev, "%s: Failed to get full descriptor length\n",
 			__func__);
 		return ret;
 	}
@@ -1316,14 +1364,14 @@ int ufshcd_read_desc_param(struct ufs_hba *hba, enum desc_idn desc_id,
 					    &buff_len);
 
 	if (ret) {
-		dev_err(hba->dev, "%s: Failed reading descriptor. desc_id %d, desc_index %d, param_offset %d, ret %d",
+		dev_err(hba->dev, "%s: Failed reading descriptor. desc_id %d, desc_index %d, param_offset %d, ret %d\n",
 			__func__, desc_id, desc_index, param_offset, ret);
 		goto out;
 	}
 
 	/* Sanity check */
 	if (desc_buf[QUERY_DESC_DESC_TYPE_OFFSET] != desc_id) {
-		dev_err(hba->dev, "%s: invalid desc_id %d in descriptor header",
+		dev_err(hba->dev, "%s: invalid desc_id %d in descriptor header\n",
 			__func__, desc_buf[QUERY_DESC_DESC_TYPE_OFFSET]);
 		ret = -EINVAL;
 		goto out;
@@ -1456,13 +1504,11 @@ static void prepare_prdt_table(struct ufs_hba *hba, struct scsi_cmd *pccb)
 	}
 
 	if (pccb->dma_dir == DMA_TO_DEVICE) {	/* Write to device */
-		flush_dcache_range(aaddr, aaddr +
-				   ALIGN(datalen, ARCH_DMA_MINALIGN));
+		flush_dcache_range(aaddr, ALIGN(aaddr + datalen + ARCH_DMA_MINALIGN - 1, ARCH_DMA_MINALIGN));
 	}
 
 	/* In any case, invalidate cache to avoid stale data in it. */
-	invalidate_dcache_range(aaddr, aaddr +
-				ALIGN(datalen, ARCH_DMA_MINALIGN));
+	invalidate_dcache_range(aaddr, ALIGN(aaddr + datalen + ARCH_DMA_MINALIGN - 1, ARCH_DMA_MINALIGN));
 
 	table_length = DIV_ROUND_UP(pccb->datalen, MAX_PRDT_ENTRY);
 	buf = pccb->pdata;
@@ -1573,7 +1619,7 @@ int ufshcd_read_string_desc(struct ufs_hba *hba, int desc_index,
 			goto out;
 		}
 
-		buff_ascii = kmalloc(ascii_len, GFP_KERNEL);
+		buff_ascii = kmalloc(ALIGN(ascii_len, ARCH_DMA_MINALIGN), GFP_KERNEL);
 		if (!buff_ascii) {
 			err = -ENOMEM;
 			goto out;
@@ -1600,59 +1646,20 @@ out:
 	return err;
 }
 
-static int ufs_get_device_desc(struct ufs_hba *hba,
-			       struct ufs_dev_desc *dev_desc)
+static int ufs_get_device_desc(struct ufs_hba *hba, struct ufs_device_descriptor *dev_desc)
 {
 	int err;
 	size_t buff_len;
-	u8 model_index;
-	u8 *desc_buf;
 
-	buff_len = max_t(size_t, hba->desc_size.dev_desc,
-			 QUERY_DESC_MAX_SIZE + 1);
-	desc_buf = kmalloc(buff_len, GFP_KERNEL);
-	if (!desc_buf) {
-		err = -ENOMEM;
-		goto out;
-	}
+	buff_len = sizeof(*dev_desc);
+	if (buff_len > hba->desc_size.dev_desc)
+		buff_len = hba->desc_size.dev_desc;
 
-	err = ufshcd_read_device_desc(hba, desc_buf, hba->desc_size.dev_desc);
-	if (err) {
+	err = ufshcd_read_device_desc(hba, (u8 *)dev_desc, buff_len);
+	if (err)
 		dev_err(hba->dev, "%s: Failed reading Device Desc. err = %d\n",
 			__func__, err);
-		goto out;
-	}
 
-	/*
-	 * getting vendor (manufacturerID) and Bank Index in big endian
-	 * format
-	 */
-	dev_desc->wmanufacturerid = desc_buf[DEVICE_DESC_PARAM_MANF_ID] << 8 |
-				     desc_buf[DEVICE_DESC_PARAM_MANF_ID + 1];
-
-	model_index = desc_buf[DEVICE_DESC_PARAM_PRDCT_NAME];
-
-	/* Zero-pad entire buffer for string termination. */
-	memset(desc_buf, 0, buff_len);
-
-	err = ufshcd_read_string_desc(hba, model_index, desc_buf,
-				      QUERY_DESC_MAX_SIZE, true/*ASCII*/);
-	if (err) {
-		dev_err(hba->dev, "%s: Failed reading Product Name. err = %d\n",
-			__func__, err);
-		goto out;
-	}
-
-	desc_buf[QUERY_DESC_MAX_SIZE] = '\0';
-	strlcpy(dev_desc->model, (char *)(desc_buf + QUERY_DESC_HDR_SIZE),
-		min_t(u8, desc_buf[QUERY_DESC_LENGTH_OFFSET],
-		      MAX_MODEL_LEN));
-
-	/* Null terminate the model string */
-	dev_desc->model[MAX_MODEL_LEN] = '\0';
-
-out:
-	kfree(desc_buf);
 	return err;
 }
 
@@ -1850,9 +1857,8 @@ static void ufshcd_def_desc_sizes(struct ufs_hba *hba)
 	hba->desc_size.hlth_desc = QUERY_DESC_HEALTH_DEF_SIZE;
 }
 
-int ufs_start(struct ufs_hba *hba)
+int _ufs_start(struct ufs_hba *hba)
 {
-	struct ufs_dev_desc card = {0};
 	int ret;
 
 	ret = ufshcd_link_startup(hba);
@@ -1870,13 +1876,24 @@ int ufs_start(struct ufs_hba *hba)
 	/* Init check for device descriptor sizes */
 	ufshcd_init_desc_sizes(hba);
 
-	ret = ufs_get_device_desc(hba, &card);
+	ret = ufs_get_device_desc(hba, hba->dev_desc);
 	if (ret) {
 		dev_err(hba->dev, "%s: Failed getting device info. err = %d\n",
 			__func__, ret);
 
 		return ret;
 	}
+
+	return ret;
+}
+
+int ufs_start(struct ufs_hba *hba)
+{
+	int ret;
+
+	ret = _ufs_start(hba);
+	if (ret)
+		return ret;
 
 	if (ufshcd_get_max_pwr_mode(hba)) {
 		dev_err(hba->dev,

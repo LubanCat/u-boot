@@ -65,6 +65,46 @@ struct ufs_desc_size {
 	int hlth_desc;
 };
 
+struct ufs_device_descriptor {
+	uint8_t b_length;
+	uint8_t b_descriptor_idn;
+	uint8_t b_device;
+	uint8_t b_device_class;
+	uint8_t b_device_sub_class;
+	uint8_t b_protocol;
+	uint8_t b_number_lu;
+	uint8_t b_number_wlu;
+	uint8_t b_boot_enable;
+	uint8_t b_descr_access_en;
+	uint8_t b_init_power_mode;
+	uint8_t b_high_priority_lun;
+	uint8_t b_secure_removal_type;
+	uint8_t b_security_lu;
+	uint8_t b_background_ops_term_lat;
+	uint8_t b_init_active_icc_level;
+	uint16_t w_spec_version;
+	uint16_t w_manufacture_date;
+	uint8_t i_manufacturer_name;
+	uint8_t i_product_name;
+	uint8_t i_serial_number;
+	uint8_t i_oem_id;
+	uint16_t w_manufacturer_id;
+	uint8_t b_ud_0base_offset;
+	uint8_t b_ud_config_plength;
+	uint8_t b_device_rtt_cap;
+	uint16_t w_periodic_rtc_update;
+	uint8_t b_ufs_feature_support;
+	uint8_t b_ffu_timeout;
+	uint8_t b_queue_depth;
+	uint16_t w_device_version;
+	uint8_t b_num_secure_wp_area;
+	uint32_t d_psa_max_data_size;
+	uint8_t b_psa_state_timeout;
+	uint8_t i_product_revision_level;
+	uint8_t reserved[5]; /* 5 reserved */
+	uint8_t reserved_ume[16]; /* 16 reserved */
+} __attribute__ ((packed));
+
 /*
  * Request Descriptor Definitions
  */
@@ -717,7 +757,19 @@ struct ufs_hba {
  * the LCC transmission on UFS device (by clearing TX_LCC_ENABLE
  * attribute of device to 0).
  */
-#define UFSHCD_QUIRK_BROKEN_LCC				0x1
+#define UFSHCD_QUIRK_BROKEN_LCC				BIT(0)
+
+/*
+ * This quirk needs to be enabled if the host controller has
+ * 64-bit addressing supported capability but it doesn't work.
+ */
+#define UFSHCD_QUIRK_BROKEN_64BIT_ADDRESS		BIT(1)
+
+/*
+ * This quirk needs to be enabled if the host controller has
+ * auto-hibernate capability but it's FASTAUTO only.
+ */
+#define UFSHCD_QUIRK_HIBERN_FASTAUTO			BIT(2)
 
 	/* Virtual memory reference */
 	struct utp_transfer_cmd_desc *ucdl;
@@ -735,6 +787,7 @@ struct ufs_hba {
 	struct ufs_pwr_mode_info max_pwr_info;
 
 	struct ufs_dev_cmd dev_cmd;
+	struct ufs_device_descriptor *dev_desc;
 };
 
 static inline int ufshcd_ops_init(struct ufs_hba *hba)
@@ -769,6 +822,8 @@ enum {
 	UFSHCI_VERSION_11 = 0x00010100, /* 1.1 */
 	UFSHCI_VERSION_20 = 0x00000200, /* 2.0 */
 	UFSHCI_VERSION_21 = 0x00000210, /* 2.1 */
+	UFSHCI_VERSION_30 = 0x00000300, /* 3.0 */
+	UFSHCI_VERSION_31 = 0x00000310, /* 3.1 */
 };
 
 /* Interrupt disable masks */
@@ -913,5 +968,6 @@ enum {
 #define UTP_TASK_REQ_LIST_RUN_STOP_BIT		0x1
 
 int ufshcd_probe(struct udevice *dev, struct ufs_hba_ops *hba_ops);
-
+int ufshcd_dme_reset(struct ufs_hba *hba);
+int ufshcd_dme_enable(struct ufs_hba *hba);
 #endif

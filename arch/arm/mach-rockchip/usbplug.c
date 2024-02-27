@@ -9,6 +9,7 @@
 #include <malloc.h>
 #include <mmc.h>
 #include <stdlib.h>
+#include <scsi.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -31,6 +32,7 @@ static const struct bootdev_list dev_list[] = {
 };
 #elif CONFIG_IS_ENABLED(ROCKCHIP_RK3576)
 static const struct bootdev_list dev_list[] = {
+	{IF_TYPE_SCSI, 0, 0},
 	{IF_TYPE_MMC, 0, 0},
 	{IF_TYPE_MTD, 0, 0}, /* BLK_MTD_NAND */
 	{IF_TYPE_MTD, 1, 0}, /* BLK_MTD_SPI_NAND FSPI0 M0 */
@@ -80,6 +82,12 @@ struct blk_desc *usbplug_blk_get_devnum_by_type(enum if_type if_type, int devnum
 		case IF_TYPE_MTD:
 			board_set_iomux(if_type, devnum, iomux_routing);
 			break;
+#if defined(CONFIG_SCSI) && defined(CONFIG_CMD_SCSI) && (defined(CONFIG_AHCI) || defined(CONFIG_UFS))
+		case IF_TYPE_SCSI:
+			scsi_scan(true);
+			scsi_scan(true);
+			break;
+#endif
 		default:
 			printf("Bootdev 0x%x is not support\n", if_type);
 			return NULL;
@@ -118,6 +126,12 @@ static char *bootdev_rockusb_cmd(void)
 		case IF_TYPE_MTD:
 			board_set_iomux(if_type, devnum, iomux_routing);
 			break;
+#if defined(CONFIG_SCSI) && defined(CONFIG_CMD_SCSI) && (defined(CONFIG_AHCI) || defined(CONFIG_UFS))
+		case IF_TYPE_SCSI:
+			scsi_scan(true);
+			scsi_scan(true);
+			break;
+#endif
 		default:
 			printf("Bootdev 0x%x is not support\n", if_type);
 			return NULL;

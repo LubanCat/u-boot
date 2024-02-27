@@ -14,7 +14,7 @@
 
 	chosen {
 		stdout-path = &uart0;
-		u-boot,spl-boot-order = &sdmmc, &sdhci, &spi_nand, &spi_nor;
+		u-boot,spl-boot-order = &sdmmc, "same-as-spl";
 	};
 };
 
@@ -246,5 +246,10 @@
 
 &u2phy0_otg {
 	u-boot,dm-pre-reloc;
+	status = "okay";
+};
+
+&ufs {
+	u-boot,dm-spl;
 	status = "okay";
 };

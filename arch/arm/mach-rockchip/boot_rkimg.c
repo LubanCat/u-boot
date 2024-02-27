@@ -65,7 +65,7 @@ static int bootdev_init(const char *devtype, const char *devnum)
 			return -ENODEV;
 	}
 #endif
-#if defined(CONFIG_SCSI) && defined(CONFIG_CMD_SCSI) && (defined(CONFIG_AHCI) || defined(CONFIG_SCSI_UFS))
+#if defined(CONFIG_SCSI) && defined(CONFIG_CMD_SCSI) && (defined(CONFIG_AHCI) || defined(CONFIG_UFS))
 	if (!strcmp("scsi", devtype)) {
 		scsi_scan(true);
 		if (scsi_scan(true))

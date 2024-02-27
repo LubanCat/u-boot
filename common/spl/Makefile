@@ -53,6 +53,7 @@ obj-$(CONFIG_$(SPL_TPL_)USB_SUPPORT) += spl_usb.o
 obj-$(CONFIG_$(SPL_TPL_)FAT_SUPPORT) += spl_fat.o
 obj-$(CONFIG_$(SPL_TPL_)EXT_SUPPORT) += spl_ext.o
 obj-$(CONFIG_$(SPL_TPL_)SATA_SUPPORT) += spl_sata.o
+obj-$(CONFIG_$(SPL_TPL_)UFS_SUPPORT) += spl_ufs.o
 obj-$(CONFIG_$(SPL_TPL_)DFU) += spl_dfu.o
 obj-$(CONFIG_$(SPL_TPL_)SPI_LOAD) += spl_spi.o
 obj-$(CONFIG_$(SPL_TPL_)RAM_SUPPORT) += spl_ram.o

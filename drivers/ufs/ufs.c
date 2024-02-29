@@ -21,6 +21,9 @@
 #include <linux/bitops.h>
 #include <linux/delay.h>
 
+#if defined(CONFIG_SUPPORT_USBPLUG)
+#include "ufs-rockchip-usbplug.h"
+#endif
 #include "ufs.h"
 
 #define UFSHCD_ENABLE_INTRS	(UTP_TRANSFER_REQ_COMPL |\
@@ -678,6 +681,15 @@ static int ufshcd_memory_alloc(struct ufs_hba *hba)
 		return -ENOMEM;
 	}
 
+#if defined(CONFIG_SUPPORT_USBPLUG)
+	hba->rc_desc = memalign(ARCH_DMA_MINALIGN, sizeof(struct ufs_configuration_descriptor));
+	hba->wc_desc = memalign(ARCH_DMA_MINALIGN, sizeof(struct ufs_configuration_descriptor));
+	hba->geo_desc = memalign(ARCH_DMA_MINALIGN, sizeof(struct ufs_geometry_descriptor));
+	if (!hba->rc_desc || !hba->wc_desc || !hba->geo_desc) {
+		dev_err(hba->dev, "memory allocation failed\n");
+		return -ENOMEM;
+	}
+#endif
 	return 0;
 }
 
@@ -1895,6 +1907,13 @@ int ufs_start(struct ufs_hba *hba)
 	if (ret)
 		return ret;
 
+#if defined(CONFIG_SUPPORT_USBPLUG) 
+	ret = ufs_create_partition_inventory(hba);
+	if (ret) {
+		dev_err(hba->dev, "%s: Failed to creat partition. err = %d\n", __func__, ret);
+		return ret;
+	}
+#endif
 	if (ufshcd_get_max_pwr_mode(hba)) {
 		dev_err(hba->dev,
 			"%s: Failed getting max supported power mode\n",

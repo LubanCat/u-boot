@@ -788,6 +788,11 @@ struct ufs_hba {
 
 	struct ufs_dev_cmd dev_cmd;
 	struct ufs_device_descriptor *dev_desc;
+#if defined(CONFIG_SUPPORT_USBPLUG)
+	struct ufs_configuration_descriptor *rc_desc;
+	struct ufs_configuration_descriptor *wc_desc;
+	struct ufs_geometry_descriptor *geo_desc;
+#endif
 };
 
 static inline int ufshcd_ops_init(struct ufs_hba *hba)
@@ -970,4 +975,12 @@ enum {
 int ufshcd_probe(struct udevice *dev, struct ufs_hba_ops *hba_ops);
 int ufshcd_dme_reset(struct ufs_hba *hba);
 int ufshcd_dme_enable(struct ufs_hba *hba);
+int ufs_create_partition_inventory(struct ufs_hba *hba);
+int ufshcd_map_desc_id_to_length(struct ufs_hba *hba, enum desc_idn desc_id, int *desc_len);
+int ufshcd_read_desc_param(struct ufs_hba *hba, enum desc_idn desc_id,
+			   int desc_index, u8 param_offset, u8 *param_read_buf,
+			   u8 param_size);
+int ufshcd_query_descriptor_retry(struct ufs_hba *hba, enum query_opcode opcode,
+				  enum desc_idn idn, u8 index, u8 selector,
+				  u8 *desc_buf, int *buf_len);
 #endif

@@ -18,10 +18,9 @@
 	};
 };
 
-// &firmware {
-// 	u-boot,dm-spl;
-// 	status = "okay";
-// };
+&firmware {
+	u-boot,dm-pre-reloc;
+};
 
 &gpio0 {
 	u-boot,dm-spl;
@@ -48,20 +47,17 @@
 	status = "okay";
 };
 
-// &scmi {
-// 	u-boot,dm-spl;
-// 	status = "okay";
-// };
+&scmi {
+	u-boot,dm-pre-reloc;
+};
 
-// &scmi_clk {
-// 	u-boot,dm-spl;
-// 	status = "okay";
-// };
+&scmi_clk {
+	u-boot,dm-pre-reloc;
+};
 
-// &scmi_shmem {
-// 	u-boot,dm-spl;
-// 	status = "okay";
-// };
+&scmi_shmem {
+	u-boot,dm-pre-reloc;
+};
 
 &sys_grf {
 	u-boot,dm-spl;

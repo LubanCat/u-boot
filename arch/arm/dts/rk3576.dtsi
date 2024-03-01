@@ -1644,7 +1644,6 @@
 			     &pdm0m0_sdi1
 			     &pdm0m0_sdi2
 			     &pdm0m0_sdi3>;
-		power-domains = <&power RK3576_PD_PMU1>;
 		#sound-dai-cells = <0>;
 		sound-name-prefix = "PDM0";
 		status = "disabled";

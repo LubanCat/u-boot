@@ -2293,6 +2293,9 @@ static int rk3576_clk_probe(struct udevice *dev)
 {
 	struct rk3576_clk_priv *priv = dev_get_priv(dev);
 	int ret;
+#if CONFIG_IS_ENABLED(CLK_SCMI)
+	struct clk clk;
+#endif
 
 	priv->sync_kernel = false;
 
@@ -2329,6 +2332,8 @@ static int rk3576_clk_probe(struct udevice *dev)
 		rk_clrsetreg(&priv->cru->litclksel_con[0], CLK_LITCORE_DIV_MASK,
 			     0 << CLK_LITCORE_DIV_SHIFT);
 	}
+	/* init cci */
+	writel(0xffff20cb, RK3576_CRU_BASE + RK3576_CCI_CLKSEL_CON(4));
 #endif
 
 	priv->grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
@@ -2336,8 +2341,30 @@ static int rk3576_clk_probe(struct udevice *dev)
 		return PTR_ERR(priv->grf);
 
 	rk3576_clk_init(priv);
-	/* init cci */
-	writel(0xffff20cb, RK3576_CRU_BASE + RK3576_CCI_CLKSEL_CON(4));
+
+#if CONFIG_IS_ENABLED(CLK_SCMI)
+#ifndef CONFIG_SPL_BUILD
+	ret = rockchip_get_scmi_clk(&clk.dev);
+	if (ret) {
+		printf("Failed to get scmi clk dev, ret=%d\n", ret);
+		return ret;
+	}
+	if (!priv->armclk_enter_hz) {
+		clk.id = ARMCLK_L;
+		ret = clk_set_rate(&clk, CPU_PVTPLL_HZ);
+		if (ret < 0) {
+			printf("Failed to set cpubl, ret=%d\n", ret);
+		} else {
+			priv->armclk_enter_hz = CPU_PVTPLL_HZ;
+			priv->armclk_init_hz = CPU_PVTPLL_HZ;
+		}
+	}
+	clk.id = ARMCLK_B;
+	ret = clk_set_rate(&clk, CPU_PVTPLL_HZ);
+	if (ret < 0)
+		printf("Failed to set cpub, ret=%d\n", ret);
+#endif
+#endif
 
 	/* Process 'assigned-{clocks/clock-parents/clock-rates}' properties */
 	ret = clk_set_defaults(dev);

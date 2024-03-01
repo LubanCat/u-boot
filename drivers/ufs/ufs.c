@@ -1547,6 +1547,10 @@ static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 	int ocs, result = 0;
 	u8 scsi_status;
 
+	/* cmd do not set lun for ufs 2.1 */
+	if (hba->dev_desc->w_spec_version == 0x210)
+		pccb->cmd[1] &= 0x1F;
+
 	ufshcd_prepare_req_desc_hdr(req_desc, &upiu_flags, pccb->dma_dir);
 	ufshcd_prepare_utp_scsi_cmd_upiu(hba, pccb, upiu_flags);
 	prepare_prdt_table(hba, pccb);

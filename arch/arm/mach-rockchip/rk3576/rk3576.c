@@ -9,6 +9,7 @@
 #include <mmc.h>
 #include <spl.h>
 #include <asm/io.h>
+#include <asm/arch/bootrom.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/ioc_rk3576.h>
@@ -119,6 +120,14 @@ struct mm_region *mem_map = rk3576_mem_map;
 void board_debug_uart_init(void)
 {
 }
+
+const char * const boot_devices[BROM_LAST_BOOTSOURCE + 1] = {
+	[BROM_BOOTSOURCE_EMMC] = "/mmc@2a330000",
+	[BROM_BOOTSOURCE_SPINOR] = "/spi@2a340000",
+	[BROM_BOOTSOURCE_SPINAND] = "/spi@2a340000",
+	[BROM_BOOTSOURCE_SD] = "/mmc@2a310000",
+	[BROM_BOOTSOURCE_UFS] = "/ufs@2a2d0000",
+};
 
 #ifdef CONFIG_SPL_BUILD
 void rockchip_stimer_init(void)

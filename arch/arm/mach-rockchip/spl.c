@@ -42,6 +42,10 @@ const char *board_spl_was_booted_from(void)
 	u32  bootdevice_brom_id = readl(BROM_BOOTSOURCE_ID_ADDR);
 	const char *bootdevice_ofpath = NULL;
 
+	if ((bootdevice_brom_id & BROM_DOWNLOAD_MASK) == BROM_DOWNLOAD_MASK)
+		bootdevice_brom_id = BROM_BOOTSOURCE_USB;
+
+	bootdevice_brom_id = bootdevice_brom_id & BROM_BOOTSOURCE_MASK;
 	if (bootdevice_brom_id < ARRAY_SIZE(boot_devices))
 		bootdevice_ofpath = boot_devices[bootdevice_brom_id];
 

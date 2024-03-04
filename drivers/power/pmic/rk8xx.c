@@ -52,7 +52,8 @@ static const struct virq_reg rk806_irqs[] = {
 static struct virq_chip rk806_irq_chip = {
 	.status_base		= RK806_INT_STS0,
 	.mask_base		= RK806_INT_MSK0,
-	.num_regs		= 1,
+	.irq_reg_stride		= 2,
+	.num_regs		= 2,
 	.read			= pmic_reg_read,
 	.write			= pmic_reg_write,
 	.irqs			= rk806_irqs,
@@ -484,12 +485,21 @@ static int rk8xx_irq_chip_init(struct udevice *dev)
 	struct rk8xx_priv *priv = dev_get_priv(dev);
 	struct virq_chip *irq_chip = NULL;
 	__maybe_unused int irq_plugout = 1;
+	uint8_t value;
 	int ret;
 
 	switch (priv->variant) {
 	case RK806_ID:
 		irq_chip = &rk806_irq_chip;
 		irq_plugout = 0;
+		ret = rk8xx_read(dev, RK806_GPIO_INT_CONFIG, &value, 1);
+		if (ret)
+			return ret;
+		/* set INT polarity active low */
+		value &= (~RK806_INT_POL_HIGH);
+		ret = rk8xx_write(dev, RK806_GPIO_INT_CONFIG, &value, 1);
+		if (ret)
+			return ret;
 		break;
 	case RK808_ID:
 		irq_chip = &rk808_irq_chip;

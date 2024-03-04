@@ -10,7 +10,12 @@ struct udevice;
 #define UPIU_TRANSACTION_UIC_CMD 0x1F
 #define UIC_CMD_SIZE (sizeof(u32) * 4)
 #define RESPONSE_UPIU_SENSE_DATA_LENGTH	18
+
+#ifdef CONFIG_ARCH_ROCKCHIP
+#define UFS_MAX_LUNS		0x4
+#else
 #define UFS_MAX_LUNS		0x7F
+#endif
 
 enum {
 	TASK_REQ_UPIU_SIZE_DWORDS	= 8,

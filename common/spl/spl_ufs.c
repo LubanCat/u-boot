@@ -36,7 +36,6 @@ static int spl_ufs_load_image(struct spl_image_info *spl_image,
 	/* try to recognize storage devices immediately */
 	ufs_probe();
 	scsi_scan(true);
-	scsi_scan(true);
 
 	desc = blk_get_devnum_by_type(IF_TYPE_SCSI, 0);
 	if (!desc)

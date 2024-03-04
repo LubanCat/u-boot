@@ -85,7 +85,6 @@ struct blk_desc *usbplug_blk_get_devnum_by_type(enum if_type if_type, int devnum
 #if defined(CONFIG_SCSI) && defined(CONFIG_CMD_SCSI) && (defined(CONFIG_AHCI) || defined(CONFIG_UFS))
 		case IF_TYPE_SCSI:
 			scsi_scan(true);
-			scsi_scan(true);
 			break;
 #endif
 		default:
@@ -128,7 +127,6 @@ static char *bootdev_rockusb_cmd(void)
 			break;
 #if defined(CONFIG_SCSI) && defined(CONFIG_CMD_SCSI) && (defined(CONFIG_AHCI) || defined(CONFIG_UFS))
 		case IF_TYPE_SCSI:
-			scsi_scan(true);
 			scsi_scan(true);
 			break;
 #endif

@@ -17,6 +17,7 @@
 #include <dm.h>
 #include <misc.h>
 #include <mmc.h>
+#include <scsi.h>
 #include <stdlib.h>
 #include <usbplug.h>
 
@@ -761,6 +762,12 @@ static int rkusb_do_switch_storage(struct fsg_common *common)
 		type = IF_TYPE_MTD;
 		devnum = 2;
 		break;
+#if defined(CONFIG_SCSI) && defined(CONFIG_CMD_SCSI) && (defined(CONFIG_AHCI) || defined(CONFIG_UFS))
+	case BOOT_TYPE_SATA:
+		type = IF_TYPE_SCSI;
+		devnum = 0;
+		break;
+#endif
 	default:
 		printf("Bootdev 0x%x is not support\n", media);
 		return -ENODEV;

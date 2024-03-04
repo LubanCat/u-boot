@@ -1544,13 +1544,13 @@ static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 	struct ufs_hba *hba = dev_get_uclass_priv(scsi_dev->parent);
 	struct utp_transfer_req_desc *req_desc = hba->utrdl;
 	u32 upiu_flags;
-	int ocs, result = 0;
+	int ocs, result = 0, retry_count = 5;
 	u8 scsi_status;
 
 	/* cmd do not set lun for ufs 2.1 */
 	if (hba->dev_desc->w_spec_version == 0x1002) /* verison 0x210 in big end */
 		pccb->cmd[1] &= 0x1F;
-
+retry:
 	ufshcd_prepare_req_desc_hdr(req_desc, &upiu_flags, pccb->dma_dir);
 	ufshcd_prepare_utp_scsi_cmd_upiu(hba, pccb, upiu_flags);
 	prepare_prdt_table(hba, pccb);
@@ -1566,6 +1566,9 @@ static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 			result = ufshcd_get_rsp_upiu_result(hba->ucd_rsp_ptr);
 
 			scsi_status = result & MASK_SCSI_STATUS;
+
+			if ((pccb->cmd[0] == SCSI_TST_U_RDY) && scsi_status == SENSE_NOT_READY && retry_count--)
+				goto retry;
 			if (scsi_status)
 				return -EINVAL;
 

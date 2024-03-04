@@ -237,6 +237,8 @@ void scsi_init(void);
 #endif
 
 #define SCSI_IDENTIFY					0xC0  /* not used */
+#define SCSI_STD_INQUIRY_BYTES				36
+#define SCSI_MAX_INQUIRY_BYTES				96
 
 /* Hardware errors  */
 #define SCSI_SEL_TIME_OUT			 0x00000101	 /* Selection time out */

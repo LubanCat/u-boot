@@ -1548,7 +1548,7 @@ static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 	u8 scsi_status;
 
 	/* cmd do not set lun for ufs 2.1 */
-	if (hba->dev_desc->w_spec_version == 0x210)
+	if (hba->dev_desc->w_spec_version == 0x1002) /* verison 0x210 in big end */
 		pccb->cmd[1] &= 0x1F;
 
 	ufshcd_prepare_req_desc_hdr(req_desc, &upiu_flags, pccb->dma_dir);

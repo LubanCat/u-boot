@@ -26,7 +26,11 @@ ifdef CONFIG_SPL_BUILD
 obj-$(CONFIG_$(SPL_TPL_)BOOTROM_SUPPORT) += spl_bootrom.o
 ifdef CONFIG_SPL_KERNEL_BOOT_PREBUILT
 ifeq ($(CONFIG_$(SPL_TPL_)LOAD_FIT),y)
+ifdef CONFIG_ROCKCHIP_PX30
+obj-y += spl_fit_tb_px30.o
+else
 obj-$(CONFIG_ARM64) += spl_fit_tb_arm64.o
+endif
 obj-$(CONFIG_ROCKCHIP_RV1106) += spl_fit_tb_rv1106.o
 obj-$(CONFIG_ROCKCHIP_RV1126) += spl_fit_tb_rv1126.o
 endif

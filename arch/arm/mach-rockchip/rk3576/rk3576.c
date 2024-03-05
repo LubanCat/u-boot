@@ -57,6 +57,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define SYS_SGRF_BASE		0x26004000
 #define SYS_SGRF_SOC_CON14	0x0058
 #define SYS_SGRF_SOC_CON15	0x005C
+#define SYS_SGRF_SOC_CON20	0x0070
 
 #define FW_SYS_SGRF_BASE	0x26005000
 #define SGRF_DOMAIN_CON1	0x4
@@ -363,6 +364,12 @@ int arch_cpu_init(void)
 	 * if usb3 phy isn't ready.
 	 */
 	writel(0x000c0008, USBGRF_BASE + USB_GRF_USB3OTG0_CON1);
+
+	/*
+	 * Enable cci channels for below module AXI R/W
+	 * Module: GMAC0/1, MMU0/1(PCIe, SATA, USB3)
+	 */
+	writel(0xffffff00, SYS_SGRF_BASE + SYS_SGRF_SOC_CON20);
 #endif
 
 #if defined(CONFIG_ROCKCHIP_EMMC_IOMUX)

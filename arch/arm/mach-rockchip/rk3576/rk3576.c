@@ -36,6 +36,11 @@ DECLARE_GLOBAL_DATA_PTR;
 #define GPIO2A_IOMUX_SEL_L	0x0040
 #define GPIO2A_IOMUX_SEL_H	0x0044
 
+#define VCCIO_IOC_BASE		0x26046000
+#define VCCIO_IOC_GPIO1C_PUL	0x118
+#define VCCIO_IOC_GPIO1D_PUL	0x11C
+#define VCCIO_IOC_GPIO2A_PUL	0x120
+
 #define VCCIO6_IOC_BASE		0x2604a000
 #define VCCIO7_IOC_BASE		0x2604b000
 #define VCCIO7_IOC_GPIO4D_IOMUX_SEL_L	0x0398
@@ -163,22 +168,48 @@ void board_set_iomux(enum if_type if_type, int devnum, int routing)
 		if (routing == 0) {
 			/* FSPI0 M0 */
 			writel(0xffff2222, TOP_IOC_BASE + GPIO1A_IOMUX_SEL_L);
-			writel(0xffff2222, TOP_IOC_BASE + GPIO1A_IOMUX_SEL_H);
-			writel(0xffff2220, TOP_IOC_BASE + GPIO1B_IOMUX_SEL_L);
+			writel(0xffff2020, TOP_IOC_BASE + GPIO1B_IOMUX_SEL_L);
 		} else if (routing == 1) {
 			/* FSPI1 M0 */
 			writel(0xffff2222, TOP_IOC_BASE + GPIO2A_IOMUX_SEL_L);
-			writel(0x00FF0022, TOP_IOC_BASE + GPIO2A_IOMUX_SEL_H);
+			writel(0x00ff0022, TOP_IOC_BASE + GPIO2A_IOMUX_SEL_H);
+			/* Pull up */
+			writel(0x03ff03ff, VCCIO_IOC_BASE + VCCIO_IOC_GPIO2A_PUL);
 		} else if (routing == 2) {
 			/* FSPI1 M1 */
-			writel(0xff003300, TOP_IOC_BASE + GPIO1C_IOMUX_SEL_L);
+			writel(0xf0003000, TOP_IOC_BASE + GPIO1C_IOMUX_SEL_L);
 			writel(0xffff3333, TOP_IOC_BASE + GPIO1C_IOMUX_SEL_H);
-			writel(0xffff3333, TOP_IOC_BASE + GPIO1D_IOMUX_SEL_L);
-			writel(0x00ff0033, TOP_IOC_BASE + GPIO1D_IOMUX_SEL_H);
+			writel(0x00f00030, TOP_IOC_BASE + GPIO1D_IOMUX_SEL_H);
+			/* Pull up */
+			writel(0xffc0ffc0, VCCIO_IOC_BASE + VCCIO_IOC_GPIO1C_PUL);
 		}
 		break;
 	default:
 		printf("Bootdev 0x%x is not support\n", if_type);
+	}
+}
+
+void board_unset_iomux(enum if_type if_type, int devnum, int routing)
+{
+	switch (if_type) {
+	case IF_TYPE_MTD:
+		if (routing == 0) {
+			/* FSPI0 M0 -> GPIO */
+			writel(0xffff0000, TOP_IOC_BASE + GPIO1A_IOMUX_SEL_L);
+			writel(0xffff0000, TOP_IOC_BASE + GPIO1B_IOMUX_SEL_L);
+		} else if (routing == 1) {
+			/* FSPI1 M0 -> GPIO */
+			writel(0xffff0000, TOP_IOC_BASE + GPIO2A_IOMUX_SEL_L);
+			writel(0x00ff0000, TOP_IOC_BASE + GPIO2A_IOMUX_SEL_H);
+		} else if (routing == 2) {
+			/* FSPI1 M1 -> GPIO */
+			writel(0xf0000000, TOP_IOC_BASE + GPIO1C_IOMUX_SEL_L);
+			writel(0xffff0000, TOP_IOC_BASE + GPIO1C_IOMUX_SEL_H);
+			writel(0x00f00000, TOP_IOC_BASE + GPIO1D_IOMUX_SEL_H);
+		}
+		break;
+	default:
+		break;
 	}
 }
 

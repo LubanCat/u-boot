@@ -287,6 +287,10 @@ static int rkusb_do_read_flash_info(struct fsg_common *common,
 		.flash_mask = 0
 	};
 
+	/* Set the raw block size for tools to creat GPT with 4K block size */
+	if (desc->rawblksz == 0x1000)
+		finfo.manufacturer = 208;
+
 	finfo.flash_size = (u32)desc->lba;
 
 	if (desc->if_type == IF_TYPE_MTD &&

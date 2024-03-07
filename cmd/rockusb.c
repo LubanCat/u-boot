@@ -9,6 +9,7 @@
 #include <common.h>
 #include <command.h>
 #include <console.h>
+#include <dm/device.h>
 #include <g_dnl.h>
 #include <part.h>
 #include <usb.h>
@@ -41,10 +42,13 @@ static int rkusb_write_sector(struct ums *ums_dev,
 {
 	struct blk_desc *block_dev = &ums_dev->block_dev;
 	lbaint_t blkstart = start + ums_dev->start_sector;
+	struct blk_desc *mtd_blk = NULL;
 	int ret;
 
-	if (block_dev->if_type == IF_TYPE_MTD)
-		block_dev->op_flag |= BLK_MTD_CONT_WRITE;
+	if (block_dev->if_type == IF_TYPE_MTD) {
+		mtd_blk = dev_get_uclass_platdata(block_dev->bdev);
+		mtd_blk->op_flag |= BLK_MTD_CONT_WRITE;
+	}
 
 	ret = blk_dwrite(block_dev, blkstart, blkcnt, buf);
 	if (!ret)
@@ -56,8 +60,9 @@ static int rkusb_write_sector(struct ums *ums_dev,
 			blk_write_devnum(IF_TYPE_SCSI, 1, blkstart, blkcnt, (ulong *)buf);
 	}
 #endif
-	if (block_dev->if_type == IF_TYPE_MTD)
-		block_dev->op_flag &= ~(BLK_MTD_CONT_WRITE);
+	if (block_dev->if_type == IF_TYPE_MTD) {
+		mtd_blk->op_flag &= ~(BLK_MTD_CONT_WRITE);
+	}
 	return ret;
 }
 

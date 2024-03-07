@@ -460,6 +460,7 @@ static int spinand_read_id_op(struct spinand_device *spinand, u8 naddr,
 	return ret;
 }
 
+#if !CONFIG_IS_ENABLED(SUPPORT_USBPLUG)
 static int spinand_reset_op(struct spinand_device *spinand)
 {
 	struct spi_mem_op op = SPINAND_RESET_OP;
@@ -471,6 +472,7 @@ static int spinand_reset_op(struct spinand_device *spinand)
 
 	return spinand_wait(spinand, NULL);
 }
+#endif
 
 static int spinand_lock_block(struct spinand_device *spinand, u8 lock)
 {
@@ -1057,9 +1059,11 @@ static int spinand_detect(struct spinand_device *spinand)
 	struct nand_device *nand = spinand_to_nand(spinand);
 	int ret;
 
+#if !CONFIG_IS_ENABLED(SUPPORT_USBPLUG)
 	ret = spinand_reset_op(spinand);
 	if (ret)
 		return ret;
+#endif
 
 	ret = spinand_id_detect(spinand);
 	if (ret) {

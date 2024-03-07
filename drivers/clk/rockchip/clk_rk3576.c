@@ -2334,6 +2334,21 @@ static int rk3576_clk_probe(struct udevice *dev)
 	}
 	/* init cci */
 	writel(0xffff20cb, RK3576_CRU_BASE + RK3576_CCI_CLKSEL_CON(4));
+
+	/* Change bigcore rm from 4 to 3 */
+	writel(0x001c000c, RK3576_BIGCORE_GRF_BASE + 0x3c);
+	writel(0x001c000c, RK3576_BIGCORE_GRF_BASE + 0x44);
+	writel(0x00020002, RK3576_BIGCORE_GRF_BASE + 0x38);
+	udelay(1);
+	writel(0x00020000, RK3576_BIGCORE_GRF_BASE + 0x38);
+	/* Change litcore rm from 4 to 3 */
+	writel(0x001c000c, RK3576_LITCORE_GRF_BASE + 0x3c);
+	writel(0x001c000c, RK3576_LITCORE_GRF_BASE + 0x44);
+	writel(0x00020002, RK3576_LITCORE_GRF_BASE + 0x38);
+	udelay(1);
+	writel(0x00020000, RK3576_LITCORE_GRF_BASE + 0x38);
+	/* Change cci rm form 4 to 3 */
+	writel(0x001c000c, RK3576_CCI_GRF_BASE + 0x54);
 #endif
 
 	priv->grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);

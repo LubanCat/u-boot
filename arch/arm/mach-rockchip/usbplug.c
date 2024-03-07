@@ -34,7 +34,6 @@ static const struct bootdev_list dev_list[] = {
 static const struct bootdev_list dev_list[] = {
 	{IF_TYPE_SCSI, 0, 0},
 	{IF_TYPE_MMC, 0, 0},
-	{IF_TYPE_MTD, 0, 0}, /* BLK_MTD_NAND */
 	{IF_TYPE_MTD, 1, 0}, /* BLK_MTD_SPI_NAND FSPI0 M0 */
 	{IF_TYPE_MTD, 1, 1}, /* BLK_MTD_SPI_NAND FSPI1 M0 */
 	{IF_TYPE_MTD, 1, 2}, /* BLK_MTD_SPI_NAND FSPI1 M1 */
@@ -59,6 +58,10 @@ struct blk_desc *rockchip_get_bootdev(void)
 }
 
 __weak void board_set_iomux(enum if_type if_type, int devnum, int routing)
+{
+}
+
+__weak void board_unset_iomux(enum if_type if_type, int devnum, int routing)
 {
 }
 
@@ -96,6 +99,8 @@ struct blk_desc *usbplug_blk_get_devnum_by_type(enum if_type if_type, int devnum
 		blk_desc = blk_get_devnum_by_type(if_type, devnum);
 		if (blk_desc)
 			break;
+
+		board_unset_iomux(if_type, devnum, iomux_routing);
 	}
 
 	boot_blk_desc = blk_desc;
@@ -139,6 +144,8 @@ static char *bootdev_rockusb_cmd(void)
 		blk_desc = blk_get_devnum_by_type(if_type, devnum);
 		if (blk_desc)
 			break;
+
+		board_unset_iomux(if_type, devnum, iomux_routing);
 	}
 
 	boot_blk_desc = blk_desc;

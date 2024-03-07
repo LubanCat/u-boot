@@ -128,8 +128,6 @@ void board_debug_uart_init(void)
 
 const char * const boot_devices[BROM_LAST_BOOTSOURCE + 1] = {
 	[BROM_BOOTSOURCE_EMMC] = "/mmc@2a330000",
-	[BROM_BOOTSOURCE_SPINOR] = "/spi@2a340000",
-	[BROM_BOOTSOURCE_SPINAND] = "/spi@2a340000",
 	[BROM_BOOTSOURCE_SD] = "/mmc@2a310000",
 	[BROM_BOOTSOURCE_UFS] = "/ufs@2a2d0000",
 };

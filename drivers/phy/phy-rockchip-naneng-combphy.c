@@ -128,7 +128,19 @@ static int rockchip_combphy_pcie_init(struct rockchip_combphy_priv *priv)
 
 static int rockchip_combphy_usb3_init(struct rockchip_combphy_priv *priv)
 {
+	const struct rockchip_combphy_grfcfg *cfg = priv->cfg->grfcfg;
 	int ret = 0;
+
+	if (dev_read_bool(priv->dev, "rockchip,dis-u3otg0-port")) {
+		ret = param_write(priv->pipe_grf, &cfg->u3otg0_port_en, false);
+		return ret;
+	} else if (dev_read_bool(priv->dev, "rockchip,dis-u3otg1-port")) {
+		param_write(priv->pipe_grf, &cfg->u3otg1_port_en, false);
+#ifdef CONFIG_ROCKCHIP_RK3576
+		param_write(priv->phy_grf,  &cfg->usb_mode_set, true);
+#endif
+		return ret;
+	}
 
 	if (priv->cfg->combphy_cfg) {
 		ret = priv->cfg->combphy_cfg(priv);

@@ -614,7 +614,8 @@ static int ufshcd_hba_enable(struct ufs_hba *hba)
 	/* enable UIC related interrupts */
 	ufshcd_enable_intr(hba, UFSHCD_UIC_MASK);
 
-	ufshcd_ops_hce_enable_notify(hba, POST_CHANGE);
+	if (ufshcd_ops_hce_enable_notify(hba, POST_CHANGE))
+		return -EIO;
 
 	return 0;
 }

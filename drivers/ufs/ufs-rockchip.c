@@ -24,6 +24,44 @@ static inline bool ufshcd_is_hba_active(struct ufs_hba *hba)
 	return ufshcd_readl(hba, REG_CONTROLLER_ENABLE) & CONTROLLER_ENABLE;
 }
 
+#if defined(CONFIG_SUPPORT_USBPLUG)
+static int ufs_rockchip_test_linkup(struct ufs_hba *hba)
+{
+	unsigned long start = 0;
+	u32 intr_status;
+	u32 enabled_intr_status;
+
+	/* Write Args */
+	ufshcd_writel(hba, 0, REG_UIC_COMMAND_ARG_1);
+	ufshcd_writel(hba, 0, REG_UIC_COMMAND_ARG_2);
+	ufshcd_writel(hba, 0, REG_UIC_COMMAND_ARG_3);
+	/* Write UIC Cmd */
+	ufshcd_writel(hba, UIC_CMD_DME_LINK_STARTUP & COMMAND_OPCODE_MASK, REG_UIC_COMMAND);
+
+	start = get_timer(0);
+	do {
+		intr_status = ufshcd_readl(hba, REG_INTERRUPT_STATUS);
+		enabled_intr_status = intr_status & hba->intr_mask;
+		ufshcd_writel(hba, intr_status, REG_INTERRUPT_STATUS);
+
+		if (get_timer(start) > 50) {
+			dev_err(hba->dev,
+				"Timedout waiting for UIC response\n");
+			return -ETIMEDOUT;
+		}
+
+		if (enabled_intr_status & UFSHCD_ERROR_MASK) {
+			dev_err(hba->dev, "Error in status:%08x\n",
+				enabled_intr_status);
+
+			return -1;
+		}
+	} while (!(enabled_intr_status & UFSHCD_UIC_MASK));
+
+	return 0;
+}
+#endif
+
 static int ufs_rockchip_hce_enable_notify(struct ufs_hba *hba,
 					  enum ufs_notify_change_status status)
 {
@@ -32,6 +70,16 @@ static int ufs_rockchip_hce_enable_notify(struct ufs_hba *hba,
 	if (status == POST_CHANGE) {
 		ufshcd_dme_reset(hba);
 		ufshcd_dme_enable(hba);
+
+#if defined(CONFIG_SUPPORT_USBPLUG)
+		/* Try linkup to test if mphy has power supply */
+		if (ufs_rockchip_test_linkup(hba)) {
+			return -EIO;
+		} else {
+			ufshcd_dme_reset(hba);
+			ufshcd_dme_enable(hba);
+		}
+#endif
 		if (hba->ops->phy_initialization) {
                        err = hba->ops->phy_initialization(hba);
                        if (err) {

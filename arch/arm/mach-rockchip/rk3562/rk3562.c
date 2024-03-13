@@ -529,6 +529,19 @@ int fit_standalone_release(char *id, uintptr_t entry_point)
 	return 0;
 }
 
+void board_set_iomux(enum if_type if_type, int devnum, int routing)
+{
+	switch (if_type) {
+	case IF_TYPE_MTD:
+		/* FSPI */
+		writel(0xffff2222, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_L);
+		writel(0x00ff0022, GPIO1_IOC_BASE + GPIO1B_IOMUX_SEL_L);
+		break;
+	default:
+		printf("Bootdev 0x%x is not support\n", if_type);
+	}
+}
+
 #if defined(CONFIG_SPL_BUILD) && !defined(CONFIG_TPL_BUILD)
 static void qos_priority_init(void)
 {
@@ -611,6 +624,7 @@ static void qos_priority_init(void)
 
 	writel(0x5, PCIE_SHAPING_REG);
 }
+#endif
 
 int arch_cpu_init(void)
 {
@@ -667,8 +681,9 @@ int arch_cpu_init(void)
 	}
 #endif
 
+#if defined(CONFIG_SPL_BUILD) && !defined(CONFIG_TPL_BUILD)
 	qos_priority_init();
+#endif
 
 	return 0;
 }
-#endif

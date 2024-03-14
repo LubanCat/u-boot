@@ -1432,35 +1432,92 @@ static ulong rk3576_dclk_ebc_set_clk(struct rk3576_clk_priv *priv,
 				     ulong clk_id, ulong rate)
 {
 	struct rk3576_cru *cru = priv->cru;
-	u32 div, sel;
+	ulong pll_rate, now, best_rate = 0;
+	u32 i, con, sel, div, best_div = 0, best_sel = 0;
 	unsigned long m = 0, n = 0, val;
 
 	switch (clk_id) {
 	case DCLK_EBC:
-		if (!(priv->gpll_hz % rate)) {
-			sel = DCLK_EBC_SEL_GPLL;
-			div = priv->gpll_hz / rate;
-		} else if (!(priv->cpll_hz % rate)) {
-			sel = DCLK_EBC_SEL_CPLL;
-			div = priv->cpll_hz / rate;
-		} else if (!(priv->aupll_hz % rate)) {
-			sel = DCLK_EBC_SEL_AUPLL;
-			div = priv->aupll_hz / rate;
-		} else if (!(priv->vpll_hz % rate)) {
-			sel = DCLK_EBC_SEL_VPLL;
-			div = priv->vpll_hz / rate;
-		} else if (!(OSC_HZ % rate)) {
-			sel = DCLK_EBC_SEL_OSC;
-			div = OSC_HZ / rate;
-		} else {
-			sel = DCLK_EBC_SEL_FRAC_SRC;
+		con = readl(&cru->clksel_con[123]);
+		sel = (con & DCLK_EBC_SEL_MASK) >> DCLK_EBC_SEL_SHIFT;
+		if (sel == DCLK_EBC_SEL_VPLL) {
+			pll_rate = rockchip_pll_get_rate(&rk3576_pll_clks[VPLL],
+							 priv->cru, VPLL);
+			if (pll_rate >= RK3576_VOP_PLL_LIMIT_FREQ &&
+			    pll_rate % rate == 0) {
+				div = DIV_ROUND_UP(pll_rate, rate);
+				rk_clrsetreg(&cru->clksel_con[123],
+					     DCLK_EBC_DIV_MASK,
+					     (div - 1) << DCLK_EBC_DIV_SHIFT);
+			} else {
+				div = DIV_ROUND_UP(RK3576_VOP_PLL_LIMIT_FREQ,
+						   rate);
+				if (div % 2)
+					div = div + 1;
+				rk_clrsetreg(&cru->clksel_con[123],
+					     DCLK_EBC_DIV_MASK,
+					     (div - 1) << DCLK_EBC_DIV_SHIFT);
+				rockchip_pll_set_rate(&rk3576_pll_clks[VPLL],
+						      priv->cru,
+						      VPLL, div * rate);
+				priv->vpll_hz = rockchip_pll_get_rate(&rk3576_pll_clks[VPLL],
+								      priv->cru,
+								      VPLL);
+			}
+		} else if (sel == DCLK_EBC_SEL_FRAC_SRC) {
 			rk3576_dclk_ebc_set_clk(priv, DCLK_EBC_FRAC_SRC, rate);
 			div = rk3576_dclk_ebc_get_clk(priv, DCLK_EBC_FRAC_SRC) / rate;
+			rk_clrsetreg(&cru->clksel_con[123],
+				     DCLK_EBC_DIV_MASK,
+				     (div - 1) << DCLK_EBC_DIV_SHIFT);
+		} else {
+			for (i = 0; i <= DCLK_EBC_SEL_LPLL; i++) {
+				switch (i) {
+				case DCLK_EBC_SEL_GPLL:
+					pll_rate = priv->gpll_hz;
+					break;
+				case DCLK_EBC_SEL_CPLL:
+					pll_rate = priv->cpll_hz;
+					break;
+				case DCLK_EBC_SEL_VPLL:
+					pll_rate = 0;
+					break;
+				case DCLK_EBC_SEL_AUPLL:
+					pll_rate = priv->aupll_hz;
+					break;
+				case DCLK_EBC_SEL_LPLL:
+					pll_rate = 0;
+					break;
+				default:
+					printf("not support ebc pll sel\n");
+					return -EINVAL;
+				}
+
+				div = DIV_ROUND_UP(pll_rate, rate);
+				if (div > 255)
+					continue;
+				now = pll_rate / div;
+				if (abs(rate - now) < abs(rate - best_rate)) {
+					best_rate = now;
+					best_div = div;
+					best_sel = i;
+				}
+			}
+
+			if (best_rate) {
+				rk_clrsetreg(&cru->clksel_con[123],
+					     DCLK_EBC_DIV_MASK |
+					     DCLK_EBC_SEL_MASK,
+					     best_sel <<
+					     DCLK_EBC_SEL_SHIFT |
+					     (best_div - 1) <<
+					     DCLK_EBC_DIV_SHIFT);
+			} else {
+				printf("do not support this vop freq %lu\n",
+				       rate);
+				return -EINVAL;
+			}
 		}
-		rk_clrsetreg(&cru->clksel_con[123],
-			     DCLK_EBC_SEL_MASK | DCLK_EBC_DIV_MASK,
-			     (sel << DCLK_EBC_SEL_SHIFT) |
-			     (div - 1) << DCLK_EBC_DIV_SHIFT);
 		break;
 	case DCLK_EBC_FRAC_SRC:
 		sel = DCLK_EBC_FRAC_SRC_SEL_GPLL;
@@ -2260,6 +2317,24 @@ static int __maybe_unused rk3576_dclk_vop_set_parent(struct clk *clk,
 		rk_clrsetreg(&cru->clksel_con[147], DCLK2_VOP_SEL_MASK,
 			     sel << DCLK2_VOP_SEL_SHIFT);
 		break;
+	case DCLK_EBC:
+		if (parent->id == PLL_GPLL)
+			sel = 0;
+		else if (parent->id == PLL_CPLL)
+			sel = 1;
+		else if (parent->id == PLL_VPLL)
+			sel = 2;
+		else if (parent->id == PLL_AUPLL)
+			sel = 3;
+		else if (parent->id == PLL_LPLL)
+			sel = 4;
+		else if (parent->id == DCLK_EBC_FRAC_SRC)
+			sel = 5;
+		else
+			sel = 6;
+		rk_clrsetreg(&cru->clksel_con[123], DCLK_EBC_SEL_MASK,
+			     sel << DCLK_EBC_SEL_SHIFT);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2294,6 +2369,7 @@ static int rk3576_clk_set_parent(struct clk *clk, struct clk *parent)
 	case DCLK_VP0:
 	case DCLK_VP1:
 	case DCLK_VP2:
+	case DCLK_EBC:
 		return rk3576_dclk_vop_set_parent(clk, parent);
 	case CLK_REF_OSC_MPHY:
 		return rk3576_ufs_ref_set_parent(clk, parent);
@@ -2332,6 +2408,10 @@ static void rk3576_clk_init(struct rk3576_clk_priv *priv)
 		if (!ret)
 			priv->gpll_hz = GPLL_HZ;
 	}
+	rk_clrsetreg(&priv->cru->clksel_con[123],
+		     DCLK_EBC_FRAC_SRC_SEL_MASK,
+		     (DCLK_EBC_FRAC_SRC_SEL_GPLL <<
+		      DCLK_EBC_FRAC_SRC_SEL_SHIFT));
 }
 
 static int rk3576_clk_probe(struct udevice *dev)

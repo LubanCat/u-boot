@@ -4,7 +4,9 @@
  * SPDX-License-Identifier:     GPL-2.0+
  */
 #include <common.h>
+#include <boot_rkimg.h>
 #include <dm.h>
+#include <fdt_support.h>
 #include <misc.h>
 #include <mmc.h>
 #include <spl.h>
@@ -347,3 +349,27 @@ int arch_cpu_init(void)
 	return 0;
 }
 #endif
+
+#if defined(CONFIG_SCSI) && defined(CONFIG_CMD_SCSI) && defined(CONFIG_UFS)
+int rk_board_fdt_fixup(const void *blob)
+{
+	struct blk_desc *desc = rockchip_get_bootdev();
+
+	if (!desc)
+		return 0;
+
+	/*
+	 * If there are eMMC and UFS on a board but the boot device is not UFS.
+	 * It's quite possible that there is not power supply for UFS.
+	 *
+	 * It occurs hang if kernel ufs driver try to access UFS registers.
+	 */
+	if (desc->if_type != IF_TYPE_SCSI) {
+		do_fixup_by_path((void *)blob, "/ufs@2a2d0000", "status", "disabled", 9, 0);
+		printf("FDT: UFS is not boot device and it was disabled\n");
+	}
+
+	return 0;
+}
+#endif
+

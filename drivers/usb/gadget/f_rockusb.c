@@ -795,6 +795,7 @@ static int rkusb_do_switch_storage(struct fsg_common *common)
 		return -ENODEV;
 	}
 
+	common->luns[common->lun].num_sectors = block_dev->lba;
 	ums[common->lun].num_sectors = block_dev->lba;
 	ums[common->lun].block_dev = *block_dev;
 

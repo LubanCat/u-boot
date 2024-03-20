@@ -8,6 +8,7 @@
 #include <common.h>
 #include <dm.h>
 #include <inttypes.h>
+#include <memalign.h>
 #include <pci.h>
 #include <scsi.h>
 #include <dm/device-internal.h>
@@ -137,6 +138,21 @@ static void scsi_setup_inquiry(struct scsi_cmd *pccb)
 		pccb->cmd[4] = SCSI_MAX_INQUIRY_BYTES;
 	else
 		pccb->cmd[4] = (unsigned char)pccb->datalen;
+	pccb->cmd[5] = 0;
+	pccb->cmdlen = 6;
+	pccb->msgout[0] = SCSI_IDENTIFY; /* NOT USED */
+}
+
+/*
+ * Some setup (fill-in) routines
+ */
+static void scsi_setup_test_unit_ready(struct scsi_cmd *pccb)
+{
+	pccb->cmd[0] = SCSI_TST_U_RDY;
+	pccb->cmd[1] = pccb->lun << 5;
+	pccb->cmd[2] = 0;
+	pccb->cmd[3] = 0;
+	pccb->cmd[4] = 0;
 	pccb->cmd[5] = 0;
 	pccb->cmdlen = 6;
 	pccb->msgout[0] = SCSI_IDENTIFY; /* NOT USED */
@@ -380,6 +396,51 @@ static ulong scsi_write(struct blk_desc *block_dev, lbaint_t blknr,
 #endif
 
 }
+#ifdef CONFIG_BLK
+static ulong scsi_erase(struct udevice *dev, lbaint_t blknr, lbaint_t blkcnt)
+{
+	ALLOC_CACHE_ALIGN_BUFFER_PAD(struct unmap_para_list, um_list, 1, ARCH_DMA_MINALIGN);
+	struct blk_desc *block_dev = dev_get_uclass_platdata(dev);
+	struct udevice *bdev = dev->parent;
+	struct scsi_cmd *pccb = (struct scsi_cmd *)&tempccb;
+	uint32_t rawsectsz = block_dev->rawblksz / block_dev->blksz;
+
+	pccb->target = block_dev->target;
+	pccb->lun = block_dev->lun;
+	pccb->datalen = 0;
+	scsi_setup_test_unit_ready(pccb);
+	if (scsi_exec(bdev, pccb)) {
+		printf("TEST UNIT READY fail!Can not erase UFS device\n");
+		return 0;
+	}
+
+	if (blknr % rawsectsz != 0 || blkcnt % rawsectsz != 0)
+		printf("UFS erase area not aligned to %d, blknr = %lx, blkcnt = %lx\n", rawsectsz, blknr, blkcnt);
+
+	um_list->um_data_len = cpu_to_be16(sizeof(struct unmap_para_list) - 2);
+	um_list->um_block_desc_len = cpu_to_be16(sizeof(struct um_block_descriptor));
+	if (8 == sizeof(lbaint_t))
+		um_list->ub_desc.um_block_addr = cpu_to_be64(blknr / rawsectsz);
+	else
+		um_list->ub_desc.um_block_addr = cpu_to_be64((uint64_t)blknr / rawsectsz);
+	um_list->ub_desc.um_block_sz = cpu_to_be32((uint32_t)blkcnt / rawsectsz);
+
+	pccb->pdata = (void *)um_list;
+	pccb->datalen = 24;
+	pccb->dma_dir = DMA_TO_DEVICE;
+	memset(pccb->cmd, 0, 10);
+	pccb->cmd[0] = SCSI_UNMAP;
+	pccb->cmd[8] = 24;
+	pccb->cmdlen = 10;
+
+	if (scsi_exec(bdev, pccb)) {
+		printf("erase UFS device error.\n");
+		return 0;
+	}
+
+	return blkcnt;
+}
+#endif
 
 #if defined(CONFIG_PCI) && !defined(CONFIG_SCSI_AHCI_PLAT) && \
 	!defined(CONFIG_DM_SCSI)
@@ -526,22 +587,6 @@ static int scsi_read_capacity(struct udevice *dev, struct scsi_cmd *pccb,
 		 ((uint64_t)pccb->pdata[15]);
 
 	return 0;
-}
-
-
-/*
- * Some setup (fill-in) routines
- */
-static void scsi_setup_test_unit_ready(struct scsi_cmd *pccb)
-{
-	pccb->cmd[0] = SCSI_TST_U_RDY;
-	pccb->cmd[1] = pccb->lun << 5;
-	pccb->cmd[2] = 0;
-	pccb->cmd[3] = 0;
-	pccb->cmd[4] = 0;
-	pccb->cmd[5] = 0;
-	pccb->cmdlen = 6;
-	pccb->msgout[0] = SCSI_IDENTIFY; /* NOT USED */
 }
 
 /**
@@ -810,6 +855,7 @@ int scsi_scan(bool verbose)
 static const struct blk_ops scsi_blk_ops = {
 	.read	= scsi_read,
 	.write	= scsi_write,
+	.erase	= scsi_erase,
 };
 
 U_BOOT_DRIVER(scsi_blk) = {

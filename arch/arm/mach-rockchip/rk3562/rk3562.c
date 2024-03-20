@@ -628,6 +628,7 @@ static void qos_priority_init(void)
 
 int arch_cpu_init(void)
 {
+#if defined(CONFIG_SPL_BUILD) || defined(CONFIG_SUPPORT_USBPLUG)
 	u32 val;
 
 	/* Set the emmc to access ddr memory */
@@ -681,9 +682,10 @@ int arch_cpu_init(void)
 	}
 #endif
 
-#if defined(CONFIG_SPL_BUILD) && !defined(CONFIG_TPL_BUILD)
+#if !defined(CONFIG_TPL_BUILD)
 	qos_priority_init();
 #endif
+#endif /* #if defined(CONFIG_SPL_BUILD) || defined(CONFIG_SUPPORT_USBPLUG) */
 
 	return 0;
 }

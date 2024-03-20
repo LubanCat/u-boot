@@ -54,7 +54,6 @@ static int spl_ufs_load_image(struct spl_image_info *spl_image,
 	if (ret > 0)
 		image_sector = info.start;
 #endif
-
 	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT)) {
 		header = (struct image_header *)(CONFIG_SYS_TEXT_BASE -
 					 sizeof(struct image_header));
@@ -74,9 +73,6 @@ static int spl_ufs_load_image(struct spl_image_info *spl_image,
 		}
 	}
 
-	if (!ret)
-		return 0;
-
-	return 0;
+	return ret;
 }
 SPL_LOAD_IMAGE_METHOD("UFS", 0, BOOT_DEVICE_UFS, spl_ufs_load_image);

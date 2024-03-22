@@ -94,6 +94,12 @@ static void ufs_info_show_conf_desc(void *buf)
 	printf("bSecureRemovalType: 0x%x\n", dev->b_secure_removal_type);
 	printf("bInitActiveICCLevel: 0x%x\n", dev->b_init_active_icc_level);
 	printf("wPeriodicRTCUpdate: 0x%x\n", to_bigendian16(dev->w_periodic_rtc_update));
+	printf("bSecureRemovalType: 0x%x\n", dev->b_secure_removal_type);
+	printf("bInitActiveICCLevel: 0x%x\n", dev->b_init_active_icc_level);
+	printf("wPeriodicRTCUpdate: 0x%x\n", to_bigendian16(dev->w_periodic_rtc_update));
+	printf("bWB_EN: 0x%x\n", dev->b_write_booster_buffer_reserve_user_space_en);
+	printf("WB_TYPE: 0x%x\n", dev->b_write_booster_buffer_type);
+	printf("WB_alloc_units: 0x%x\n", to_bigendian32(dev->d_num_shared_write_booster_buffer_alloc_units));
 
 	for (i = 0; i < UNIT_DESCS_COUNT; i++) {
 		unit = &c_desc->unit_desc_conf_param[i];
@@ -223,6 +229,8 @@ static void ufs_lu_configuration(struct ufs_hba *hba, struct ufs_configuration_d
 	uint32_t alloced_units = 0;
 	int i, cap_adj_fac;
 	uint64_t total_raw_device_capacity;
+	uint32_t max_wb_alloc_units = cpu_to_be32(hba->geo_desc->d_write_booster_buffer_max_alloc_units);
+	uint32_t wb_alloc_units;
 
 	cap_adj_fac = to_bigendian16(hba->geo_desc->w_enhanced1_cap_adj_fac) / 256;
 	total_raw_device_capacity = cpu_to_be64(hba->geo_desc->q_total_raw_device_capacity);
@@ -252,6 +260,15 @@ static void ufs_lu_configuration(struct ufs_hba *hba, struct ufs_configuration_d
 	unit[3].b_memory_type = 0x3; /* lu 2, Enhanced Memory */
 	unit[3].d_num_alloc_units = (8 * 0x800 * cap_adj_fac + denominator - 1) / denominator;
 	alloced_units += unit[3].d_num_alloc_units;
+
+	if (max_wb_alloc_units) {
+		wb_alloc_units = max_wb_alloc_units;
+		if (wb_alloc_units > max_wb_alloc_units)
+			wb_alloc_units = max_wb_alloc_units;
+		dev->b_write_booster_buffer_reserve_user_space_en = 1;
+		dev->b_write_booster_buffer_type = 1;
+		dev->d_num_shared_write_booster_buffer_alloc_units = to_bigendian32(wb_alloc_units);
+	}
 
 	/* lu 0: data lu, max capacity*/
 	unit[0].b_boot_lun_id = 0x0; /* lu 3 */
@@ -292,6 +309,14 @@ static int compair_conf_desp(struct ufs_configuration_descriptor *cda, struct uf
 		return 0x8;
 	if (dev_a->w_periodic_rtc_update != dev_b->w_periodic_rtc_update)
 		return 0x9;
+	if (dev_a->b_write_booster_buffer_reserve_user_space_en !=
+	    dev_b->b_write_booster_buffer_reserve_user_space_en)
+		return 0xA;
+	if (dev_a->b_write_booster_buffer_type != dev_b->b_write_booster_buffer_type)
+		return 0xB;
+	if (dev_a->d_num_shared_write_booster_buffer_alloc_units !=
+	    dev_b->d_num_shared_write_booster_buffer_alloc_units)
+		return 0xC;
 
 	for (i = 0; i < UNIT_DESCS_COUNT; i++) {
 		unit_a = &cda->unit_desc_conf_param[i];
@@ -520,6 +545,9 @@ int ufs_create_partition_inventory(struct ufs_hba *hba)
 		dev_err(hba->dev, "%s: Failed reading geometry Desc. err = %d\n", __func__, err);
 		return err;
 	}
+
+	dev_err(hba->dev, "%s: WB_max_alloc_units = %x\n", __func__,
+		hba->geo_desc->d_write_booster_buffer_max_alloc_units);
 
 	err = ufs_get_configuration_desc(hba, hba->rc_desc);
 	if (err) {

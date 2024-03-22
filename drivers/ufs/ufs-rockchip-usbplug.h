@@ -5,14 +5,14 @@
  * Copyright (C) 2024 Rockchip Electronics Co.Ltd.
  */
 
-#define WELL_BOOT_LU_A     0x01
-#define WELL_BOOT_LU_B     0x02
+#define WELL_BOOT_LU_A		0x01
+#define WELL_BOOT_LU_B		0x02
 
-#define DEFAULT_BOOT_LUN   WELL_BOOT_LU_A
-#define DEFAULT_ACTIVE_LUN 0
+#define DEFAULT_BOOT_LUN	WELL_BOOT_LU_A
+#define DEFAULT_ACTIVE_LUN	0
 
 #define CONFIGURATION_DESC_V31_LENGTH	0xE6
-#define CONFIGURATION_DESC_V22_LENGTH 	0x90
+#define CONFIGURATION_DESC_V22_LENGTH	0x90
 #define UNIT_DESCS_COUNT		8
 
 /* Byte swap u16 */
@@ -77,7 +77,10 @@ struct ufs_dev_desc_configuration_param {
 	uint8_t b_secure_removal_type;
 	uint8_t b_init_active_icc_level;
 	uint16_t w_periodic_rtc_update;
-	uint8_t reserved[11]; /* 5 reserved, 11 in ufs3.1 */
+	uint8_t reserved[5]; /* 5 reserved, 11 in ufs3.1 */
+	uint8_t b_write_booster_buffer_reserve_user_space_en;
+	uint8_t b_write_booster_buffer_type;
+	uint32_t d_num_shared_write_booster_buffer_alloc_units;
 } __attribute__ ((packed));
 
 struct ufs_unit_desc_configuration_param {
@@ -133,5 +136,15 @@ struct ufs_geometry_descriptor {
 	uint32_t d_enhanced4_max_alloc_u;
 	uint16_t w_enhanced4_cap_adj_fac;
 	uint32_t d_optimal_logical_block_size;
-	uint8_t reserved1[15]; /* 15 reserved in ufs3.1 */
+	/* 15 reserved in ufs3.1 */
+	uint8_t b_hpb_region_size;
+	uint8_t b_hpb_number_lu;
+	uint8_t b_hpb_sub_region_size;
+	uint16_t w_device_max_active_hpb_regions;
+	uint16_t w_eserved;
+	uint32_t d_write_booster_buffer_max_alloc_units;
+	uint8_t b_device_max_write_booster_lus;
+	uint8_t b_write_booster_buffer_cap_adj_fac;
+	uint8_t b_supported_write_booster_buffer_user_space_reduction_types;
+	uint8_t b_supported_write_booster_buffer_types;
 } __attribute__ ((packed));

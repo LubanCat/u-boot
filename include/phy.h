@@ -47,7 +47,7 @@
 				SUPPORTED_10000baseT_Full)
 
 #ifndef PHY_ANEG_TIMEOUT
-#define PHY_ANEG_TIMEOUT	4000
+#define PHY_ANEG_TIMEOUT	1000
 #endif
 
 

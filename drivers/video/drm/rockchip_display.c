@@ -35,6 +35,9 @@
 #include <dm/of_access.h>
 #include <dm/ofnode.h>
 #include <asm/io.h>
+#include "logo.h"
+#include <boot_rkimg.h>
+#include <fs.h>
 
 #define DRIVER_VERSION	"v1.0.1"
 
@@ -1141,16 +1144,68 @@ static int load_kernel_bmp_logo(struct logo_info *logo, const char *bmp_name)
 	return 0;
 }
 
+static int rockchip_read_distro_logo(void *logo_addr, int size)
+{
+	const char *cmd = "part list ${devtype} ${devnum} -bootable devplist";
+	char *devnum, *devtype, *devplist;
+	char devnum_part[12];
+	char logo_hex_str[19];
+	char header_size_str[10];
+	char *fs_argv[6];
+
+	if (!rockchip_get_bootdev() || !logo_addr)
+		return -ENODEV;
+
+	if (run_command_list(cmd, -1, 0)) {
+		printf("Failed to find -bootable\n");
+		return -EINVAL;
+	}
+
+	devplist = env_get("devplist");
+	if (!devplist)
+		return -ENODEV;
+
+	devtype = env_get("devtype");
+	devnum = env_get("devnum");
+	sprintf(devnum_part, "%s:%s", devnum, devplist);
+	sprintf(logo_hex_str, "0x%lx", (ulong)logo_addr);
+	sprintf(header_size_str, "0x%x", size);
+
+	fs_argv[0] = "load";
+	fs_argv[1] = devtype,
+	fs_argv[2] = devnum_part;
+	fs_argv[3] = logo_hex_str;
+	fs_argv[4] = "logo.bmp";
+	fs_argv[5] = header_size_str;
+
+	if (do_load(NULL, 0, 6, fs_argv, FS_TYPE_ANY))
+		return -EIO;
+
+	printf("logo(Distro): logo.bmp\n");
+
+	return 0;
+}
+
+enum LOGO_SOURCE {
+    FROM_RESOURCE,
+    FROM_DISTRO,
+    FROM_INTERNEL
+};
+
 static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 {
-#ifdef CONFIG_ROCKCHIP_RESOURCE_IMAGE
 	struct rockchip_logo_cache *logo_cache;
 	struct bmp_header *header;
 	void *dst = NULL, *pdst;
-	int size, len;
+	int size;
 	int ret = 0;
 	int reserved = 0;
 	int dst_size;
+    enum LOGO_SOURCE logo_source;
+
+#ifdef CONFIG_ROCKCHIP_RESOURCE_IMAGE
+	int len;
+#endif
 
 	if (!logo || !bmp_name)
 		return -EINVAL;
@@ -1167,11 +1222,20 @@ static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 	if (!header)
 		return -ENOMEM;
 
+#ifdef CONFIG_ROCKCHIP_RESOURCE_IMAGE
 	len = rockchip_read_resource_file(header, bmp_name, 0, RK_BLK_SIZE);
-	if (len != RK_BLK_SIZE) {
-		ret = -EINVAL;
-		goto free_header;
-	}
+	if (len == RK_BLK_SIZE) {
+        logo_source = FROM_RESOURCE;
+    }
+    else
+#endif
+    if (!rockchip_read_distro_logo(header, RK_BLK_SIZE)) {
+        logo_source = FROM_DISTRO;
+    } else {
+        free(header);
+        header = (struct bmp_header *)logo_bmp;
+        logo_source = FROM_INTERNEL;
+    }
 
 	logo->bpp = get_unaligned_le16(&header->bit_count);
 	logo->width = get_unaligned_le32(&header->width);
@@ -1188,18 +1252,33 @@ static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 			goto free_header;
 		}
 		pdst = get_display_buffer(size);
-
+	} else if(logo->rotation) {
+		pdst = get_display_buffer(size);
 	} else {
 		pdst = get_display_buffer(size);
 		dst = pdst;
 	}
 
-	len = rockchip_read_resource_file(pdst, bmp_name, 0, size);
-	if (len != size) {
-		printf("failed to load bmp %s\n", bmp_name);
-		ret = -ENOENT;
-		goto free_header;
-	}
+#ifdef CONFIG_ROCKCHIP_RESOURCE_IMAGE
+    if (logo_source == FROM_RESOURCE) {
+        len = rockchip_read_resource_file(pdst, bmp_name, 0, size);
+        if (len != size) {
+            printf("failed to load bmp %s\n", bmp_name);
+            ret = -ENOENT;
+            goto free_header;
+        }
+    } else
+#endif
+    if (logo_source == FROM_DISTRO) {
+        ret = rockchip_read_distro_logo(pdst, size);
+        if (ret) {
+            printf("failed to load logo.bmp\n");
+            ret = -ENOENT;
+            goto free_header;
+        }
+    } else {
+        pdst = (void*)logo_bmp;
+    }
 
 	if (!can_direct_logo(logo->bpp)) {
 		/*
@@ -1227,6 +1306,56 @@ static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 		else
 			logo->ymirror = 1;
 	}
+
+	if (logo->rotation) {
+		void *dst_temp = NULL;
+		int height = logo->height;
+		int width = logo->width;
+		int byte = logo->bpp >> 3;
+		int newW = height & 0x3 ? (height & ~0x3) + 4 : height;
+		int newH = width;
+		int beforebmp_size =  height * width * byte;
+		int newbmp_size = newH * newW * byte;
+		int rotation = 0;
+
+		if (can_direct_logo(logo->bpp)) {
+			dst = get_display_buffer(beforebmp_size);
+			if (!dst) {
+				ret = -ENOMEM;
+				goto free_header;
+			}
+			if (bmpdecoder(pdst, dst, logo->bpp)) {
+				printf("failed to decode bmp %s\n", bmp_name);
+				ret = -EINVAL;
+				goto free_header;
+			}
+		}
+
+		dst_temp = dst;
+		dst = get_display_buffer(newbmp_size);
+		if (!dst) {
+			ret = -ENOMEM;
+			goto free_header;
+		}
+		memset(dst, 0, newbmp_size);
+
+		if((logo->rotation == ROCKCHIP_DISPLAY_ROTATION_90) || (logo->rotation == ROCKCHIP_DISPLAY_ROTATION_270)) {
+			logo->width = newW;
+			logo->height = newH;
+		}
+		rotation = bmprotation(dst, dst_temp, width, height, byte, logo->rotation);
+		if(rotation < 0) {
+			printf("failed to rotate logo\n");
+		}
+
+		flush_dcache_range((ulong)dst,
+					ALIGN((ulong)dst + newbmp_size,
+						CONFIG_SYS_CACHELINE_SIZE));
+
+		logo->offset = 0;
+		logo->ymirror = 0;
+	}
+
 	logo->mem = dst;
 
 	memcpy(&logo_cache->logo, logo, sizeof(*logo));
@@ -1234,13 +1363,11 @@ static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 	flush_dcache_range((ulong)dst, ALIGN((ulong)dst + dst_size, CONFIG_SYS_CACHELINE_SIZE));
 
 free_header:
-
-	free(header);
+    if (logo_source != FROM_INTERNEL) {
+        free(header);
+    }
 
 	return ret;
-#else
-	return -EINVAL;
-#endif
 }
 
 void rockchip_show_fbbase(ulong fbbase)
@@ -1287,6 +1414,7 @@ int rockchip_show_logo(void)
 
 	list_for_each_entry(s, &rockchip_display_list, head) {
 		s->logo.mode = s->logo_mode;
+		s->logo.rotation = s->logo_rotation;
 		if (load_bmp_logo(&s->logo, s->ulogo_name))
 			printf("failed to display uboot logo\n");
 		else
@@ -1827,6 +1955,22 @@ static int rockchip_display_probe(struct udevice *dev)
 			s->charge_logo_mode = ROCKCHIP_DISPLAY_FULLSCREEN;
 		else
 			s->charge_logo_mode = ROCKCHIP_DISPLAY_CENTER;
+
+		int rotation = ofnode_read_u32_default(node, "logo,rotation", 0);
+		switch (rotation) {
+			case 90:
+				s->logo_rotation = ROCKCHIP_DISPLAY_ROTATION_90;
+				break;
+			case 180:
+				s->logo_rotation = ROCKCHIP_DISPLAY_ROTATION_180;
+				break;
+			case 270:
+				s->logo_rotation = ROCKCHIP_DISPLAY_ROTATION_270;
+				break;
+			default:
+				s->logo_rotation = ROCKCHIP_DISPLAY_ROTATION_0;
+				break;
+		}
 
 		s->force_output = ofnode_read_bool(node, "force-output");
 

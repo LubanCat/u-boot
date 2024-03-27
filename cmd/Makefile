@@ -46,6 +46,7 @@ obj-$(CONFIG_CMD_CRYPTO_SUM) += crypto_sum.o
 obj-$(CONFIG_DATAFLASH_MMC_SELECT) += dataflash_mmc_mux.o
 obj-$(CONFIG_CMD_DATE) += date.o
 obj-$(CONFIG_CMD_DEMO) += demo.o
+obj-$(CONFIG_CMD_FDT) += dtfile.o
 obj-$(CONFIG_CMD_SOUND) += sound.o
 ifdef CONFIG_POST
 obj-$(CONFIG_CMD_DIAG) += diag.o

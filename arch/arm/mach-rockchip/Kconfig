@@ -551,6 +551,37 @@ config COPROCESSOR_RK1808
 
 endif
 
+config ROCKCHIP_RV1103B
+	bool "Support Rockchip RV1103B"
+	select CPU_V7
+	select ARM_ZERO_CNTVOFF
+	select ROCKCHIP_BROM_HELPER
+	select DEBUG_UART_BOARD_INIT
+	imply SUPPORT_SPL
+	imply SUPPORT_TPL
+	imply SPL
+	imply TPL
+	imply TPL_SERIAL_SUPPORT
+	imply TPL_TINY_FRAMEWORK if TPL
+	imply BOARD_LATE_INIT
+	imply ROCKCHIP_GPIO_V2
+
+	help
+	  The Rockchip RV1103B is a ARM-based SoC with a Cortex-A7 and
+	  other modules.
+
+if ROCKCHIP_RV1103B
+
+config TPL_LDSCRIPT
+	default "arch/arm/mach-rockchip/u-boot-tpl.lds"
+
+config TPL_TEXT_BASE
+	default 0x210f7000
+
+config TPL_MAX_SIZE
+	default 32768
+endif
+
 config ROCKCHIP_RV1106
 	bool "Support Rockchip RV1106"
 	select CPU_V7
@@ -689,6 +720,7 @@ config ROCKCHIP_BOOT_MODE_REG
 	default 0x26024040 if ROCKCHIP_RK3576
 	default 0xfd588080 if ROCKCHIP_RK3588
 	default 0xfe020200 if ROCKCHIP_RK1808
+	default 0x20160200 if ROCKCHIP_RV1103B
 	default 0xff020200 if ROCKCHIP_RV1106
 	default 0x10300580 if ROCKCHIP_RV1108
 	default 0xfe020200 if ROCKCHIP_RV1126
@@ -716,6 +748,7 @@ config ROCKCHIP_STIMER_BASE
 	default 0xfdd1c020 if ROCKCHIP_RK3568
 	default 0x27400000 if ROCKCHIP_RK3576
 	default 0xfd8c8000 if ROCKCHIP_RK3588
+	default 0x20500000 if ROCKCHIP_RV1103B
 	default 0xff590020 if ROCKCHIP_RV1106
 	default 0x10350020 if ROCKCHIP_RV1108
 	default 0xff670020 if ROCKCHIP_RV1126
@@ -741,6 +774,7 @@ config ROCKCHIP_IRAM_START_ADDR
 	default 0xfdcc0000 if ROCKCHIP_RK3568
 	default 0x3ff80000 if ROCKCHIP_RK3576
 	default 0xff000000 if ROCKCHIP_RK3588
+	default 0x210f6000 if ROCKCHIP_RV1103B
 	default 0xff6c0000 if ROCKCHIP_RV1106
 	default 0x10080000 if ROCKCHIP_RV1108
 	default 0xff700000 if ROCKCHIP_RV1126
@@ -1185,6 +1219,7 @@ source "arch/arm/mach-rockchip/rk3568/Kconfig"
 source "arch/arm/mach-rockchip/rk3576/Kconfig"
 source "arch/arm/mach-rockchip/rk3588/Kconfig"
 source "arch/arm/mach-rockchip/rk1808/Kconfig"
+source "arch/arm/mach-rockchip/rv1103b/Kconfig"
 source "arch/arm/mach-rockchip/rv1106/Kconfig"
 source "arch/arm/mach-rockchip/rv1108/Kconfig"
 source "arch/arm/mach-rockchip/rv1126/Kconfig"

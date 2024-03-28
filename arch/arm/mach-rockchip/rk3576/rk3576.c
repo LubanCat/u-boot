@@ -170,6 +170,8 @@ void board_set_iomux(enum if_type if_type, int devnum, int routing)
 		} else if (devnum == 1) {
 			writel(0xffff1111, TOP_IOC_BASE + GPIO2A_IOMUX_SEL_L);
 			writel(0x00ff0011, TOP_IOC_BASE + GPIO2A_IOMUX_SEL_H);
+			/* Pull up */
+			writel(0x0FFF0FFF, VCCIO_IOC_BASE + VCCIO_IOC_GPIO2A_PUL);
 		}
 		break;
 	case IF_TYPE_MTD:

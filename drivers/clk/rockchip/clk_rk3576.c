@@ -765,6 +765,7 @@ static ulong rk3576_mmc_get_clk(struct rk3576_clk_priv *priv, ulong clk_id)
 
 	switch (clk_id) {
 	case CCLK_SRC_SDIO:
+	case HCLK_SDIO:
 		con = readl(&cru->clksel_con[104]);
 		div = (con & CCLK_SDIO_SRC_DIV_MASK) >> CCLK_SDIO_SRC_DIV_SHIFT;
 		sel = (con & CCLK_SDIO_SRC_SEL_MASK) >>
@@ -777,6 +778,7 @@ static ulong rk3576_mmc_get_clk(struct rk3576_clk_priv *priv, ulong clk_id)
 			prate = OSC_HZ;
 		return DIV_TO_RATE(prate, div);
 	case CCLK_SRC_SDMMC0:
+	case HCLK_SDMMC0:
 		con = readl(&cru->clksel_con[105]);
 		div = (con & CCLK_SDMMC0_SRC_DIV_MASK) >> CCLK_SDMMC0_SRC_DIV_SHIFT;
 		sel = (con & CCLK_SDMMC0_SRC_SEL_MASK) >>
@@ -789,6 +791,7 @@ static ulong rk3576_mmc_get_clk(struct rk3576_clk_priv *priv, ulong clk_id)
 			prate = OSC_HZ;
 		return DIV_TO_RATE(prate, div);
 	case CCLK_SRC_EMMC:
+	case HCLK_EMMC:
 		con = readl(&cru->clksel_con[89]);
 		div = (con & CCLK_EMMC_DIV_MASK) >> CCLK_EMMC_DIV_SHIFT;
 		sel = (con & CCLK_EMMC_SEL_MASK) >>
@@ -864,6 +867,9 @@ static ulong rk3576_mmc_set_clk(struct rk3576_clk_priv *priv,
 	case CCLK_SRC_EMMC:
 	case SCLK_FSPI_X2:
 	case SCLK_FSPI1_X2:
+	case HCLK_SDMMC0:
+	case HCLK_EMMC:
+	case HCLK_SDIO:
 		if (!(OSC_HZ % rate)) {
 			src_clk = SCLK_FSPI_SEL_OSC;
 			div = DIV_ROUND_UP(OSC_HZ, rate);
@@ -900,6 +906,7 @@ static ulong rk3576_mmc_set_clk(struct rk3576_clk_priv *priv,
 
 	switch (clk_id) {
 	case CCLK_SRC_SDIO:
+	case HCLK_SDIO:
 		rk_clrsetreg(&cru->clksel_con[104],
 			     CCLK_SDIO_SRC_SEL_MASK |
 			     CCLK_SDIO_SRC_DIV_MASK,
@@ -907,13 +914,15 @@ static ulong rk3576_mmc_set_clk(struct rk3576_clk_priv *priv,
 			     (div - 1) << CCLK_SDIO_SRC_DIV_SHIFT);
 		break;
 	case CCLK_SRC_SDMMC0:
+	case HCLK_SDMMC0:
 		rk_clrsetreg(&cru->clksel_con[105],
-			     CCLK_EMMC_SEL_MASK |
-			     CCLK_EMMC_DIV_MASK,
-			     (src_clk << CCLK_EMMC_SEL_SHIFT) |
-			     (div - 1) << CCLK_EMMC_DIV_SHIFT);
+			     CCLK_SDMMC0_SRC_SEL_MASK |
+			     CCLK_SDMMC0_SRC_DIV_MASK,
+			     (src_clk << CCLK_SDMMC0_SRC_SEL_SHIFT) |
+			     (div - 1) << CCLK_SDMMC0_SRC_DIV_SHIFT);
 		break;
 	case CCLK_SRC_EMMC:
+	case HCLK_EMMC:
 		rk_clrsetreg(&cru->clksel_con[89],
 			     CCLK_EMMC_DIV_MASK |
 			     CCLK_EMMC_SEL_MASK,
@@ -1964,6 +1973,9 @@ static ulong rk3576_clk_get_rate(struct clk *clk)
 	case SCLK_FSPI_X2:
 	case SCLK_FSPI1_X2:
 	case DCLK_DECOM:
+	case HCLK_SDMMC0:
+	case HCLK_EMMC:
+	case HCLK_SDIO:
 		rate = rk3576_mmc_get_clk(priv, clk->id);
 		break;
 	case TCLK_WDT0:
@@ -2124,6 +2136,9 @@ static ulong rk3576_clk_set_rate(struct clk *clk, ulong rate)
 	case SCLK_FSPI_X2:
 	case SCLK_FSPI1_X2:
 	case DCLK_DECOM:
+	case HCLK_SDMMC0:
+	case HCLK_EMMC:
+	case HCLK_SDIO:
 		ret = rk3576_mmc_set_clk(priv, clk->id, rate);
 		break;
 	case TCLK_WDT0:

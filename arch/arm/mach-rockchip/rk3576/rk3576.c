@@ -21,6 +21,8 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define SYS_GRF_BASE		0x2600A000
 #define SYS_GRF_SOC_CON2	0x0008
+#define SYS_GRF_SOC_CON11	0x002c
+#define SYS_GRF_SOC_CON12	0x0030
 
 #define GPIO0_IOC_BASE		0x26040000
 #define GPIO0B_PULL_L		0x0024
@@ -343,6 +345,10 @@ int arch_cpu_init(void)
 	writel(0xffff, USB2PHY0_GRF_BASE + USB2PHY_GRF_RX_TIMEOUT);
 	writel(0x05, USB2PHY0_GRF_BASE + USB2PHY_GRF_SEQ_LIMT);
 	writel(0x00010001, USB2PHY0_GRF_BASE + USB2PHY_GRF_DBG_CON);
+
+	/* Enable noc slave response timeout */
+	writel(0x80008000, SYS_GRF_BASE + SYS_GRF_SOC_CON11);
+	writel(0xffffffff, SYS_GRF_BASE + SYS_GRF_SOC_CON12);
 
 	/*
 	 * Select usb otg0 pipe phy status to 0 that

@@ -79,10 +79,10 @@
 	status = "okay";
 };
 
-// &crypto {
-// 	u-boot,dm-spl;
-// 	status = "okay";
-// };
+&crypto {
+	u-boot,dm-spl;
+	status = "okay";
+};
 
 &uart0 {
 	u-boot,dm-spl;

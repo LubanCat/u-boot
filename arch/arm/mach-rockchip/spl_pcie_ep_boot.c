@@ -216,10 +216,10 @@ static void pcie_bar_init(void *dbi_base)
 				      PCI_BASE_ADDRESS_MEM_PREFETCH | PCI_BASE_ADDRESS_MEM_TYPE_64);
 	rockchip_pcie_ep_set_bar_flag(dbi_base, 4, PCI_BASE_ADDRESS_MEM_TYPE_32);
 
-	/* Close bar1 bar3 bar5 */
+	/* Close bar1 bar5 */
 	writel(0x0, dbi_base + 0x100000 + 0x14);
 	//writel(0x0, dbi_base + 0x100000 + 0x18);
-	writel(0x0, dbi_base + 0x100000 + 0x1c);
+	//writel(0x0, dbi_base + 0x100000 + 0x1c);
 	//writel(0x0, dbi_base + 0x100000 + 0x20);
 	writel(0x0, dbi_base + 0x100000 + 0x24);
 	/* Close ROM BAR */
@@ -659,7 +659,7 @@ static void pcie_ep_init(void)
 	u32 val;
 	void *dbi_base = (void *)PCIE_SNPS_DBI_BASE;
 	u64 apb_base = PCIE_SNPS_APB_BASE;
-	int i, retries = 0;
+	int i, retries = 0, phy_linkup;
 
 #ifdef PCIE_ENABLE_SRNS_PLL_REFCLK
 	printep("RefClock in SRNS clock mode\n");
@@ -723,9 +723,16 @@ reinit:
 	/* Waiting for Link up */
 	while (1) {
 		val = readl(apb_base + 0x300);
-		if (((val & 0x3ffff) & ((0x3 << 16) | 0x11)) == 0x30011)
+		if (((val & 0x3ffff) & ((0x3 << 16))) == 0x30000)
 			break;
-		mdelay(1);
+
+		if (((val & 0x3ffff) & ((0x3 << 16))) == 0x10000)
+			phy_linkup = 1;
+
+		if (val == 0 && phy_linkup)
+			pcie_first_reset();
+
+		udelay(10);
 	}
 	printep("Link up %x\n", val);
 	mdelay(3);
@@ -742,6 +749,13 @@ reinit:
 			} else {
 				break;
 			}
+		}
+
+		/* L2 */
+		val = readl(apb_base + 0x4);
+		if (val & 0x400) {
+			writel(0x4, apb_base + 0x10);
+			pcie_first_reset();
 		}
 		udelay(1);
 	}

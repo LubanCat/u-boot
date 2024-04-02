@@ -2598,6 +2598,11 @@ int sdram_init_(struct dram_info *dram, struct rv1126_sdram_params *sdram_params
 		pctl_write_mr(dram->pctl, 3, 22,
 			      mr_tmp >> PCTL2_LPDDR4_MR22_SHIFT & PCTL2_MR_MASK,
 			      LPDDR4);
+	} else if (sdram_params->base.dramtype == DDR4) {
+		mr_tmp = readl(pctl_base + DDR_PCTL2_INIT7) >> PCTL2_DDR4_MR6_SHIFT & PCTL2_MR_MASK;
+		pctl_write_mr(dram->pctl, 0x3, 6, mr_tmp | BIT(7), DDR4);
+		pctl_write_mr(dram->pctl, 0x3, 6, mr_tmp | BIT(7), DDR4);
+		pctl_write_mr(dram->pctl, 0x3, 6, mr_tmp, DDR4);
 	}
 
 	if (sdram_params->base.dramtype == DDR3 && post_init == 0)
@@ -3492,6 +3497,13 @@ void ddr_set_rate(struct dram_info *dram,
 
 			mr_tmp = readl(pctl_base + UMCTL2_REGS_FREQ(dst_fsp) +
 				       DDR_PCTL2_INIT7);
+			/* updata ddr4 vrefdq */
+			pctl_write_mr(dram->pctl, 3, 6,
+				      (mr_tmp | (0x1 << 7)) >> PCTL2_DDR4_MR6_SHIFT &
+				      PCTL2_MR_MASK, dramtype);
+			pctl_write_mr(dram->pctl, 3, 6,
+				      (mr_tmp | (0x1 << 7)) >> PCTL2_DDR4_MR6_SHIFT &
+				      PCTL2_MR_MASK, dramtype);
 			pctl_write_mr(dram->pctl, 3, 6,
 				      mr_tmp >> PCTL2_DDR4_MR6_SHIFT &
 				      PCTL2_MR_MASK,

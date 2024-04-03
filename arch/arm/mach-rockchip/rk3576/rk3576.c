@@ -350,7 +350,7 @@ int arch_cpu_init(void)
 
 	/* Enable noc slave response timeout */
 	writel(0x80008000, SYS_GRF_BASE + SYS_GRF_SOC_CON11);
-	writel(0xffffffff, SYS_GRF_BASE + SYS_GRF_SOC_CON12);
+	writel(0xffffffe0, SYS_GRF_BASE + SYS_GRF_SOC_CON12);
 
 	/*
 	 * Select usb otg0 pipe phy status to 0 that

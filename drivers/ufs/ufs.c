@@ -43,6 +43,9 @@
 /* maximum timeout in ms for a general UIC command */
 #define UFS_UIC_CMD_TIMEOUT	1000
 /* NOP OUT retries waiting for NOP IN response */
+/* Polling time to wait for fDeviceInit */
+#define FDEVICEINIT_COMPL_TIMEOUT 1500 /* millisecs */
+
 #define NOP_OUT_RETRIES    10
 /* Timeout after 30 msecs if NOP OUT hangs without response */
 #define NOP_OUT_TIMEOUT    30 /* msecs */
@@ -1834,6 +1837,7 @@ static int ufshcd_verify_dev_init(struct ufs_hba *hba)
  */
 static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 {
+	unsigned long start = 0;
 	int i;
 	int err;
 	bool flag_res = 1;
@@ -1847,11 +1851,16 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 		goto out;
 	}
 
-	/* poll for max. 1000 iterations for fDeviceInit flag to clear */
-	for (i = 0; i < 1000 && !err && flag_res; i++)
+	/* poll for max. 1500ms for fDeviceInit flag to clear */
+	start = get_timer(0);
+	for (i = 0; i < 3000 && !err && flag_res; i++) {
 		err = ufshcd_query_flag_retry(hba, UPIU_QUERY_OPCODE_READ_FLAG,
 					      QUERY_FLAG_IDN_FDEVICEINIT,
 					      &flag_res);
+		if (get_timer(start) > FDEVICEINIT_COMPL_TIMEOUT)
+			break;
+		udelay(500);
+	}
 
 	if (err)
 		dev_err(hba->dev,

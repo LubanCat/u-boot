@@ -231,17 +231,6 @@ int fit_standalone_release(char *id, uintptr_t entry_point)
 	 */
 	writel(0x5c000000, TOP_CRU_BASE + TOP_CRU_GATE_CON19);
 
-	/*
-	 * mcu_cache_peripheral_addr
-	 * The uncache area ranges from 0x20000000 to 0x48200000
-	 * and contains rpmsg shared memory
-	 */
-	writel(0x20000000, SYS_SGRF_BASE + SYS_SGRF_SOC_CON14);
-	writel(0x48200000, SYS_SGRF_BASE + SYS_SGRF_SOC_CON15);
-
-	/* TODO: need bl31 support */
-	writel(0x48200000, 0x26004060);
-
 	/* select bus m0 jtag GPIO2A2 GPIO2A3 */
 	/* writel(0x001f0010, 0x2600a01c); */
 	/* writel(0xff009900, 0x26044040); */
@@ -252,17 +241,6 @@ int fit_standalone_release(char *id, uintptr_t entry_point)
 	/* pmu m0 configuration: */
 	/* open pmu m0 rtc / core / biu / root */
 	/* writel(0x59020000, PMU1_CRU_BASE + PMU1_CRU_GATE_CON03); */
-
-	/*
-	 * mcu_cache_peripheral_addr
-	 * The uncache area ranges from 0x20000000 to 0x48200000
-	 * and contains rpmsg shared memory
-	 */
-	/* writel(0x20000000, PMU1_SGRF_BASE + PMU1_SGRF_SOC_CON10); */
-	/* writel(0x48200000, PMU1_SGRF_BASE + PMU1_SGRF_SOC_CON11); */
-
-	/* TODO: need bl31 support */
-	/* writel(0x48200000, 0x26002030); */
 
 	/* select pmu m0 jtag */
 	/* writel(0x001f0008, 0x2600a01c); */
@@ -314,6 +292,28 @@ int arch_cpu_init(void)
 	 */
 	writel(0x00ff00ff, GPIO0_IOC_BASE + GPIO0B_PULL_L);
 	writel(0x000f000f, GPIO0_IOC_BASE + GPIO0B_IE_L);
+
+	/*
+	 * bus mcu_cache_peripheral_addr
+	 * The uncache area ranges from 0x20000000 to 0x48200000
+	 * and contains rpmsg shared memory
+	 */
+	writel(0x20000000, SYS_SGRF_BASE + SYS_SGRF_SOC_CON14);
+	writel(0x48200000, SYS_SGRF_BASE + SYS_SGRF_SOC_CON15);
+
+	/* TODO: bus mcu code addr need bl31 support */
+	writel(0x48200000, 0x26004060);
+
+	/*
+	 * pmu mcu_cache_peripheral_addr
+	 * The uncache area ranges from 0x20000000 to 0x48200000
+	 * and contains rpmsg shared memory
+	 */
+	/* writel(0x20000000, PMU1_SGRF_BASE + PMU1_SGRF_SOC_CON10); */
+	/* writel(0x48200000, PMU1_SGRF_BASE + PMU1_SGRF_SOC_CON11); */
+
+	/* TODO: pmu mcu code addr need bl31 support */
+	/* writel(0x48200000, 0x26002030); */
 
 	/*
 	 * Set SYS_GRF_SOC_CON2[12](input of pwm2_ch0) as 0,

@@ -167,6 +167,7 @@ struct crtc_state {
 	void *private;
 	ofnode node;
 	struct device_node *ports_node; /* if (ports_node) it's vop2; */
+	struct device_node *port_node;
 	struct clk dclk;
 	int crtc_id;
 
@@ -203,6 +204,8 @@ struct crtc_state {
 	u64 dsc_cds_clk_rate;
 	struct drm_dsc_picture_parameter_set pps;
 	struct rockchip_dsc_sink_cap dsc_sink_cap;
+
+	u32 *lut_val;
 };
 
 struct panel_state {

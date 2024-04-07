@@ -60,14 +60,17 @@
 #define ENV_MEM_LAYOUT_SETTINGS \
 	"scriptaddr=0x60500000\0" \
 	"pxefile_addr_r=0x60600000\0" \
+	"fdt_over_addr=0x68000000\0" \
 	"fdt_addr_r=0x68300000\0" \
 	"kernel_addr_r=0x62008000\0" \
+	"env_addr_r=0x6a100000\0" \
 	"ramdisk_addr_r=0x6a200000\0"
 
 #include <config_distro_bootcmd.h>
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	ENV_MEM_LAYOUT_SETTINGS \
 	ENV_MEM_LAYOUT_SETTINGS1 \
+	"fdtfile=" "rk-kernel.dtb" "\0" \
 	"partitions=" PARTS_DEFAULT \
 	ROCKCHIP_DEVICE_SETTINGS \
 	RKIMG_DET_BOOTDEV \

@@ -1547,7 +1547,8 @@ retry:
 	ufshcd_prepare_utp_scsi_cmd_upiu(hba, pccb, upiu_flags);
 	prepare_prdt_table(hba, pccb);
 
-	ufshcd_send_command(hba, TASK_TAG);
+	if (ufshcd_send_command(hba, TASK_TAG) == -ETIMEDOUT && retry_count--)
+		goto retry;
 
 	ocs = ufshcd_get_tr_ocs(hba);
 	switch (ocs) {

@@ -59,6 +59,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define SYS_SGRF_SOC_CON15	0x005C
 
 #define FW_SYS_SGRF_BASE	0x26005000
+#define SGRF_DOMAIN_CON1	0x4
 #define SGRF_DOMAIN_CON2	0x8
 #define SGRF_DOMAIN_CON3	0xc
 #define SGRF_DOMAIN_CON4	0x10
@@ -273,6 +274,10 @@ int arch_cpu_init(void)
 	/* Set the fspi0 and fspi1 to access ddr memory */
 	val = readl(FW_SYS_SGRF_BASE + SGRF_DOMAIN_CON4);
 	writel(val | 0x7700, FW_SYS_SGRF_BASE + SGRF_DOMAIN_CON4);
+
+	/* Set the decom to access ddr memory */
+	val = readl(FW_SYS_SGRF_BASE + SGRF_DOMAIN_CON1);
+	writel(val | 0x700, FW_SYS_SGRF_BASE + SGRF_DOMAIN_CON1);
 
 	/* Set the sdmmc0 iomux */
 	board_set_iomux(IF_TYPE_MMC, 1, 0);

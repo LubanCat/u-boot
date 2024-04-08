@@ -365,6 +365,17 @@ int arch_cpu_init(void)
 	writel(0x000c0008, USBGRF_BASE + USB_GRF_USB3OTG0_CON1);
 #endif
 
+#if defined(CONFIG_ROCKCHIP_EMMC_IOMUX)
+	board_set_iomux(IF_TYPE_MMC, 0, 0);
+#elif defined(CONFIG_ROCKCHIP_SFC_IOMUX)
+	/*
+	 * (IF_TYPE_MTD, 0, 0) FSPI0
+	 * (IF_TYPE_MTD, 1, 0) FSPI1 M0
+	 * (IF_TYPE_MTD, 2, 0) FSPI1 M1
+	 */
+	board_set_iomux(IF_TYPE_MTD, 0, 0);
+#endif /* #if defined(CONFIG_ROCKCHIP_EMMC_IOMUX) */
+
 	return 0;
 }
 #endif

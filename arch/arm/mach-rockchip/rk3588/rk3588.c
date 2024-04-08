@@ -13,6 +13,7 @@
 #include <asm/arch/cpu.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/ioc_rk3588.h>
+#include <asm/arch/rockchip_smccc.h>
 #include <dt-bindings/clock/rk3588-cru.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -1440,40 +1441,21 @@ int rk_board_fdt_fixup(const void *blob)
 	return 0;
 }
 
-#ifdef CONFIG_SPL_BUILD
-int spl_fit_standalone_release(char *id, uintptr_t entry_point)
+int fit_standalone_release(char *id, uintptr_t entry_point)
 {
-	u32 val;
-
 	/* pmu m0 configuration: */
 	/* set gpll */
 	writel(0x00f00042, CRU_BASE + CRU_GPLL_CON1);
-	/* set pmu mcu to access ddr memory */
-	val = readl(FIREWALL_DDR_BASE + FW_DDR_MST19_REG);
-	writel(val & 0x0000ffff, FIREWALL_DDR_BASE + FW_DDR_MST19_REG);
-	/* set pmu mcu to access system memory */
-	val = readl(FIREWALL_SYSMEM_BASE + FW_SYSM_MST19_REG);
-	writel(val & 0x000000ff, FIREWALL_SYSMEM_BASE + FW_SYSM_MST19_REG);
-	/* set pmu mcu to secure */
-	writel(0x00080000, PMU1_SGRF_BASE + PMU1_SGRF_SOC_CON0);
-	/* set start addr, pmu_mcu_code_addr_start */
-	writel(0xFFFF0000 | (entry_point >> 16), PMU1_SGRF_BASE + PMU1_SGRF_SOC_CON9);
-	/* set pmu_mcu_sram_addr_start */
-	writel(0xFFFF2000, PMU1_SGRF_BASE + PMU1_SGRF_SOC_CON10);
-	/* set pmu_mcu_tcm_addr_start */
-	writel(0xFFFF2000, PMU1_SGRF_BASE + PMU1_SGRF_SOC_CON13);
-	/* set cache cache_peripheral_addr */
-	/* 0xf0000000 ~ 0xfee00000 */
-	writel(0xffff0000, PMU1_SGRF_BASE + PMU1_SGRF_SOC_CON6);
-	writel(0xffffee00, PMU1_SGRF_BASE + PMU1_SGRF_SOC_CON7);
-	writel(0x00ff00ff, PMU1_SGRF_BASE + PMU1_SGRF_SOC_CON8);
-	/* enable PMU WDT reset system */
-	writel(0x02000200, BUS_SGRF_BASE + BUS_SGRF_SOC_CON2);
+
+	sip_smc_mcu_config(ROCKCHIP_SIP_CONFIG_PMUMCU_0_ID,
+			   ROCKCHIP_SIP_CONFIG_MCU_CODE_START_ADDR,
+			   0xffff0000 | (entry_point >> 16));
+
 	/* select WDT trigger global reset. */
 	writel(0x08400840, CRU_BASE + CRU_GLB_RST_CON);
 	/* release pmu mcu */
-	/* writel(0x20000000, PMU1CRU_BASE + PMU1CRU_SOFTRST_CON00); */
+	writel(0x20000000, PMU1CRU_BASE + PMU1CRU_SOFTRST_CON00);
 
 	return 0;
 }
-#endif
+

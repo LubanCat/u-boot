@@ -981,12 +981,6 @@ static int ufshcd_copy_query_response(struct ufs_hba *hba)
 				 __func__);
 			return -EINVAL;
 		}
-	} else if (hba->dev_cmd.query.descriptor && hba->ucd_rsp_ptr->qr.opcode == UPIU_QUERY_OPCODE_READ_ATTR) {
-		u8 *value = (u8 *)&query_res->upiu_res.value;
-		hba->dev_cmd.query.descriptor[0] = value[11];
-		hba->dev_cmd.query.descriptor[1] = value[10];
-		hba->dev_cmd.query.descriptor[2] = value[9];
-		hba->dev_cmd.query.descriptor[3] = value[8];
 	}
 
 	return 0;
@@ -995,8 +989,7 @@ static int ufshcd_copy_query_response(struct ufs_hba *hba)
 /**
  * ufshcd_exec_dev_cmd - API for sending device management requests
  */
-static int ufshcd_exec_dev_cmd(struct ufs_hba *hba, enum dev_cmd_type cmd_type,
-			       int timeout)
+int ufshcd_exec_dev_cmd(struct ufs_hba *hba, enum dev_cmd_type cmd_type, int timeout)
 {
 	int err;
 	int resp;
@@ -1076,10 +1069,8 @@ int ufshcd_query_flag(struct ufs_hba *hba, enum query_opcode opcode,
 	case UPIU_QUERY_OPCODE_SET_FLAG:
 	case UPIU_QUERY_OPCODE_CLEAR_FLAG:
 	case UPIU_QUERY_OPCODE_TOGGLE_FLAG:
-	case UPIU_QUERY_OPCODE_WRITE_ATTR:
 		request->query_func = UPIU_QUERY_FUNC_STANDARD_WRITE_REQUEST;
 		break;
-	case UPIU_QUERY_OPCODE_READ_ATTR:
 	case UPIU_QUERY_OPCODE_READ_FLAG:
 		request->query_func = UPIU_QUERY_FUNC_STANDARD_READ_REQUEST;
 		if (!flag_res) {
@@ -1167,12 +1158,9 @@ static int __ufshcd_query_descriptor(struct ufs_hba *hba,
 	request->upiu_req.length = cpu_to_be16(*buf_len);
 
 	switch (opcode) {
-	case UPIU_QUERY_OPCODE_WRITE_ATTR:
-		request->upiu_req.value = (desc_buf[0] << 24 | desc_buf[1] << 16 | desc_buf[2] << 8 | desc_buf[3]);
 	case UPIU_QUERY_OPCODE_WRITE_DESC:
 		request->query_func = UPIU_QUERY_FUNC_STANDARD_WRITE_REQUEST;
 		break;
-	case UPIU_QUERY_OPCODE_READ_ATTR:
 	case UPIU_QUERY_OPCODE_READ_DESC:
 		request->query_func = UPIU_QUERY_FUNC_STANDARD_READ_REQUEST;
 		break;

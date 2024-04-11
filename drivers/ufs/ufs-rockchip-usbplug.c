@@ -21,6 +21,10 @@
 
 #include "ufs-rockchip-usbplug.h"
 #include "ufs.h"
+/* Query request retries */
+#define QUERY_REQ_RETRIES 3
+/* Query request timeout */
+#define QUERY_REQ_TIMEOUT 1500 /* 1.5 seconds */
 
 #if defined(CONFIG_SUPPORT_USBPLUG)
 int _ufs_start(struct ufs_hba *hba);
@@ -248,6 +252,7 @@ static void ufs_lu_configuration(struct ufs_hba *hba, struct ufs_configuration_d
 	unit[3].b_memory_type = 0x3; /* lu 2, Enhanced Memory */
 	unit[3].d_num_alloc_units = (8 * 0x800 * cap_adj_fac + denominator - 1) / denominator;
 	alloced_units += unit[3].d_num_alloc_units;
+
 	/* lu 0: data lu, max capacity*/
 	unit[0].b_boot_lun_id = 0x0; /* lu 3 */
 	unit[0].b_memory_type = 0x0; /* lu 3, Normal Memory */
@@ -315,21 +320,114 @@ static int compair_conf_desp(struct ufs_configuration_descriptor *cda, struct uf
 	return 0;
 }
 
-static int read_attribute(struct ufs_hba *hba, enum attr_id idn, uint8_t index, uint8_t selector, uint32_t *value)
-{
-	int ret, buff_len = 4;
 
-	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_ATTR,
-					    idn, index, 0, (uint8_t *)value, &buff_len);
+/**
+ * ufshcd_init_query() - init the query response and request parameters
+ */
+static inline void ufshcd_init_query(struct ufs_hba *hba,
+				     struct ufs_query_req **request,
+				     struct ufs_query_res **response,
+				     enum query_opcode opcode,
+				     u8 idn, u8 index, u8 selector)
+{
+	*request = &hba->dev_cmd.query.request;
+	*response = &hba->dev_cmd.query.response;
+	memset(*request, 0, sizeof(struct ufs_query_req));
+	memset(*response, 0, sizeof(struct ufs_query_res));
+	(*request)->upiu_req.opcode = opcode;
+	(*request)->upiu_req.idn = idn;
+	(*request)->upiu_req.index = index;
+	(*request)->upiu_req.selector = selector;
+}
+
+/**
+ * ufshcd_query_flag() - API function for sending flag query requests
+ */
+static int ufshcd_query_attribute(struct ufs_hba *hba,enum query_opcode opcode,
+				  enum attr_id idn, u8 index, u8 selector, u32 *value)
+{
+	struct ufs_query_req *request = &hba->dev_cmd.query.request;
+	struct ufs_query_res *response = &hba->dev_cmd.query.response;
+	int err;
+	int timeout = QUERY_REQ_TIMEOUT;
+
+	memset(request, 0, sizeof(struct ufs_query_req));
+	memset(response, 0, sizeof(struct ufs_query_res));
+	request->upiu_req.opcode = opcode;
+	request->upiu_req.idn = idn;
+	request->upiu_req.index = 0;
+	request->upiu_req.selector = 0;
+
+	switch (opcode) {
+	case UPIU_QUERY_OPCODE_WRITE_ATTR:
+		request->query_func = UPIU_QUERY_FUNC_STANDARD_WRITE_REQUEST;
+		request->upiu_req.value = be32_to_cpu(*value);
+		break;
+	case UPIU_QUERY_OPCODE_READ_ATTR:
+		request->query_func = UPIU_QUERY_FUNC_STANDARD_READ_REQUEST;
+		break;
+	default:
+		dev_err(hba->dev,
+			"%s: Expected query flag opcode but got = %d\n",
+			__func__, opcode);
+		err = -EINVAL;
+		goto out;
+	}
+
+	err = ufshcd_exec_dev_cmd(hba, DEV_CMD_TYPE_QUERY, timeout);
+
+	if (err) {
+		dev_err(hba->dev,
+			"%s: Sending flag query for idn %d failed, err = %d\n",
+			__func__, idn, err);
+		goto out;
+	}
+
+	if (value)
+		*value = be32_to_cpu(response->upiu_res.value);
+
+out:
+	return err;
+}
+
+static int ufshcd_query_attribute_retry(struct ufs_hba *hba, enum query_opcode opcode,
+					enum attr_id idn, u8 index, u8 selector, u32 *value)
+{
+	int ret;
+	int retries;
+
+	for (retries = 0; retries < QUERY_REQ_RETRIES; retries++) {
+		ret = ufshcd_query_attribute(hba, opcode, idn, index, selector, value);
+		if (ret)
+			dev_dbg(hba->dev,
+				"%s: failed with error %d, retries %d\n",
+				__func__, ret, retries);
+		else
+			break;
+	}
+
+	if (ret)
+		dev_err(hba->dev,
+			"%s: query attribute, opcode %d, idn %d, failed with error %d after %d retires\n",
+			__func__, opcode, idn, ret, retries);
 	return ret;
 }
 
-static int write_attribute(struct ufs_hba *hba, enum attr_id idn, uint8_t index, uint8_t selector, uint32_t *value)
+static int read_attribute(struct ufs_hba *hba, enum attr_id idn, u8 index, u8 selector, u32 *value)
 {
-	int ret, buff_len = 4;
+	int ret;
 
-	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_WRITE_ATTR,
-					    idn, index, 0, (uint8_t *)value, &buff_len);
+	ret = ufshcd_query_attribute_retry(hba, UPIU_QUERY_OPCODE_READ_ATTR,
+					    idn, index, 0, value);
+	return ret;
+}
+
+static int write_attribute(struct ufs_hba *hba, enum attr_id idn, u8 index, u8 selector, u32 *value)
+{
+	int ret;
+
+	ret = ufshcd_query_attribute_retry(hba, UPIU_QUERY_OPCODE_WRITE_ATTR,
+					    idn, index, 0, value);
 	return ret;
 }
 
@@ -346,8 +444,7 @@ static int set_boot_lu_enable(struct ufs_hba *hba)
 	}
 
 	if (value != 0)
-		printf("UFS get boot W-LU-%c\n",
-			(value == WELL_BOOT_LU_A) ? 'A' : 'B');
+		printf("UFS get boot W-LU-%c\n", (value == WELL_BOOT_LU_A) ? 'A' : 'B');
 
 	if (value == target_value)
 		return 0;
@@ -360,8 +457,55 @@ static int set_boot_lu_enable(struct ufs_hba *hba)
 		return ret;
 	}
 
-	printf("UFS set boot W-LU(%c)\n", (value == WELL_BOOT_LU_A) ? 'A' : 'B');
-	return ret;
+	ret = read_attribute(hba, B_BOOT_LUNEN, 0, 0, &value);
+	if (ret) {
+		printf("read bBootLunEn fail. ret = %d\n", ret);
+		return ret;
+	}
+
+	if (target_value == value)
+		return 0;
+
+	printf("UFS set boot W-LU(%c) Fail value = %x\n", (value == WELL_BOOT_LU_A) ? 'A' : 'B', value);
+	return 0;
+}
+
+static int ufs_set_ref_clk(struct ufs_hba *hba)
+{
+	uint32_t value;
+	int ret;
+	uint32_t target_ref_clk;
+
+	target_ref_clk = 1; /* 26 MHz */
+
+	ret = read_attribute(hba, B_REFCLK_FREQ, 0, 0, &value);
+	if (ret) {
+		printf("read bRefClkFreq fail. ret = %d\n", ret);
+		return ret;
+	}
+
+	printf("UFS get ref clock %d Mhz\n", (value == 1) ? 26 : 19);
+	if (target_ref_clk == value)
+		return 0;
+
+	/* set default boot from Boot LU A */
+	ret = write_attribute(hba, B_REFCLK_FREQ, 0, 0, &target_ref_clk);
+	if (ret) {
+		printf("write bRefClkFreq attribute fail. ret = %d\n", ret);
+		return ret;
+	}
+
+	ret = read_attribute(hba, B_REFCLK_FREQ, 0, 0, &value);
+	if (ret) {
+		printf("read bRefClkFreq fail. ret = %d\n", ret);
+		return ret;
+	}
+
+	if (target_ref_clk == value)
+		return 0;
+
+	printf("UFS set bRefClkFreq  26Mhz Fail\n");
+	return -EINVAL;
 }
 
 int ufs_create_partition_inventory(struct ufs_hba *hba)
@@ -394,7 +538,7 @@ int ufs_create_partition_inventory(struct ufs_hba *hba)
 	printf("compair_conf_desp: 0x%x\n", err);
 
 	if (!err)
-		return 0;
+		goto out;
 
 	err = ufs_write_configuration_desc(hba, hba->wc_desc);
 	if (err)
@@ -403,8 +547,10 @@ int ufs_create_partition_inventory(struct ufs_hba *hba)
 	err =  _ufs_start(hba);
         if (err)
                 return err;
-
+out:
 	ufs_info_show_dev_desc(hba->dev_desc);
+
+	ufs_set_ref_clk(hba);
 
         return set_boot_lu_enable(hba);
 }

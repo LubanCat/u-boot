@@ -72,6 +72,21 @@ static int rkusb_erase_sector(struct ums *ums_dev,
 	struct blk_desc *block_dev = &ums_dev->block_dev;
 	lbaint_t blkstart = start + ums_dev->start_sector;
 
+#if defined(CONFIG_SCSI) && defined(CONFIG_CMD_SCSI) && (defined(CONFIG_UFS))
+	if (block_dev->if_type == IF_TYPE_SCSI && block_dev->rawblksz == 4096) {
+		/* write loader to UFS BootA */
+		if (blkstart < 8192) {
+			lbaint_t cur_cnt = 8192 - blkstart;
+
+			if (cur_cnt > blkcnt)
+				cur_cnt = blkcnt;
+			blk_erase_devnum(IF_TYPE_SCSI, 1, blkstart, cur_cnt);
+			blkcnt -= cur_cnt;
+			blkstart += cur_cnt;
+		}
+	}
+#endif
+
 	return blk_derase(block_dev, blkstart, blkcnt);
 }
 

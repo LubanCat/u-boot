@@ -1536,7 +1536,7 @@ static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 	struct ufs_hba *hba = dev_get_uclass_priv(scsi_dev->parent);
 	struct utp_transfer_req_desc *req_desc = hba->utrdl;
 	u32 upiu_flags;
-	int ocs, result = 0, retry_count = 5;
+	int ocs, result = 0, retry_count = 3;
 	u8 scsi_status;
 
 	/* cmd do not set lun for ufs 2.1 */
@@ -1547,8 +1547,10 @@ retry:
 	ufshcd_prepare_utp_scsi_cmd_upiu(hba, pccb, upiu_flags);
 	prepare_prdt_table(hba, pccb);
 
-	if (ufshcd_send_command(hba, TASK_TAG) == -ETIMEDOUT && retry_count--)
+	if (ufshcd_send_command(hba, TASK_TAG) == -ETIMEDOUT && retry_count) {
+		retry_count--;
 		goto retry;
+	}
 
 	ocs = ufshcd_get_tr_ocs(hba);
 	switch (ocs) {
@@ -1559,9 +1561,14 @@ retry:
 			result = ufshcd_get_rsp_upiu_result(hba->ucd_rsp_ptr);
 
 			scsi_status = result & MASK_SCSI_STATUS;
-
-			if ((pccb->cmd[0] == SCSI_TST_U_RDY) && scsi_status == SENSE_NOT_READY && retry_count--)
-				goto retry;
+			if (pccb->cmd[0] == SCSI_TST_U_RDY && scsi_status) {
+				/* Test ready cmd will fail with Phison UFS, break to continue */
+				if (retry_count) {
+					retry_count--;
+					goto retry;
+				}
+				break;
+			}
 			if (scsi_status)
 				return -EINVAL;
 

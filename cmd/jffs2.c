@@ -162,7 +162,14 @@ static int mtd_device_validate(u8 type, u8 num, u32 *size)
 		printf("no such FLASH device: %s%d (valid range 0 ... %d\n",
 				MTD_DEV_TYPE(type), num, CONFIG_SYS_MAX_FLASH_BANKS - 1);
 #else
-		printf("support for FLASH devices not present\n");
+		struct mtd_info *mtd = get_nand_dev_by_index(num);
+		if (mtd) {
+			*size = mtd->size;
+			return 0;
+		}
+
+		printf("no such Nor device: %s%d (valid range 0 ... %d)\n",
+				MTD_DEV_TYPE(type), num, CONFIG_SYS_MAX_FLASH_BANKS - 1);
 #endif
 	} else if (type == MTD_DEV_TYPE_NAND) {
 #if defined(CONFIG_JFFS2_NAND) && defined(CONFIG_CMD_NAND)
@@ -286,8 +293,11 @@ static inline u32 get_part_sector_size_nor(struct mtdids *id, struct part_info *
 
 	return sector_size;
 #else
-	BUG();
-	return 0;
+	struct mtd_info *mtd;
+
+	mtd = get_nand_dev_by_index(id->num);
+
+	return mtd->erasesize;
 #endif
 }
 

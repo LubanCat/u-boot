@@ -378,10 +378,10 @@ static inline void *get_fl_mem_nor(u32 off, u32 size, void *ext_buf)
 
 	addr += flash->start[0];
 	if (ext_buf) {
-		memcpy(ext_buf, (void *)addr, size);
+		memcpy(ext_buf, (void *)(long)addr, size);
 		return ext_buf;
 	}
-	return (void*)addr;
+	return (void*)(long)addr;
 }
 
 static inline void *get_node_mem_nor(u32 off, void *ext_buf)
@@ -425,7 +425,7 @@ static inline void *get_fl_mem(u32 off, u32 size, void *ext_buf)
 		printf("get_fl_mem: unknown device type, " \
 			"using raw offset!\n");
 	}
-	return (void*)off;
+	return (void*)(long)off;
 }
 
 static inline void *get_node_mem(u32 off, void *ext_buf)
@@ -453,7 +453,7 @@ static inline void *get_node_mem(u32 off, void *ext_buf)
 		printf("get_fl_mem: unknown device type, " \
 			"using raw offset!\n");
 	}
-	return (void*)off;
+	return (void*)(long)off;
 }
 
 static inline void put_fl_mem(void *buf, void *ext_buf)

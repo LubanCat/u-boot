@@ -9,6 +9,7 @@
 #include <fdt_support.h>
 #include <misc.h>
 #include <mmc.h>
+#include <scsi.h>
 #include <spl.h>
 #include <asm/io.h>
 #include <asm/arch/bootrom.h>
@@ -388,22 +389,35 @@ int arch_cpu_init(void)
 #endif
 
 #if defined(CONFIG_SCSI) && defined(CONFIG_CMD_SCSI) && defined(CONFIG_UFS)
-int rk_board_fdt_fixup(const void *blob)
+int rk_board_dm_fdt_fixup(const void *blob)
 {
 	struct blk_desc *desc = rockchip_get_bootdev();
-
-	if (!desc)
-		return 0;
+	const char *status = NULL;
+	int node = -1;
 
 	/*
-	 * If there are eMMC and UFS on a board but the boot device is not UFS.
-	 * It's quite possible that there is not power supply for UFS.
+	 * 1. Kernel DTS will enable UFS by default.
 	 *
-	 * It occurs hang if kernel ufs driver try to access UFS registers.
+	 * 2. It hangs if Kernel UFS driver tries to access UFS registers when there
+	 * is no power supply for UFS.
+	 *
+	 * So generally, disable UFS when detect fail.
+	 *
+	 * To save time spent on detecting UFS, you can disable UFS in kernel dts or
+	 * U-Boot defconfig.
+	 *
 	 */
 	if (desc->if_type != IF_TYPE_SCSI) {
-		do_fixup_by_path((void *)blob, "/ufs@2a2d0000", "status", "disabled", 9, 0);
-		printf("FDT: UFS is not boot device and it was disabled\n");
+		node = fdt_path_offset(blob, "/ufs@2a2d0000");
+		if (node >= 0) {
+			status = fdt_getprop(blob, node, "status", NULL);
+			if (status && strcmp(status, "disabled")) {
+				if (scsi_scan(true)) {
+					fdt_setprop((void *)blob, node, "status", "disabled", 9);
+					printf("FDT: UFS was not detected, disabling UFS.\n");
+				}
+			}
+		}
 	}
 
 	return 0;

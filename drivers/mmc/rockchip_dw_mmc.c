@@ -69,6 +69,76 @@ int board_mmc_dm_reinit(struct udevice *dev)
 __weak void mmc_gpio_init_direct(void) {}
 #endif
 
+static uint rockchip_dwmmc_get_mmc_clk(struct dwmci_host *host, uint freq)
+{
+	struct udevice *dev = host->priv;
+	struct rockchip_dwmmc_priv *priv = dev_get_priv(dev);
+	int ret;
+
+	/*
+	 * If DDR52 8bit mode(only emmc work in 8bit mode),
+	 * divider must be set 1
+	 */
+	if (mmc_card_ddr52(host->mmc) && host->mmc->bus_width == 8)
+		freq *= 2;
+
+	ret = clk_set_rate(&priv->clk, freq);
+	if (ret < 0) {
+		debug("%s: err=%d\n", __func__, ret);
+		return 0;
+	}
+
+	return freq;
+}
+
+static int rockchip_dwmmc_ofdata_to_platdata(struct udevice *dev)
+{
+#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+	struct rockchip_dwmmc_priv *priv = dev_get_priv(dev);
+	struct dwmci_host *host = &priv->host;
+
+	host->name = dev->name;
+	host->ioaddr = dev_read_addr_ptr(dev);
+	host->buswidth = dev_read_u32_default(dev, "bus-width", 4);
+	host->get_mmc_clk = rockchip_dwmmc_get_mmc_clk;
+	host->priv = dev;
+
+	/* use non-removeable as sdcard and emmc as judgement */
+	if (dev_read_bool(dev, "non-removable"))
+		host->dev_index = 0;
+	else
+		host->dev_index = 1;
+
+	priv->fifo_depth = dev_read_u32_default(dev, "fifo-depth", 0);
+
+	if (priv->fifo_depth < 0)
+		return -EINVAL;
+	priv->fifo_mode = dev_read_bool(dev, "fifo-mode");
+
+	/*
+	 * 'clock-freq-min-max' is deprecated
+	 * (see https://github.com/torvalds/linux/commit/b023030f10573de738bbe8df63d43acab64c9f7b)
+	 */
+	if (dev_read_u32_array(dev, "clock-freq-min-max", priv->minmax, 2)) {
+		int val = dev_read_u32_default(dev, "max-frequency", -EINVAL);
+
+		if (val < 0)
+			return val;
+
+		priv->minmax[0] = 400000;  /* 400 kHz */
+		priv->minmax[1] = val;
+	} else {
+		debug("%s: 'clock-freq-min-max' property was deprecated.\n",
+		      __func__);
+	}
+#endif
+	return 0;
+}
+
+#ifndef CONFIG_MMC_SIMPLE
+#define NUM_PHASES	32
+#define TUNING_ITERATION_TO_PHASE(i, num_phases) (DIV_ROUND_UP((i) * 360, num_phases))
+
 /*
  * Each fine delay is between 44ps-77ps. Assume each fine delay is 60ps to
  * simplify calculations. So 45degs could be anywhere between 33deg and 57.8deg.
@@ -180,76 +250,6 @@ static int rockchip_mmc_set_phase(struct dwmci_host *host, bool sample, int degr
 
 	return 0;
 }
-
-static uint rockchip_dwmmc_get_mmc_clk(struct dwmci_host *host, uint freq)
-{
-	struct udevice *dev = host->priv;
-	struct rockchip_dwmmc_priv *priv = dev_get_priv(dev);
-	int ret;
-
-	/*
-	 * If DDR52 8bit mode(only emmc work in 8bit mode),
-	 * divider must be set 1
-	 */
-	if (mmc_card_ddr52(host->mmc) && host->mmc->bus_width == 8)
-		freq *= 2;
-
-	ret = clk_set_rate(&priv->clk, freq);
-	if (ret < 0) {
-		debug("%s: err=%d\n", __func__, ret);
-		return 0;
-	}
-
-	return freq;
-}
-
-static int rockchip_dwmmc_ofdata_to_platdata(struct udevice *dev)
-{
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct rockchip_dwmmc_priv *priv = dev_get_priv(dev);
-	struct dwmci_host *host = &priv->host;
-
-	host->name = dev->name;
-	host->ioaddr = dev_read_addr_ptr(dev);
-	host->buswidth = dev_read_u32_default(dev, "bus-width", 4);
-	host->get_mmc_clk = rockchip_dwmmc_get_mmc_clk;
-	host->priv = dev;
-
-	/* use non-removeable as sdcard and emmc as judgement */
-	if (dev_read_bool(dev, "non-removable"))
-		host->dev_index = 0;
-	else
-		host->dev_index = 1;
-
-	priv->fifo_depth = dev_read_u32_default(dev, "fifo-depth", 0);
-
-	if (priv->fifo_depth < 0)
-		return -EINVAL;
-	priv->fifo_mode = dev_read_bool(dev, "fifo-mode");
-
-	/*
-	 * 'clock-freq-min-max' is deprecated
-	 * (see https://github.com/torvalds/linux/commit/b023030f10573de738bbe8df63d43acab64c9f7b)
-	 */
-	if (dev_read_u32_array(dev, "clock-freq-min-max", priv->minmax, 2)) {
-		int val = dev_read_u32_default(dev, "max-frequency", -EINVAL);
-
-		if (val < 0)
-			return val;
-
-		priv->minmax[0] = 400000;  /* 400 kHz */
-		priv->minmax[1] = val;
-	} else {
-		debug("%s: 'clock-freq-min-max' property was deprecated.\n",
-		      __func__);
-	}
-#endif
-	return 0;
-}
-
-#ifndef CONFIG_MMC_SIMPLE
-#define NUM_PHASES	32
-#define TUNING_ITERATION_TO_PHASE(i, num_phases) (DIV_ROUND_UP((i) * 360, num_phases))
 
 static int rockchip_dwmmc_execute_tuning(struct dwmci_host *host, u32 opcode)
 {

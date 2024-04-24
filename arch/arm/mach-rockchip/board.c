@@ -567,8 +567,52 @@ int interrupt_debugger_init(void)
 #endif
 }
 
+#ifdef CONFIG_SANITY_CPU_SWAP
+static void sanity_cpu_swap(void *blob)
+{
+	int cpus_offset;
+	int noffset;
+	ulong mpidr;
+	ulong reg;
+
+	cpus_offset = fdt_path_offset(blob, "/cpus");
+	if (cpus_offset < 0)
+		return;
+
+	for (noffset = fdt_first_subnode(blob, cpus_offset);
+	     noffset >= 0;
+	     noffset = fdt_next_subnode(blob, noffset)) {
+		const struct fdt_property *prop;
+		int len;
+
+		prop = fdt_get_property(blob, noffset, "device_type", &len);
+		if (!prop)
+			continue;
+		if (len < 4)
+			continue;
+		if (strcmp(prop->data, "cpu"))
+			continue;
+
+		/* only sanity first cpu */
+		reg = (ulong)fdtdec_get_addr_size_auto_parent(blob, cpus_offset, noffset,
+                                                              "reg", 0, NULL, false);
+		mpidr = read_mpidr() & 0xfff;
+		if ((mpidr & reg) != reg) {
+			printf("CPU swap error: Loader and Kernel firmware mismatch! "
+			       "Current cpu0 \"reg\" is 0x%lx but kernel dtb requires 0x%lx\n",
+			       mpidr, reg);
+			run_command("download", 0);
+		}
+		return;
+	}
+}
+#endif
+
 int board_fdt_fixup(void *blob)
 {
+#ifdef CONFIG_SANITY_CPU_SWAP
+	sanity_cpu_swap(blob);
+#endif
 	/*
 	 * Device's platdata points to orignal fdt blob property,
 	 * access DM device before any fdt fixup.

@@ -1162,6 +1162,12 @@ config ROCKCHIP_MINIDUMP_MAX_ENTRIES
 	help
 	  This sets the max entries of minidump region.
 
+config SANITY_CPU_SWAP
+	bool "Sanity cpu swap"
+	help
+	  This enale checking current cpu mpidr and kernel
+	  dts cpu0 mpidr.
+
 source "arch/arm/mach-rockchip/px30/Kconfig"
 source "arch/arm/mach-rockchip/rk3036/Kconfig"
 source "arch/arm/mach-rockchip/rk3066/Kconfig"

@@ -399,7 +399,7 @@ bool spl_is_low_power(void)
 
 void spl_next_stage(struct spl_image_info *spl)
 {
-	const char *reason[] = { "Recovery key", "Ctrl+c", "LowPwr", "Unknown" };
+	const char *reason[] = { "Recovery key", "Ctrl+c", "LowPwr", "Other" };
 	uint32_t reg_boot_mode;
 	int i = 0;
 
@@ -425,20 +425,15 @@ void spl_next_stage(struct spl_image_info *spl)
 
 	reg_boot_mode = readl((void *)CONFIG_ROCKCHIP_BOOT_MODE_REG);
 	switch (reg_boot_mode) {
-	case BOOT_COLD:
-	case BOOT_PANIC:
-	case BOOT_WATCHDOG:
-	case BOOT_NORMAL:
-	case BOOT_RECOVERY:
-		spl->next_stage = SPL_NEXT_STAGE_KERNEL;
-		break;
+	case BOOT_LOADER:
+	case BOOT_FASTBOOT:
+	case BOOT_CHARGING:
+	case BOOT_UMS:
+	case BOOT_DFU:
+		i = 3;
+		spl->next_stage = SPL_NEXT_STAGE_UBOOT;
 	default:
-		if ((reg_boot_mode & REBOOT_FLAG) != REBOOT_FLAG) {
-			spl->next_stage = SPL_NEXT_STAGE_KERNEL;
-		} else {
-			i = 3;
-			spl->next_stage = SPL_NEXT_STAGE_UBOOT;
-		}
+		spl->next_stage = SPL_NEXT_STAGE_KERNEL;
 	}
 
 out:

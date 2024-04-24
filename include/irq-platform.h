@@ -308,7 +308,7 @@
 #define GPIO3_PHYS			0x2ae30000
 #define GPIO4_PHYS			0x2ae40000
 
-#define GIC_IRQS_NR			(7 * 32)
+#define GIC_IRQS_NR			(420)
 #define GPIO_IRQS_NR			(5 * 32)
 
 #define GPIO_BANK_NUM			5

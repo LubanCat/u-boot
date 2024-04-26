@@ -432,6 +432,7 @@ void spl_next_stage(struct spl_image_info *spl)
 	case BOOT_DFU:
 		i = 3;
 		spl->next_stage = SPL_NEXT_STAGE_UBOOT;
+		break;
 	default:
 		spl->next_stage = SPL_NEXT_STAGE_KERNEL;
 	}

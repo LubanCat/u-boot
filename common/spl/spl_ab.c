@@ -5,7 +5,9 @@
 
 #include <common.h>
 #include <blk.h>
+#include <malloc.h>
 #include <spl_ab.h>
+#include <fdt_support.h>
 
 int safe_memcmp(const void *s1, const void *s2, size_t n)
 {
@@ -410,4 +412,27 @@ int spl_ab_decrease_reset(struct blk_desc *dev_desc)
 	 * negative number, then enter maskrom in the caller.
 	 */
 	return -EINVAL;
+}
+
+int spl_ab_bootargs_append_slot(void *fdt, char *slot)
+{
+	char *str;
+	int len, ret = 0;
+
+	if (!slot)
+		return 0;
+
+	len = strlen(ANDROID_ARG_SLOT_SUFFIX) + strlen(slot) + 1;
+	str = malloc(len);
+	if (!str)
+		return -ENOMEM;
+
+	snprintf(str, len, "%s%s", ANDROID_ARG_SLOT_SUFFIX, slot);
+	ret = fdt_bootargs_append(fdt, str);
+	if (ret)
+		printf("Append slot info to bootargs fail");
+
+	free(str);
+
+	return ret;
 }

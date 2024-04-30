@@ -12,6 +12,8 @@
 #include <optee_include/OpteeClientApiLib.h>
 #include <optee_test.h>
 
+DECLARE_GLOBAL_DATA_PTR;
+
 static int curr_device = -1;
 
 static void print_mmcinfo(struct mmc *mmc)
@@ -597,6 +599,13 @@ static int do_mmc_dev(cmd_tbl_t *cmdtp, int flag,
 {
 	int dev, part = 0, ret;
 	struct mmc *mmc;
+
+	/* If not boot from mmc devices, init mmc devices first. */
+	ret = mmc_initialize(gd->bd);
+	if (ret) {
+		printf("Could not initialize mmc. error: %d\n", ret);
+		return ret;
+	}
 
 	if (argc == 1) {
 		dev = curr_device;

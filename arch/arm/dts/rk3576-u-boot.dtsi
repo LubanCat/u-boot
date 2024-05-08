@@ -139,7 +139,6 @@
 &sdmmc {
 	bus-width = <4>;
 	u-boot,dm-spl;
-	pwr-en-gpios = <&gpio0 RK_PB6 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 };
 
@@ -169,6 +168,10 @@
 };
 
 &sdmmc0_det {
+	u-boot,dm-spl;
+};
+
+&sdmmc0_pwren {
 	u-boot,dm-spl;
 };
 

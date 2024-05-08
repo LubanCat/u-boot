@@ -180,7 +180,7 @@ static unsigned int dwmci_get_drto(struct dwmci_host *host,
 				   host->mmc->clock);
 
 	/* add a bit spare time */
-	drto_ms += 10;
+	drto_ms += 50;
 
 	return drto_ms;
 }

@@ -405,7 +405,7 @@ static void pcie_board_init(void)
 #define PCIE3PHY_GRF_PHY1_LN0_CON1	(PCIE3PHY_GRF_BASE + 0x2004)
 #define PCIE3PHY_GRF_PHY1_LN1_CON1	(PCIE3PHY_GRF_BASE + 0x2104)
 #define FIREWALL_PCIE_MASTER_SEC	0xfe0300f0
-#define FIREWALL_PCIE_ACCESS		0xfe586040
+#define FIREWALL_PCIE_ACCESS		0xfd586040
 #define CRU_PHYREF_ALT_GATE_CON		(CRU_BASE_ADDR + 0x0c38)
 #define PMU1_GRF_BASE			0xfd58a000
 #define PMU_PWR_GATE_SFTCON1		0xfd8d8150
@@ -513,7 +513,7 @@ static void pcie_firewall_init(void)
 {
 	/* Enable PCIe Access in firewall and master secure mode */
 	writel(0xffff0000, FIREWALL_PCIE_MASTER_SEC);
-	writel(0x01800000, FIREWALL_PCIE_ACCESS);
+	writel(0x03000000, FIREWALL_PCIE_ACCESS);
 }
 #elif CONFIG_ROCKCHIP_RK3568
 

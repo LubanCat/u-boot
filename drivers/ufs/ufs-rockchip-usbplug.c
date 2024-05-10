@@ -121,15 +121,15 @@ static void ufs_info_show_conf_desc(void *buf)
 
 static int ufs_get_configuration_desc(struct ufs_hba *hba, struct ufs_configuration_descriptor *c_desc)
 {
-	u8 desc_buf[CONFIGURATION_DESC_V22_LENGTH];
+	u8 desc_buf[CONFIGURATION_DESC_V31_LENGTH];
 	u8 *buf = desc_buf;
-	int length = CONFIGURATION_DESC_V22_LENGTH;
+	int length = hba->desc_size.conf_desc;
 	int err;
 
 	if (CONFIGURATION_DESC_V31_LENGTH == hba->desc_size.conf_desc) {
 		buf = (u8 *)c_desc;
-		length = CONFIGURATION_DESC_V31_LENGTH;
-	} else if(CONFIGURATION_DESC_V22_LENGTH != hba->desc_size.conf_desc) {
+	} else if(CONFIGURATION_DESC_V22_LENGTH != hba->desc_size.conf_desc &&
+		  CONFIGURATION_DESC_V30_LENGTH != hba->desc_size.conf_desc) {
 		return -EINVAL;
 	}
 
@@ -146,6 +146,15 @@ static int ufs_get_configuration_desc(struct ufs_hba *hba, struct ufs_configurat
 		for (int i = 0; i < UNIT_DESCS_COUNT; i++) {
 			memcpy(&c_desc->unit_desc_conf_param[i], buf,  0x10);
 			buf += 0x10;
+		}
+	}
+
+	if (CONFIGURATION_DESC_V30_LENGTH == hba->desc_size.conf_desc) {
+		memcpy(&c_desc->dev_desc_conf_param, buf, 0x12);
+		buf += 0x12;
+		for (int i = 0; i < UNIT_DESCS_COUNT; i++) {
+			memcpy(&c_desc->unit_desc_conf_param[i], buf,  0x1A);
+			buf += 0x1A;
 		}
 	}
 
@@ -191,20 +200,27 @@ static int ufshcd_write_desc_param(struct ufs_hba *hba, enum desc_idn desc_id,
 
 static int ufs_write_configuration_desc(struct ufs_hba *hba, struct ufs_configuration_descriptor *c_desc)
 {
-	u8 desc_buf[CONFIGURATION_DESC_V22_LENGTH];
+	u8 desc_buf[CONFIGURATION_DESC_V31_LENGTH];
 	u8 *buf = desc_buf;
-	int length = CONFIGURATION_DESC_V22_LENGTH;
+	int length = hba->desc_size.conf_desc;
 	int err;
 
 	if (CONFIGURATION_DESC_V31_LENGTH == hba->desc_size.conf_desc) {
 		buf = (u8 *)c_desc;
-		length = CONFIGURATION_DESC_V31_LENGTH;
-	} else if(CONFIGURATION_DESC_V22_LENGTH == hba->desc_size.conf_desc) {
+	} else if (CONFIGURATION_DESC_V22_LENGTH == hba->desc_size.conf_desc) {
 		memcpy(buf, &c_desc->dev_desc_conf_param, 0x10);
 		buf += 0x10;
 		for (int i = 0; i < UNIT_DESCS_COUNT; i++) {
 			memcpy(buf, &c_desc->unit_desc_conf_param[i], 0x10);
 			buf += 0x10;
+		}
+		buf = desc_buf;
+	} else if (CONFIGURATION_DESC_V30_LENGTH == hba->desc_size.conf_desc) {
+		memcpy(buf, &c_desc->dev_desc_conf_param, 0x12);
+		buf += 0x12;
+		for (int i = 0; i < UNIT_DESCS_COUNT; i++) {
+			memcpy(buf, &c_desc->unit_desc_conf_param[i], 0x1A);
+			buf += 0x1A;
 		}
 		buf = desc_buf;
 	} else {

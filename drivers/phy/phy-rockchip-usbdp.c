@@ -194,6 +194,37 @@ struct rockchip_udphy {
 	const struct rockchip_udphy_cfg *cfgs;
 };
 
+#ifdef CONFIG_ROCKCHIP_RK3576
+static const struct dp_tx_drv_ctrl rk3576_dp_tx_drv_ctrl_rbr_hbr[4][4] = {
+	/* voltage swing 0, pre-emphasis 0->3 */
+	{
+		{ 0x20, 0x10, 0x42, 0xe5 },
+		{ 0x26, 0x14, 0x42, 0xe5 },
+		{ 0x29, 0x18, 0x42, 0xe5 },
+		{ 0x2b, 0x1c, 0x43, 0xe7 },
+	},
+
+	/* voltage swing 1, pre-emphasis 0->2 */
+	{
+		{ 0x23, 0x10, 0x42, 0xe7 },
+		{ 0x2a, 0x17, 0x43, 0xe7 },
+		{ 0x2b, 0x1a, 0x43, 0xe7 },
+	},
+
+	/* voltage swing 2, pre-emphasis 0->1 */
+	{
+		{ 0x27, 0x10, 0x43, 0x67 },
+		{ 0x2b, 0x17, 0x43, 0xe7 },
+	},
+
+	/* voltage swing 3, pre-emphasis 0 */
+	{
+		{ 0x29, 0x10, 0x43, 0xe7 },
+	},
+};
+#endif
+
+#ifdef CONFIG_ROCKCHIP_RK3588
 static const struct dp_tx_drv_ctrl rk3588_dp_tx_drv_ctrl_rbr_hbr[4][4] = {
 	/* voltage swing 0, pre-emphasis 0->3 */
 	{
@@ -221,6 +252,7 @@ static const struct dp_tx_drv_ctrl rk3588_dp_tx_drv_ctrl_rbr_hbr[4][4] = {
 		{ 0x29, 0x10, 0x43, 0xe7 },
 	},
 };
+#endif
 
 static const struct dp_tx_drv_ctrl rk3588_dp_tx_drv_ctrl_hbr2[4][4] = {
 	/* voltage swing 0, pre-emphasis 0->3 */
@@ -1349,8 +1381,8 @@ static const struct rockchip_udphy_cfg rk3576_udphy_cfgs = {
 		},
 	},
 	.dp_tx_ctrl_cfg = {
-		rk3588_dp_tx_drv_ctrl_rbr_hbr,
-		rk3588_dp_tx_drv_ctrl_rbr_hbr,
+		rk3576_dp_tx_drv_ctrl_rbr_hbr,
+		rk3576_dp_tx_drv_ctrl_rbr_hbr,
 		rk3588_dp_tx_drv_ctrl_hbr2,
 		rk3588_dp_tx_drv_ctrl_hbr3,
 	},

@@ -247,9 +247,9 @@ static int ahci_host_init(struct ahci_uc_priv *uc_priv)
 #endif
 
 	for (i = 0; i < uc_priv->n_ports; i++) {
+		uc_priv->port[i].port_mmio = ahci_port_base(mmio, i);
 		if (!(port_map & (1 << i)))
 			continue;
-		uc_priv->port[i].port_mmio = ahci_port_base(mmio, i);
 		port_mmio = (u8 *)uc_priv->port[i].port_mmio;
 
 		/* make sure port is not active */

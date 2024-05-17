@@ -441,13 +441,16 @@ internal_phase:
 		plat->cfg.host_caps |= MMC_MODE_HS200;
 	plat->mmc.default_phase =
 		dev_read_u32_default(dev, "default-sample-phase", 0);
-#ifdef CONFIG_ROCKCHIP_RV1106
+
+	/* Set default sample phase for initializate */
 	if (!(ret < 0) && (&priv->sample_clk)) {
-		ret = clk_set_phase(&priv->sample_clk, plat->mmc.default_phase);
+		if (priv->usrid == USRID_INTER_PHASE)
+			ret = rockchip_mmc_set_phase(host, true, plat->mmc.default_phase);
+		else
+			ret = clk_set_phase(&priv->sample_clk, plat->mmc.default_phase);
 		if (ret < 0)
 			debug("MMC: can not set default phase!\n");
 	}
-#endif
 
 	plat->mmc.init_retry = 0;
 	host->mmc = &plat->mmc;

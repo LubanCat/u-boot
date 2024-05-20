@@ -396,6 +396,7 @@ static ulong scsi_write(struct blk_desc *block_dev, lbaint_t blknr,
 #endif
 
 }
+
 #ifdef CONFIG_BLK
 static ulong scsi_erase(struct udevice *dev, lbaint_t blknr, lbaint_t blkcnt)
 {
@@ -551,7 +552,6 @@ static int scsi_read_capacity(struct udevice *dev, struct scsi_cmd *pccb,
 			 ((unsigned long)pccb->pdata[5] << 16) |
 			 ((unsigned long)pccb->pdata[6] << 8)  |
 			 ((unsigned long)pccb->pdata[7]);
-		*capacity = *capacity + 1;
 		return 0;
 	}
 
@@ -575,7 +575,6 @@ static int scsi_read_capacity(struct udevice *dev, struct scsi_cmd *pccb,
 		    ((uint64_t)pccb->pdata[5] << 16) |
 		    ((uint64_t)pccb->pdata[6] << 8)  |
 		    ((uint64_t)pccb->pdata[7]);
-	*capacity = *capacity + 1;
 
 	*blksz = ((uint64_t)pccb->pdata[8]  << 56) |
 		 ((uint64_t)pccb->pdata[9]  << 48) |
@@ -750,6 +749,7 @@ static int do_scsi_scan_one(struct udevice *dev, int id, int lun, bool verbose)
 
 	if (bdesc->rawblksz == 4096) {
 		bdesc->blksz = 512;
+		bdesc->rawlba++; /* add 1 sector for ufs */
 		bdesc->lba = bdesc->rawlba * 8;
 		bdesc->align_sector_buf = memalign(CONFIG_SYS_CACHELINE_SIZE, bdesc->rawblksz);
 	}

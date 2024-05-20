@@ -406,6 +406,9 @@ static ulong scsi_erase(struct udevice *dev, lbaint_t blknr, lbaint_t blkcnt)
 	struct scsi_cmd *pccb = (struct scsi_cmd *)&tempccb;
 	uint32_t rawsectsz = block_dev->rawblksz / block_dev->blksz;
 
+	if (rawsectsz == 1) /* The sata devices not support data erase yet. */
+		return blkcnt;
+
 	pccb->target = block_dev->target;
 	pccb->lun = block_dev->lun;
 	pccb->datalen = 0;

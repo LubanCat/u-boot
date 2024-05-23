@@ -688,7 +688,7 @@ int arch_cpu_init(void)
 	}
 #endif
 
-#if !defined(CONFIG_TPL_BUILD)
+#if !defined(CONFIG_TPL_BUILD) && !defined(CONFIG_SUPPORT_USBPLUG)
 	qos_priority_init();
 #endif
 #endif /* #if defined(CONFIG_SPL_BUILD) || defined(CONFIG_SUPPORT_USBPLUG) */

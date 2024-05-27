@@ -2870,12 +2870,13 @@
 			      "aclk_dbi", "pclk",
 			      "aux";
 		device_type = "pci";
-		interrupts = <GIC_SPI 281 IRQ_TYPE_LEVEL_HIGH>,
+		interrupts = <GIC_SPI 283 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 281 IRQ_TYPE_LEVEL_HIGH>,
 			     <GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
 			     <GIC_SPI 279 IRQ_TYPE_LEVEL_HIGH>,
 			     <GIC_SPI 280 IRQ_TYPE_LEVEL_HIGH>,
 			     <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-		interrupt-names = "sys", "pmc", "msg", "legacy", "err";
+		interrupt-names = "msi", "sys", "pmc", "msg", "legacy", "err";
 		#interrupt-cells = <1>;
 		interrupt-map-mask = <0 0 0 7>;
 		interrupt-map = <0 0 0 1 &pcie0_intc 0>,
@@ -2891,15 +2892,17 @@
 		phys = <&combphy0_ps PHY_TYPE_PCIE>;
 		phy-names = "pcie-phy";
 		power-domains = <&power RK3576_PD_PHP>;
-		ranges = <0x81000000 0x0 0x20000000 0x0 0x20000000 0x0 0x00100000
-			  0x82000000 0x0 0x20100000 0x0 0x20100000 0x0 0x00f00000
+		ranges = <0x00000800 0x0 0x20000000 0x0 0x20000000 0x0 0x00100000
+			  0x81000000 0x0 0x20100000 0x0 0x20100000 0x0 0x00100000
+			  0x82000000 0x0 0x20200000 0x0 0x20200000 0x0 0x00e00000
 			  0xc3000000 0x9 0x00000000 0x9 0x00000000 0x0 0x80000000>;
 		reg = <0x0 0x2a200000 0x0 0x00010000>,
 		      <0x0 0x22000000 0x0 0x00400000>,
 		      <0x0 0x20000000 0x0 0x00100000>;
 		reg-names = "pcie-apb", "pcie-dbi", "config";
-		resets = <&cru SRST_PCIE0_POWER_UP>;
-		reset-names = "pipe";
+		resets = <&cru SRST_PCIE0_POWER_UP>, <&cru SRST_P_PCIE0>;
+		reset-names = "pipe", "p_pcie0";
+		dma-coherent;
 		status = "disabled";
 
 		pcie0_intc: legacy-interrupt-controller {
@@ -2923,12 +2926,13 @@
 			      "aclk_dbi", "pclk",
 			      "aux";
 		device_type = "pci";
-		interrupts = <GIC_SPI 267 IRQ_TYPE_LEVEL_HIGH>,
+		interrupts = <GIC_SPI 269 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 267 IRQ_TYPE_LEVEL_HIGH>,
 			     <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH>,
 			     <GIC_SPI 265 IRQ_TYPE_LEVEL_HIGH>,
 			     <GIC_SPI 266 IRQ_TYPE_LEVEL_HIGH>,
 			     <GIC_SPI 264 IRQ_TYPE_LEVEL_HIGH>;
-		interrupt-names = "sys", "pmc", "msg", "legacy", "err";
+		interrupt-names = "msi", "sys", "pmc", "msg", "legacy", "err";
 		#interrupt-cells = <1>;
 		interrupt-map-mask = <0 0 0 7>;
 		interrupt-map = <0 0 0 1 &pcie1_intc 0>,
@@ -2944,15 +2948,17 @@
 		phys = <&combphy1_psu PHY_TYPE_PCIE>;
 		phy-names = "pcie-phy";
 		power-domains = <&power RK3576_PD_SUBPHP>;
-		ranges = <0x81000000 0x0 0x21000000 0x0 0x21000000 0x0 0x00100000
-			  0x82000000 0x0 0x21100000 0x0 0x21100000 0x0 0x00f00000
+		ranges = <0x00000800 0x0 0x21000000 0x0 0x21000000 0x0 0x00100000
+			  0x81000000 0x0 0x21100000 0x0 0x21100000 0x0 0x00100000
+			  0x82000000 0x0 0x21200000 0x0 0x21200000 0x0 0x00e00000
 			  0x83000000 0x9 0x80000000 0x9 0x80000000 0x0 0x80000000>;
 		reg = <0x0 0x2a210000 0x0 0x00010000>,
 		      <0x0 0x22400000 0x0 0x00400000>,
 		      <0x0 0x21000000 0x0 0x00100000>;
 		reg-names = "pcie-apb", "pcie-dbi", "config";
-		resets = <&cru SRST_PCIE1_POWER_UP>;
-		reset-names = "pipe";
+		resets = <&cru SRST_PCIE1_POWER_UP>, <&cru SRST_P_PCIE1>;
+		reset-names = "pipe", "p_pcie1";
+		dma-coherent;
 		status = "disabled";
 
 		pcie1_intc: legacy-interrupt-controller {

@@ -226,7 +226,6 @@ static int do_rkusb(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 	if (argc != 4)
 		return CMD_RET_USAGE;
 
-re_enumerate:
 	usb_controller = argv[1];
 	devtype = argv[2];
 	devnum	= argv[3];
@@ -259,6 +258,7 @@ re_enumerate:
 #endif
 	}
 
+re_enumerate:
 	controller_index = (unsigned int)(simple_strtoul(
 				usb_controller,	NULL, 0));
 	rc = usb_gadget_initialize(controller_index);
@@ -348,7 +348,6 @@ re_enumerate:
 				rkusb_force_to_usb2(true);
 				g_dnl_unregister();
 				usb_gadget_release(controller_index);
-				rkusb_fini();
 				goto re_enumerate;
 			}
 
@@ -368,7 +367,6 @@ re_enumerate:
 			printf("rockusb switch to usb3\n");
 			g_dnl_unregister();
 			usb_gadget_release(controller_index);
-			rkusb_fini();
 			goto re_enumerate;
 		}
 	}

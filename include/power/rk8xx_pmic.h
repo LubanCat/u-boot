@@ -263,6 +263,7 @@ enum {
 #define RK806_PWRCTRL_CONFIG1		0x63
 #define RK806_VSEL_CTR_SEL0		0x64
 #define RK806_DVS_CTR_SEL4		0x6e
+#define RK806_PWRCTRL_GPIO		0x71
 #define RK806_SYS_CFG3			0x72
 #define RK806_PWRON_KEY			0x76
 #define RK806_INT_STS0			0x77
@@ -272,7 +273,17 @@ enum {
 #define RK806_GPIO_INT_CONFIG		0x7B
 #define RK806_ON_SOURCE			0x74
 #define RK806_OFF_SOURCE		0x75
-#define RK806_BUCK_RSERVE_REG3	0xfd
+#define RK806_BUCK_RSERVE_REG3		0xfd
+
+#define RK806_PWRCTRL1			0x01
+#define RK806_PWRCTRL2			0x02
+#define RK806_PWRCTRL3			0x03
+
+#define RK806_PWRCTR_GPIO_FUN		0x05
+#define RK806_PWRCTR_MSK_FUN		0x07
+#define RK806_PWRCTR_OUTPUT_MSK		0x11
+#define RK806_PWRCTR_OUTPUT0		0x01
+#define RK806_PWRCTR_OUTPUT1		0x11
 
 #define RK806_INT_POL_HIGH		BIT(1)
 #define RK806_IRQ_PWRON_FALL_MSK	BIT(0)
@@ -378,6 +389,7 @@ struct rk8xx_priv {
 	int not_save_power_en;
 	int sys_can_sd;
 	int buck5_feedback_dis;
+	int pwr_ctr[3];
 };
 
 int rk8xx_spl_configure_buck(struct udevice *pmic, int buck, int uvolt);

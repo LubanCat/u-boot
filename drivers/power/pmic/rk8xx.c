@@ -600,7 +600,36 @@ static int rk8xx_ofdata_to_platdata(struct udevice *dev)
 	/* buck5 external feedback resister disable */
 	rk8xx->buck5_feedback_dis = dev_read_bool(dev, "buck5-feedback-disable");
 
+	rk8xx->pwr_ctr[0] = dev_read_u32_default(dev, "pwrctrl1_output", -1);
+	rk8xx->pwr_ctr[1] = dev_read_u32_default(dev, "pwrctrl2_output", -1);
+	rk8xx->pwr_ctr[2] = dev_read_u32_default(dev, "pwrctrl3_output", -1);
+
 	return 0;
+}
+
+static void rk806_pwrctrl_output_value(struct udevice *dev,
+				       int pin,
+				       int output_value)
+{
+	u8 value;
+
+	rk8xx_read(dev, RK806_PWRCTRL_CONFIG0 + pin / 3, &value, 1);
+	if ((pin == RK806_PWRCTRL1) || (pin == RK806_PWRCTRL3)) {
+		value &= ~RK806_PWRCTR_MSK_FUN;
+		value |= RK806_PWRCTR_GPIO_FUN;
+	} else {
+		value &= ~(RK806_PWRCTR_MSK_FUN << 4);
+		value |= RK806_PWRCTR_GPIO_FUN << 4;
+	}
+	rk8xx_write(dev, RK806_PWRCTRL_CONFIG0 + pin / 3, &value, 1);
+
+	rk8xx_read(dev, RK806_PWRCTRL_GPIO, &value, 1);
+	value &= ~(RK806_PWRCTR_OUTPUT_MSK << (pin - 1));
+	if (output_value)
+		value |= (RK806_PWRCTR_OUTPUT1 << (pin - 1));
+	else
+		value |= (RK806_PWRCTR_OUTPUT0 << (pin - 1));
+	rk8xx_write(dev, RK806_PWRCTRL_GPIO, &value, 1);
 }
 
 static int rk8xx_probe(struct udevice *dev)
@@ -658,6 +687,12 @@ static int rk8xx_probe(struct udevice *dev)
 			rk8xx_write(dev, RK806_SYS_CFG1, &value, 1);
 		}
 
+		for (i = 0; i < 3; i++)
+			if (priv->pwr_ctr[i] >= 0 && priv->pwr_ctr[i] <= 1)
+				rk806_pwrctrl_output_value(dev,
+							   i + 1,
+							   priv->pwr_ctr[i]);
+
 		if (priv->rst_fun) {
 			rk8xx_read(dev, RK806_SYS_CFG3, &value, 1);
 			value &= RK806_RESET_FUN_CLR;
@@ -672,7 +707,7 @@ static int rk8xx_probe(struct udevice *dev)
 
 		if (priv->buck5_feedback_dis) {
 			rk8xx_read(dev, RK806_BUCK_RSERVE_REG3, &value, 1);
-			value &=( ~RK806_BUCK5_EX_RES_EN);
+			value &= (~RK806_BUCK5_EX_RES_EN);
 			rk8xx_write(dev, RK806_BUCK_RSERVE_REG3, &value, 1);
 		}
 		break;

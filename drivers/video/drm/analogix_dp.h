@@ -575,6 +575,7 @@ enum dp_irq_type {
 
 struct video_info {
 	char *name;
+	struct drm_display_mode mode;
 
 	bool h_sync_polarity;
 	bool v_sync_polarity;
@@ -589,6 +590,8 @@ struct video_info {
 	enum link_lane_count_type max_lane_count;
 
 	bool force_stream_valid;
+
+	u32 bpc;
 };
 
 struct link_train {
@@ -626,6 +629,9 @@ struct analogix_dp_plat_data {
 struct analogix_dp_device {
 	struct rockchip_connector connector;
 	int id;
+	int nr_link_rate_table;
+	int link_rate_table[DP_MAX_SUPPORTED_RATES];
+	int link_rate_select;
 	struct udevice *dev;
 	void *reg_base;
 	struct regmap *grf;

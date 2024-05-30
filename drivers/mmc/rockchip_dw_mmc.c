@@ -270,7 +270,7 @@ static int rockchip_dwmmc_execute_tuning(struct dwmci_host *host, u32 opcode)
 	int middle_phase, real_middle_phase;
 	ulong ts;
 
-	if (IS_ERR(&priv->sample_clk))
+	if (!(priv->sample_clk.dev))
 		return -EIO;
 	ts = get_timer(0);
 
@@ -443,10 +443,10 @@ internal_phase:
 		dev_read_u32_default(dev, "default-sample-phase", 0);
 
 	/* Set default sample phase for initializate */
-	if (!(ret < 0) && (&priv->sample_clk)) {
+	if (!(ret < 0)) {
 		if (priv->usrid == USRID_INTER_PHASE)
 			ret = rockchip_mmc_set_phase(host, true, plat->mmc.default_phase);
-		else
+		else if ((!priv->sample_clk.dev))
 			ret = clk_set_phase(&priv->sample_clk, plat->mmc.default_phase);
 		if (ret < 0)
 			debug("MMC: can not set default phase!\n");

@@ -367,6 +367,7 @@ static int rockchip_dwmmc_execute_tuning(struct dwmci_host *host, u32 opcode)
 }
 #else
 static int rockchip_dwmmc_execute_tuning(struct dwmci_host *host, u32 opcode) { return 0; }
+static int rockchip_mmc_set_phase(struct dwmci_host *host, bool sample, int degrees) { return 0; }
 #endif
 
 static int rockchip_dwmmc_probe(struct udevice *dev)

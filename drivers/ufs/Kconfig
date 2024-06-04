@@ -32,4 +32,12 @@ config ROCKCHIP_UFS
 
 	  Select this if you have UFS controller on Rockchip chipset.
 	  If unsure, say N.
+
+config ROCKCHIP_UFS_DISABLED_LINKUP_TEST
+	bool "Rockchip ufs disabled linkup test"
+	depends on ROCKCHIP_UFS
+	default N
+	help
+	  This selects to disabled linkup test for mphy power supply.
+
 endmenu

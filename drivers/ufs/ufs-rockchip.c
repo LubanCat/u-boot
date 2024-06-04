@@ -24,7 +24,7 @@ static inline bool ufshcd_is_hba_active(struct ufs_hba *hba)
 	return ufshcd_readl(hba, REG_CONTROLLER_ENABLE) & CONTROLLER_ENABLE;
 }
 
-#if !defined(CONFIG_SPL_BUILD)
+#if !defined(CONFIG_SPL_BUILD) && !defined(CONFIG_ROCKCHIP_UFS_DISABLED_LINKUP_TEST)
 static int ufs_rockchip_test_linkup(struct ufs_hba *hba)
 {
 	unsigned long start = 0;
@@ -71,7 +71,7 @@ static int ufs_rockchip_hce_enable_notify(struct ufs_hba *hba,
 		ufshcd_dme_reset(hba);
 		ufshcd_dme_enable(hba);
 
-#if !defined(CONFIG_SPL_BUILD)
+#if !defined(CONFIG_SPL_BUILD) && !defined(CONFIG_ROCKCHIP_UFS_DISABLED_LINKUP_TEST)
 		/* Try linkup to test if mphy has power supply */
 		if (ufs_rockchip_test_linkup(hba)) {
 			return -EIO;

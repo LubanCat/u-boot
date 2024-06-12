@@ -147,7 +147,7 @@ static int rockchip_mmc_get_phase(struct dwmci_host *host, bool sample)
 {
 	struct udevice *dev = host->priv;
 	struct rockchip_dwmmc_priv *priv = dev_get_priv(dev);
-	unsigned long rate = clk_get_rate(&priv->clk);
+	unsigned long rate = clk_get_rate(&priv->clk) / 2;
 	u32 raw_value;
 	u16 degrees;
 	u32 delay_num = 0;
@@ -177,7 +177,7 @@ static int rockchip_mmc_set_phase(struct dwmci_host *host, bool sample, int degr
 {
 	struct udevice *dev = host->priv;
 	struct rockchip_dwmmc_priv *priv = dev_get_priv(dev);
-	unsigned long rate = clk_get_rate(&priv->clk);
+	unsigned long rate = clk_get_rate(&priv->clk) / 2;
 	u8 nineties, remainder;
 	u8 delay_num;
 	u32 raw_value;

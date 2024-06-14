@@ -15,6 +15,7 @@
 #include <asm/arch/bootrom.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/hardware.h>
+#include <asm/arch/boot_mode.h>
 #include <asm/arch/ioc_rk3576.h>
 #include <asm/arch/rockchip_smccc.h>
 #include <asm/system.h>
@@ -72,6 +73,8 @@ DECLARE_GLOBAL_DATA_PTR;
 #define USBGRF_BASE		0x2601e000
 #define USB_GRF_USB3OTG0_CON1	0x0030
 
+#define PMU1_GRF_BASE		0x26026000
+#define OS_REG0			0x200
 #define USB2PHY0_GRF_BASE	0x2602e000
 #define USB2PHY1_GRF_BASE	0x26030000
 #define USB2PHY_GRF_CON4	0x0010
@@ -163,6 +166,22 @@ void rockchip_stimer_init(void)
 	writel(0x00010001, CONFIG_ROCKCHIP_STIMER_BASE + 0x04);
 }
 #endif
+
+void reset_misc(void)
+{
+#ifdef CONFIG_SPL_BUILD
+	/* For RK3576 SPL, should extraly write os_reg0 and reset to maskrom. */
+	if (readl(CONFIG_ROCKCHIP_BOOT_MODE_REG) == BOOT_BROM_DOWNLOAD)
+		writel(BOOT_BROM_DOWNLOAD, PMU1_GRF_BASE + OS_REG0);
+#elif CONFIG_SUPPORT_USBPLUG
+	/*
+	 * For RK3576 USBPLUG, should clear maskrom flag both in os_reg0 and os_reg16.
+	 * It already clear os_reg16 under ./drivers/usb/gadget/f_rockusb.c
+	 */
+	if (readl(CONFIG_ROCKCHIP_BOOT_MODE_REG) != BOOT_BROM_DOWNLOAD)
+		writel(0, (void *)PMU1_GRF_BASE + OS_REG0);
+#endif
+}
 
 void board_set_iomux(enum if_type if_type, int devnum, int routing)
 {

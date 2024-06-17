@@ -274,6 +274,9 @@ static unsigned long rockchip_sfc_clk_get_rate(struct rockchip_sfc *sfc)
 
 static int rockchip_sfc_init(struct rockchip_sfc *sfc)
 {
+#if defined(CONFIG_SPL_BUILD)
+	printf("sfc cmd=%02xH(6BH-x4)\n", readl(sfc->regbase + SFC_CMD) & 0xFF);
+#endif
 	writel(0, sfc->regbase + SFC_CTRL);
 	if (rockchip_sfc_get_version(sfc) >= SFC_VER_4)
 		writel(SFC_LEN_CTRL_TRB_SEL, sfc->regbase + SFC_LEN_CTRL);

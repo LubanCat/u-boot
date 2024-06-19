@@ -1071,6 +1071,8 @@ static int spinand_detect(struct spinand_device *spinand)
 			spinand->id.data[0], spinand->id.data[1], spinand->id.data[2]);
 		return ret;
 	}
+	dev_err(dev, "SPI Nand ID %x %x %x\n",
+		spinand->id.data[0], spinand->id.data[1], spinand->id.data[2]);
 
 	if (nand->memorg.ntargets > 1 && !spinand->select_target) {
 		dev_err(dev,

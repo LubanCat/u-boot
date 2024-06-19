@@ -566,6 +566,13 @@ ulong mtd_dwrite(struct udevice *udev, lbaint_t start,
 	if (blkcnt == 0)
 		return 0;
 
+#if CONFIG_IS_ENABLED(SUPPORT_USBPLUG)
+	if (desc->op_flag & BLK_MTD_CONT_WRITE && ((desc->lba - start) <= 33)) {
+		printf("Write in GPT backup area!\n");
+		desc->op_flag &= ~BLK_MTD_CONT_WRITE;
+	}
+#endif
+
 	if (desc->devnum == BLK_MTD_NAND ||
 	    desc->devnum == BLK_MTD_SPI_NAND ||
 	    desc->devnum == BLK_MTD_SPI_NOR) {

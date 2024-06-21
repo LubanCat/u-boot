@@ -112,6 +112,10 @@
 #define  SFC_VER_8			0x8
 #define  SFC_VER_9			0x9
 
+/* Ext ctrl */
+#define SFC_EXT_CTRL			0x34
+#define  SFC_SCLK_X2_BYPASS		BIT(24)
+
 /* Delay line controller resiter */
 #define SFC_DLL_CTRL0			0x3C
 #define SFC_DLL_CTRL0_SCLK_SMP_DLL	BIT(15)
@@ -184,6 +188,7 @@ struct rockchip_sfc {
 	u32 cur_real_speed;
 	u32 speed[SFC_MAX_CHIPSELECT_NUM];
 	bool use_dma;
+	bool sclk_x2_bypass;
 	u32 max_iosize;
 	u16 version;
 
@@ -258,29 +263,36 @@ static __maybe_unused void rockchip_sfc_set_delay_lines(struct rockchip_sfc *sfc
 #if CONFIG_IS_ENABLED(CLK)
 static int rockchip_sfc_clk_set_rate(struct rockchip_sfc *sfc, unsigned long  speed)
 {
-	if (sfc->version >= SFC_VER_8)
-		return clk_set_rate(&sfc->clk, speed * 2);
-	else
+	if (sfc->version < SFC_VER_8|| sfc->sclk_x2_bypass)
 		return clk_set_rate(&sfc->clk, speed);
+	else
+		return clk_set_rate(&sfc->clk, speed * 2);
 }
 
 static unsigned long rockchip_sfc_clk_get_rate(struct rockchip_sfc *sfc)
 {
-	if (sfc->version >= SFC_VER_8)
-		return clk_get_rate(&sfc->clk) / 2;
-	else
+	if (sfc->version < SFC_VER_8 || sfc->sclk_x2_bypass)
 		return clk_get_rate(&sfc->clk);
+	else
+		return clk_get_rate(&sfc->clk) / 2;
 }
 #endif
 
 static int rockchip_sfc_init(struct rockchip_sfc *sfc)
 {
+	u32 reg;
+
 #if defined(CONFIG_SPL_BUILD)
 	printf("sfc cmd=%02xH(6BH-x4)\n", readl(sfc->regbase + SFC_CMD) & 0xFF);
 #endif
 	writel(0, sfc->regbase + SFC_CTRL);
 	if (rockchip_sfc_get_version(sfc) >= SFC_VER_4)
 		writel(SFC_LEN_CTRL_TRB_SEL, sfc->regbase + SFC_LEN_CTRL);
+	if (rockchip_sfc_get_version(sfc) > SFC_VER_8 && sfc->sclk_x2_bypass) {
+		reg = readl(sfc->regbase + SFC_EXT_CTRL);
+		reg |= SFC_SCLK_X2_BYPASS;
+		writel(reg, sfc->regbase + SFC_EXT_CTRL);
+	}
 
 	return 0;
 }
@@ -323,6 +335,7 @@ static int rockchip_sfc_ofdata_to_platdata(struct udevice *bus)
 		sfc->use_dma = false;
 	else
 		sfc->use_dma = true;
+	sfc->sclk_x2_bypass = ofnode_read_bool(dev_ofnode(bus), "rockchip,sclk-x2-bypass");
 #if CONFIG_IS_ENABLED(CLK)
 	int ret;
 
@@ -897,6 +910,7 @@ static const struct dm_spi_ops rockchip_sfc_ops = {
 };
 
 static const struct udevice_id rockchip_sfc_ids[] = {
+	{ .compatible = "rockchip,fspi"},
 	{ .compatible = "rockchip,sfc"},
 	{},
 };

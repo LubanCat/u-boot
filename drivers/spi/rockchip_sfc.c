@@ -110,6 +110,7 @@
 #define  SFC_VER_5			0x5
 #define  SFC_VER_6			0x6
 #define  SFC_VER_8			0x8
+#define  SFC_VER_9			0x9
 
 /* Delay line controller resiter */
 #define SFC_DLL_CTRL0			0x3C
@@ -359,6 +360,8 @@ static int rockchip_sfc_probe(struct udevice *bus)
 #endif
 	/* Initial the version at the first */
 	sfc->version = rockchip_sfc_get_version(sfc);
+	if (sfc->version == SFC_VER_9)
+		sfc->version = SFC_VER_6;
 
 	ret = rockchip_sfc_init(sfc);
 	if (ret)

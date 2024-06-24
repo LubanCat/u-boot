@@ -54,7 +54,7 @@ obj-$(CONFIG_ROCKCHIP_HWID_DTB) += resource_hwid.o
 obj-$(CONFIG_ROCKCHIP_DEBUGGER) += rockchip_debugger.o
 endif
 
-obj-$(CONFIG_FPGA_ROCKCHIP) += fpga.o
+obj-$(CONFIG_$(SPL_)FPGA_ROCKCHIP) += fpga.o
 obj-$(CONFIG_RAM) += param.o
 obj-$(CONFIG_$(SPL_TPL_)RAM) += sdram.o
 obj-$(CONFIG_SPL_KERNEL_BOOT) += spl_resource_img.o

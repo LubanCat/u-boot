@@ -670,6 +670,8 @@ static int spl_internal_load_simple_fit(struct spl_image_info *spl_image,
 		if (image_info.entry_point == FDT_ERROR)
 			image_info.entry_point = image_info.load_addr;
 
+		flush_dcache_range(image_info.load_addr,
+				   image_info.load_addr + image_info.size);
 		ret = spl_fit_standalone_release(desc, image_info.entry_point);
 		if (ret)
 			printf("%s: start standalone fail, ret=%d\n", desc, ret);

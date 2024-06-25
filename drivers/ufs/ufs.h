@@ -989,4 +989,5 @@ int ufshcd_query_descriptor_retry(struct ufs_hba *hba, enum query_opcode opcode,
 				  enum desc_idn idn, u8 index, u8 selector,
 				  u8 *desc_buf, int *buf_len);
 int ufshcd_exec_dev_cmd(struct ufs_hba *hba, enum dev_cmd_type cmd_type, int timeout);
+
 #endif

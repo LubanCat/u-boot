@@ -24,7 +24,12 @@
 #if defined(CONFIG_SUPPORT_USBPLUG)
 #include "ufs-rockchip-usbplug.h"
 #endif
+
 #include "ufs.h"
+
+#if defined(CONFIG_ROCKCHIP_UFS_RPMB)
+#include "ufs-rockchip-rpmb.h"
+#endif
 
 #define UFSHCD_ENABLE_INTRS	(UTP_TRANSFER_REQ_COMPL |\
 				 UTP_TASK_REQ_COMPL |\
@@ -1531,9 +1536,8 @@ static void prepare_prdt_table(struct ufs_hba *hba, struct scsi_cmd *pccb)
 	ufshcd_cache_flush_and_invalidate(req_desc, sizeof(*req_desc));
 }
 
-static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
+int ufs_send_scsi_cmd(struct ufs_hba *hba, struct scsi_cmd *pccb)
 {
-	struct ufs_hba *hba = dev_get_uclass_priv(scsi_dev->parent);
 	struct utp_transfer_req_desc *req_desc = hba->utrdl;
 	u32 upiu_flags;
 	int ocs, result = 0, retry_count = 3;
@@ -1591,6 +1595,13 @@ retry:
 	}
 
 	return 0;
+}
+
+static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
+{
+	struct ufs_hba *hba = dev_get_uclass_priv(scsi_dev->parent);
+
+	return ufs_send_scsi_cmd(hba, pccb);
 }
 
 static inline int ufshcd_read_desc(struct ufs_hba *hba, enum desc_idn desc_id,
@@ -1943,6 +1954,10 @@ int ufs_start(struct ufs_hba *hba)
 		printf("Device at %s up at:", hba->dev->name);
 		ufshcd_print_pwr_info(hba);
 	}
+
+#if defined(CONFIG_ROCKCHIP_UFS_RPMB) 
+	ufs_rpmb_init(hba);
+#endif
 
 	return 0;
 }

@@ -23,6 +23,7 @@
 #include <asm/arch/ioc_rk3562.h>
 #include <asm/arch/grf_rk3568.h>
 #include <asm/arch/grf_rk3588.h>
+#include <asm/arch/grf_rv1103b.h>
 #include <asm/arch/grf_rv1106.h>
 #include <asm/arch/grf_rv1126.h>
 #include "dwc_eth_qos.h"
@@ -722,7 +723,11 @@ static int rv1106_set_rmii_speed(struct gmac_rockchip_platdata *pdata,
 				 struct rockchip_eth_dev *dev)
 {
 	struct eqos_priv *priv = &dev->eqos;
+#ifdef CONFIG_ROCKCHIP_RV1103B
+	struct rv1103b_grf *grf;
+#else
 	struct rv1106_grf *grf;
+#endif
 	unsigned int div;
 
 	enum {
@@ -1647,9 +1652,27 @@ static void rk3588_set_to_rgmii(struct gmac_rockchip_platdata *pdata)
 	rk_clrsetreg(&php_grf->clk_con1, clk_mode_mask, clk_mode);
 }
 
+static void rv1103b_set_to_rmii(struct gmac_rockchip_platdata *pdata)
+{
+	struct rv1103b_grf *grf;
+	enum {
+		RV1103B_SYSGRF_GMAC_CLK_RMII_50M_MASK = BIT(2),
+		RV1103B_SYSGRF_GMAC_CLK_RMII_50M = BIT(2),
+	};
+
+	grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
+	rk_clrsetreg(&grf->gmac_clk_con,
+		     RV1103B_SYSGRF_GMAC_CLK_RMII_50M_MASK,
+		     RV1103B_SYSGRF_GMAC_CLK_RMII_50M);
+};
+
 static void rv1106_gmac_integrated_phy_powerup(struct gmac_rockchip_platdata *pdata)
 {
-	struct rv1106_grf *grf;
+	#ifdef CONFIG_ROCKCHIP_RV1103B
+		struct rv1103b_grf *grf;
+	#else
+		struct rv1106_grf *grf;
+	#endif
 	unsigned char bgs[1] = {0};
 
 	enum {
@@ -1966,7 +1989,7 @@ static int gmac_rockchip_probe(struct udevice *dev)
 
 	ret = clk_get_by_index(dev, 0, &clk);
 	if (ret)
-		return ret;
+		debug("%s clk_get_by_index failed %d\n", __func__, ret);
 
 	pdata->phy_interface = eth_pdata->phy_interface;
 
@@ -1986,9 +2009,11 @@ static int gmac_rockchip_probe(struct udevice *dev)
 		 * is not set, because of it is bypassed.
 		 */
 		if (!pdata->clock_input) {
-			rate = clk_set_rate(&clk, 125000000);
-			if (rate != 125000000)
-				return -EINVAL;
+			if (clk.id) {
+				rate = clk_set_rate(&clk, 125000000);
+				if (rate != 125000000)
+					return -EINVAL;
+			}
 		}
 
 		if (eth_pdata->phy_interface == PHY_INTERFACE_MODE_RGMII_RXID)
@@ -2004,9 +2029,11 @@ static int gmac_rockchip_probe(struct udevice *dev)
 	case PHY_INTERFACE_MODE_RMII:
 		/* The commet is the same as RGMII mode */
 		if (!pdata->clock_input) {
-			rate = clk_set_rate(&clk, 50000000);
-			if (rate != 50000000)
-				return -EINVAL;
+			if (clk.id) {
+				rate = clk_set_rate(&clk, 50000000);
+				if (rate != 50000000)
+					return -EINVAL;
+			}
 		}
 
 		/* Set to RMII mode */
@@ -2198,6 +2225,12 @@ const struct rk_gmac_ops rk3588_gmac_ops = {
 	.set_clock_selection = rk3588_set_clock_selection,
 };
 
+const struct rk_gmac_ops rv1103b_gmac_ops = {
+	.fix_mac_speed = rv1106_set_rmii_speed,
+	.set_to_rmii = rv1103b_set_to_rmii,
+	.integrated_phy_powerup = rv1106_gmac_integrated_phy_powerup,
+};
+
 const struct rk_gmac_ops rv1106_gmac_ops = {
 	.fix_mac_speed = rv1106_set_rmii_speed,
 	.set_to_rmii = rv1106_set_to_rmii,
@@ -2276,6 +2309,11 @@ static const struct udevice_id rockchip_gmac_ids[] = {
 #ifdef CONFIG_ROCKCHIP_RK3588
 	{ .compatible = "rockchip,rk3588-gmac",
 	  .data = (ulong)&rk3588_gmac_ops },
+#endif
+
+#ifdef CONFIG_ROCKCHIP_RV1103B
+	{ .compatible = "rockchip,rv1103b-gmac",
+	  .data = (ulong)&rv1103b_gmac_ops },
 #endif
 
 #ifdef CONFIG_ROCKCHIP_RV1106

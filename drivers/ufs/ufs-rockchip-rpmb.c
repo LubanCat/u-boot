@@ -559,6 +559,98 @@ int ufs_rpmb_write_key(uint8_t * key, uint8_t len)
 	return 1;
 }
 
+static int ufs_read_desc(struct ufs_hba *hba, enum desc_idn desc_id,
+		  int desc_index, u8 *buf, u32 size)
+{
+	return ufshcd_read_desc_param(hba, desc_id, desc_index, 0, buf, size);
+}
+
+int ufs_read_device_desc(u8 *buf, u32 size)
+{
+	int ret = 0;
+
+	ret = hba_test(rpmb_hba);
+	if (ret)
+		return ret;
+
+	return ufs_read_desc(rpmb_hba, QUERY_DESC_IDN_DEVICE, 0, buf, size);
+}
+
+int ufs_read_string_desc(int desc_index, u8 *buf, u32 size)
+{
+	int ret = 0;
+
+	ret = hba_test(rpmb_hba);
+	if (ret)
+		return ret;
+
+	return ufs_read_desc(rpmb_hba, QUERY_DESC_IDN_STRING, desc_index, buf, size);
+}
+
+int ufs_read_geo_desc(u8 *buf, u32 size)
+{
+	int ret = 0;
+
+	ret = hba_test(rpmb_hba);
+	if (ret)
+		return ret;
+
+	return ufs_read_desc(rpmb_hba, QUERY_DESC_IDN_GEOMETRY, 0, buf, size);
+}
+
+int ufs_read_rpmb_unit_desc(u8 *buf, u32 size)
+{
+	int ret = 0;
+
+	ret = hba_test(rpmb_hba);
+	if (ret)
+		return ret;
+
+	return ufs_read_desc(rpmb_hba, QUERY_DESC_IDN_UNIT, 0xc4, buf, size);
+}
+
+int do_rpmb_op(struct rpmb_data_frame *frame_in, uint32_t in_cnt,
+	       struct rpmb_data_frame *frame_out, uint32_t out_cnt)
+{
+	uint16_t msg_type = 0;
+	int ret = 0;
+
+	ret = hba_test(rpmb_hba);
+	if (ret)
+		return ret;
+
+	if (rpmb_lu_info.log2blksz == 0) {
+		ret = prepare_rpmb_lu();
+		if (ret != 0) {
+			printf("prepare rpmb unit failed!\n");
+			return ret;
+		}
+	}
+
+	if (!frame_in || !frame_out || !in_cnt || !out_cnt) {
+		printf("Wrong rpmb parameters\n");
+		return -1;
+	}
+
+	rpmb_send_scsi_cmd(rpmb_hba, UFS_OP_SECURITY_PROTOCOL_OUT, DMA_TO_DEVICE,
+			   rpmb_lu_info.lu_index, (void*)frame_in, 0, in_cnt);
+
+	bytes_to_u16(frame_in->msg_type, &msg_type);
+	if ((msg_type == RPMB_WRITE) || (msg_type == RPMB_WRITE_KEY) ||
+	    (msg_type == RPMB_SEC_CONF_WRITE)) {
+		memset(&frame_in[0], 0, sizeof(frame_in[0]));
+		msg_type = RPMB_READ_RESP;
+		u16_to_bytes(msg_type, frame_in->msg_type);
+
+		rpmb_send_scsi_cmd(rpmb_hba, UFS_OP_SECURITY_PROTOCOL_OUT, DMA_TO_DEVICE,
+				   rpmb_lu_info.lu_index, (void*)frame_in, 0, 1);
+	}
+
+	rpmb_send_scsi_cmd(rpmb_hba, UFS_OP_SECURITY_PROTOCOL_IN, DMA_FROM_DEVICE,
+			   rpmb_lu_info.lu_index, (void*)frame_out, 0, out_cnt);
+	return 0;
+}
+
 int ufs_rpmb_init(struct ufs_hba *hba)
 {
 	rpmb_hba = hba;

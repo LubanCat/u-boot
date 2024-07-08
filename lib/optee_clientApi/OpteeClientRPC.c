@@ -5,6 +5,7 @@
  * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
+#include <boot_rkimg.h>
 #include <stdlib.h>
 #include <command.h>
 #include <mmc.h>
@@ -15,6 +16,7 @@
 #include <optee_include/teesmc_v2.h>
 #include <optee_include/teesmc_optee.h>
 #include <optee_include/tee_mmc_rpmb.h>
+#include <optee_include/tee_ufs_rpmb.h>
 #include <optee_include/tee_rpc_types.h>
 #include <optee_include/tee_rpc.h>
 #ifdef CONFIG_OPTEE_V1
@@ -95,7 +97,21 @@ Exit:
  */
 TEEC_Result OpteeRpcCmdRpmb(t_teesmc32_arg *TeeSmc32Arg)
 {
-	return emmc_rpmb_process(TeeSmc32Arg);
+	struct blk_desc *dev_desc;
+
+	dev_desc = rockchip_get_bootdev();
+	if (!dev_desc) {
+		printf("%s: dev_desc is NULL!\n", __func__);
+		return TEEC_ERROR_GENERIC;
+	}
+
+	if (dev_desc->if_type == IF_TYPE_MMC && dev_desc->devnum == 0)//emmc
+		return emmc_rpmb_process(TeeSmc32Arg);
+	else if (dev_desc->if_type == IF_TYPE_SCSI)//ufs
+		return ufs_rpmb_process(TeeSmc32Arg);
+
+	printf("Device not support rpmb!\n");
+	return TEEC_ERROR_NOT_IMPLEMENTED;
 }
 
 /*

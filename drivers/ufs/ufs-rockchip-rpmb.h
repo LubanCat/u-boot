@@ -76,4 +76,11 @@ int prepare_rpmb_lu(void);
 int ufs_rpmb_init(struct ufs_hba *hba);
 int ufs_rpmb_write_key(uint8_t * key, uint8_t len);
 
+int ufs_read_device_desc(u8 *buf, u32 size);
+int ufs_read_string_desc(int desc_index, u8 *buf, u32 size);
+int ufs_read_geo_desc(u8 *buf, u32 size);
+int ufs_read_rpmb_unit_desc(u8 *buf, u32 size);
+int do_rpmb_op(struct rpmb_data_frame *frame_in, uint32_t in_cnt,
+	       struct rpmb_data_frame *frame_out, uint32_t out_cnt);
+
 #endif

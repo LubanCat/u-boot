@@ -148,44 +148,6 @@ static int resource_add_file(const char *name, u32 size,
 	return 0;
 }
 
-static int resource_setup_list(struct blk_desc *desc, ulong blk_start,
-			       void *resc_hdr, bool in_ram)
-{
-	struct resource_img_hdr *hdr = resc_hdr;
-	struct resource_entry *et;
-	u32 i, stride;
-	void *pos;
-
-	pos = (void *)hdr + hdr->c_offset * desc->blksz;
-	stride = hdr->e_blks * desc->blksz;
-
-	for (i = 0; i < hdr->e_nums; i++) {
-		et = pos + (i * stride);
-		if (memcmp(et->tag, ENTRY_TAG, ENTRY_TAG_SIZE))
-			continue;
-
-		resource_add_file(et->name, et->size,
-				  blk_start, et->blk_offset,
-				  et->hash, et->hash_size, in_ram);
-	}
-
-	return 0;
-}
-
-int resource_setup_ram_list(struct blk_desc *desc, void *hdr)
-{
-	if (!desc)
-		return -ENODEV;
-
-	if (resource_check_header(hdr)) {
-		printf("RESC: invalid\n");
-		return -EINVAL;
-	}
-
-	/* @blk_start: set as 'hdr' point addr, to be used in byte */
-	return resource_setup_list(desc, (ulong)hdr, hdr, true);
-}
-
 #ifdef CONFIG_ANDROID_BOOT_IMAGE
 /*
  * Add logo.bmp and logo_kernel.bmp from "logo" parititon
@@ -251,7 +213,49 @@ static int resource_setup_logo_bmp(struct blk_desc *desc)
 
 	return ret;
 }
+#endif
 
+static int resource_setup_list(struct blk_desc *desc, ulong blk_start,
+			       void *resc_hdr, bool in_ram)
+{
+	struct resource_img_hdr *hdr = resc_hdr;
+	struct resource_entry *et;
+	u32 i, stride;
+	void *pos;
+
+	pos = (void *)hdr + hdr->c_offset * desc->blksz;
+	stride = hdr->e_blks * desc->blksz;
+
+	for (i = 0; i < hdr->e_nums; i++) {
+		et = pos + (i * stride);
+		if (memcmp(et->tag, ENTRY_TAG, ENTRY_TAG_SIZE))
+			continue;
+
+		resource_add_file(et->name, et->size,
+				  blk_start, et->blk_offset,
+				  et->hash, et->hash_size, in_ram);
+	}
+#ifdef CONFIG_ANDROID_BOOT_IMAGE
+	resource_setup_logo_bmp(desc);
+#endif
+	return 0;
+}
+
+int resource_setup_ram_list(struct blk_desc *desc, void *hdr)
+{
+	if (!desc)
+		return -ENODEV;
+
+	if (resource_check_header(hdr)) {
+		printf("RESC: invalid\n");
+		return -EINVAL;
+	}
+
+	/* @blk_start: set as 'hdr' point addr, to be used in byte */
+	return resource_setup_list(desc, (ulong)hdr, hdr, true);
+}
+
+#ifdef CONFIG_ANDROID_BOOT_IMAGE
 static int resource_setup_blk_list(struct blk_desc *desc, ulong blk_start)
 {
 	struct resource_img_hdr *hdr;
@@ -297,7 +301,6 @@ static int resource_setup_blk_list(struct blk_desc *desc, ulong blk_start)
 	}
 
 	resource_setup_list(desc, blk_start, hdr, false);
-	resource_setup_logo_bmp(desc);
 out:
 	free(hdr);
 

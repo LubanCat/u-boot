@@ -10,6 +10,7 @@
 #include <asm/arch/hardware.h>
 #include <asm/arch/grf_rk3506.h>
 #include <asm/arch/ioc_rk3506.h>
+#include <asm/arch-rockchip/rockchip_smccc.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -29,6 +30,8 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define CRU_BASE		0xff9a0000
 #define CRU_GLB_RST_CON		0xc10
+#define CRU_GATE_CON5           0x0814
+#define CRU_SOFTRST_CON5        0x0a14
 
 void board_debug_uart_init(void)
 {
@@ -98,5 +101,34 @@ int arch_cpu_init(void)
 	 */
 	writel(0x18c0, CRU_BASE + CRU_GLB_RST_CON);
 #endif
+	return 0;
+}
+
+int fit_standalone_release(char *id, uintptr_t entry_point)
+{
+	/* address map: map 0 to sram, enable TCM mode for sram
+	 * 0xfff84000 for sram
+	 * 0x03e00000 for ddr */
+	sip_smc_mcu_config(ROCKCHIP_SIP_CONFIG_BUSMCU_0_ID,
+		ROCKCHIP_SIP_CONFIG_MCU_CODE_START_ADDR,
+		entry_point);
+
+	/*
+	* bus m0 configuration:
+	* open m0 swclktck & hclk
+	*/
+	writel(0x0c000000, CRU_BASE + CRU_GATE_CON5);
+
+	/* set m0 system time calibration GRF->GRF_SOC_CON36 */
+	writel(0xbcd3d80, 0xff288090);
+
+	/* enable m0 interrupt: PMU->PMU_INT_MASK_CON mcu_rst_dis_cfg=1,glb_int_mask_mcu=0 */
+	writel(0x00060004, 0xff90000c);
+
+	/* select jtag m1 GPIO0C6 GPIO0C7 */
+	//writel(0x00220000, 0xff960000);
+	//writel(0x00300020, 0xff288000);
+	//writel(0x00ff0022, 0xff4d8064);
+	//writel(0xff002200, 0xff950014);
 	return 0;
 }

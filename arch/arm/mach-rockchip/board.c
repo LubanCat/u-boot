@@ -316,11 +316,11 @@ static void env_fixup(void)
 #ifdef ENV_MEM_LAYOUT_SETTINGS1
 	const char *env_addr0[] = {
 		"scriptaddr", "pxefile_addr_r",
-		"fdt_addr_r", "kernel_addr_r", "ramdisk_addr_r",
+		"fdt_addr_r", "kernel_addr_r", "kernel_addr_c", "ramdisk_addr_r",
 	};
 	const char *env_addr1[] = {
 		"scriptaddr1", "pxefile_addr1_r",
-		"fdt_addr1_r", "kernel_addr1_r", "ramdisk_addr1_r",
+		"fdt_addr1_r", "kernel_addr1_r", "kernel_addr1_c", "ramdisk_addr1_r",
 	};
 	int i;
 

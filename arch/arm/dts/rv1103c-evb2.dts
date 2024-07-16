@@ -13,6 +13,10 @@
 	model = "Rockchip RV1103C EVB2 Board";
 	compatible = "rockchip,rv1103c-evb2", "rockchip,rv1103c";
 
+	aliases {
+		/delete-property/ ethernet0;
+	};
+
 	chosen {
 		stdout-path = &uart0;
 		u-boot,spl-boot-order = &spi_nor, &emmc;
@@ -35,15 +39,7 @@
 	};
 };
 
-&gmac {
-	/delete-property/ u-boot,dm-spl;
-	status = "disabled";
-};
-
-&mdio {
-	/delete-property/ u-boot,dm-spl;
-	status = "disabled";
-};
+/delete-node/ &gmac;
 
 &pinctrl {
 	/delete-property/ u-boot,dm-spl;
@@ -56,11 +52,6 @@
 };
 
 &pcfg_pull_up {
-	/delete-property/ u-boot,dm-spl;
-	status = "disabled";
-};
-
-&rmii_phy {
 	/delete-property/ u-boot,dm-spl;
 	status = "disabled";
 };

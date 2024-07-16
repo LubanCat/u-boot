@@ -43,42 +43,12 @@
 
 &sdmmc0 {
 	u-boot,dm-spl;
-	pinctrl-names = "default", "idle";
-	pinctrl-0 = <&sdmmc0_clk_pins &sdmmc0_cmd_pins &sdmmc0_det_pins &sdmmc0_bus4_pins>;
 	status = "okay";
-};
-
-&sdmmc0_pins {
-	u-boot,dm-spl;
-};
-
-&sdmmc0_clk_pins {
-	u-boot,dm-spl;
-};
-
-&sdmmc0_cmd_pins {
-	u-boot,dm-spl;
-};
-
-&sdmmc0_det_pins {
-	u-boot,dm-spl;
-};
-
-&sdmmc0_bus4_pins {
-	u-boot,dm-spl;
 };
 
 &ioc {
 	u-boot,dm-spl;
 	status = "okay";
-};
-
-&pcfg_pull_up_drv_level_2 {
-	u-boot,dm-spl;
-};
-
-&pcfg_pull_up {
-	u-boot,dm-spl;
 };
 
 &gpio0 {
@@ -95,7 +65,6 @@
 	u-boot,dm-pre-reloc;
 	status = "okay";
 };
-
 
 &crypto {
 	u-boot,dm-spl;

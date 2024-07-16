@@ -65,30 +65,6 @@
 	status = "disabled";
 };
 
-&sdmmc0_pins {
-	/delete-property/ u-boot,dm-spl;
-};
-
-&sdmmc0_clk_pins {
-	/delete-property/ u-boot,dm-spl;
-};
-
-&sdmmc0_cmd_pins {
-	/delete-property/ u-boot,dm-spl;
-};
-
-&sdmmc0_det_pins {
-	/delete-property/ u-boot,dm-spl;
-};
-
-&sdmmc0_bus4_pins {
-	/delete-property/ u-boot,dm-spl;
-};
-
-&sdmmc0_idle_pins {
-	/delete-property/ u-boot,dm-spl;
-};
-
 &spi_nand {
 	/delete-property/ u-boot,dm-spl;
 	status = "disabled";

@@ -257,7 +257,7 @@ int fit_standalone_release(char *id, uintptr_t entry_point)
 		/* address map: map 0 to entry_point */
 		sip_smc_mcu_config(ROCKCHIP_SIP_CONFIG_BUSMCU_0_ID,
 			ROCKCHIP_SIP_CONFIG_MCU_CODE_START_ADDR,
-			0xffff0000 | (entry_point >> 16));
+			entry_point);
 
 		/*
 		* bus m0 configuration:

@@ -446,6 +446,30 @@ __weak const char *spl_kernel_partition(struct spl_image_info *spl,
 }
 #endif
 
+static int spl_fit_get_kernel_dtb(const void *fit, int images_noffset)
+{
+	const char *name = NULL;
+	int node, index = 0;
+
+	for (; ; index++) {
+		node = spl_fit_get_image_node(fit, images_noffset,
+					      FIT_FDT_PROP, index);
+		if (node < 0)
+			break;
+		name = fdt_get_name(fit, node, NULL);
+		if(!strcmp(name, "fdt"))
+			return node;
+#if defined(CONFIG_SPL_ROCKCHIP_HWID_DTB)
+		if (spl_find_hwid_dtb(name)) {
+			printf("HWID DTB: %s\n", name);
+			break;
+		}
+#endif
+	}
+
+	return node;
+}
+
 static int spl_load_kernel_fit(struct spl_image_info *spl_image,
 			       struct spl_load_info *info)
 {
@@ -526,8 +550,11 @@ static int spl_load_kernel_fit(struct spl_image_info *spl_image,
 	}
 
 	for (i = 0; i < ARRAY_SIZE(images); i++) {
-		node = spl_fit_get_image_node(fit, images_noffset,
-					      images[i], 0);
+		if (!strcmp(images[i], FIT_FDT_PROP))
+			node = spl_fit_get_kernel_dtb(fit, images_noffset);
+		else
+			node = spl_fit_get_image_node(fit, images_noffset,
+						      images[i], 0);
 		if (node < 0) {
 			debug("No image: %s\n", images[i]);
 			continue;

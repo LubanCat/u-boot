@@ -26,6 +26,7 @@
 #include <asm/arch-rockchip/sys_proto.h>
 #include <asm/io.h>
 #include <asm/arch/param.h>
+#include <asm/arch/rk_hwid.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -432,9 +433,7 @@ out:
 
 	return;
 }
-#endif
 
-#ifdef CONFIG_SPL_KERNEL_BOOT
 const char *spl_kernel_partition(struct spl_image_info *spl,
 				 struct spl_load_info *info)
 {
@@ -505,6 +504,15 @@ static void spl_fdt_fixup_memory(struct spl_image_info *spl_image)
 
 	return;
 }
+
+#if defined(CONFIG_SPL_ROCKCHIP_HWID_DTB)
+int spl_find_hwid_dtb(const char *fdt_name)
+{
+	hwid_init_data();
+
+	return hwid_dtb_is_available(fdt_name);
+}
+#endif
 #endif
 
 void spl_perform_fixups(struct spl_image_info *spl_image)

@@ -11,6 +11,7 @@
 #include <linux/libfdt.h>
 #include <linux/list.h>
 #include <asm/arch/resource_img.h>
+#include <asm/arch/rk_hwid.h>
 #include <asm/arch/uimage.h>
 #include <asm/arch/fit.h>
 
@@ -460,7 +461,26 @@ int rockchip_read_resource_file(void *buf, const char *name, int blk_offset, int
 	return len;
 }
 
-extern struct resource_file *resource_read_hwid_dtb(void);
+#ifdef CONFIG_ROCKCHIP_HWID_DTB
+static struct resource_file *resource_read_hwid_dtb(void)
+{
+	struct resource_file *file;
+	struct list_head *node;
+
+	hwid_init_data();
+
+	list_for_each(node, &entry_head) {
+		file = list_entry(node, struct resource_file, link);
+		if (!strstr(file->name, DTB_SUFFIX))
+			continue;
+
+		if (hwid_dtb_is_available(file->name))
+			return file;
+	}
+
+	return NULL;
+}
+#endif
 
 int rockchip_read_resource_dtb(void *fdt_addr, char **hash, int *hash_size)
 {

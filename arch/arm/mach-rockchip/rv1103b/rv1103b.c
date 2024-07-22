@@ -32,6 +32,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define SGRF_SYS_BASE			0x20250000
 #define SGRF_SYS_SOC_CON2		0x0008
 #define SGRF_SYS_SOC_CON3		0x000c
+#define SGRF_SYS_OTP_CON		0x0018
 #define FIREWALL_CON0			0x0020
 #define FIREWALL_CON1			0x0024
 #define FIREWALL_CON2			0x0028
@@ -147,6 +148,8 @@ int arch_cpu_init(void)
 	writel(0xffff0000, SGRF_SYS_BASE + FIREWALL_CON4);
 	writel(0xffff0000, SGRF_SYS_BASE + FIREWALL_CON5);
 	writel(0x01f00000, SGRF_SYS_BASE + FIREWALL_CON7);
+	/* Set OTP to none secure mode */
+	writel(0x00020000, SGRF_SYS_BASE + SGRF_SYS_OTP_CON);
 
 #if defined(CONFIG_ROCKCHIP_EMMC_IOMUX)
 	/* Set the emmc iomux */

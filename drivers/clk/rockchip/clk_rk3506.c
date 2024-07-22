@@ -957,6 +957,51 @@ static ulong rk3506_vop_dclk_set_rate(struct rk3506_clk_priv *priv, ulong rate)
 	return rk3506_vop_dclk_get_rate(priv);
 }
 
+static ulong rk3506_mac_get_rate(struct rk3506_clk_priv *priv, ulong clk_id)
+{
+	struct rk3506_cru *cru = priv->cru;
+	u32 div, con;
+
+	switch (clk_id) {
+	case CLK_MAC0:
+	case CLK_MAC1:
+		con = readl(&cru->clksel_con[50]);
+		div = (con & CLK_MAC_DIV_MASK) >> CLK_MAC_DIV_SHIFT;
+		break;
+	case CLK_MAC_OUT:
+		con = readl(&cru->pmuclksel_con[0]);
+		div = (con & CLK_MAC_OUT_DIV_MASK) >> CLK_MAC_OUT_DIV_SHIFT;
+	default:
+		return -ENOENT;
+	}
+
+	return DIV_TO_RATE(priv->gpll_hz, div);
+}
+
+static ulong rk3506_mac_set_rate(struct rk3506_clk_priv *priv, ulong clk_id,
+				 ulong rate)
+{
+	struct rk3506_cru *cru = priv->cru;
+	u32 div;
+
+	switch (clk_id) {
+	case CLK_MAC0:
+	case CLK_MAC1:
+		div = DIV_ROUND_UP(priv->gpll_hz, rate);
+		rk_clrsetreg(&cru->clksel_con[50], CLK_MAC_DIV_MASK,
+			     ((div - 1) << CLK_MAC_DIV_SHIFT));
+		break;
+	case CLK_MAC_OUT:
+		div = DIV_ROUND_UP(priv->gpll_hz, rate);
+		rk_clrsetreg(&cru->pmuclksel_con[0], CLK_MAC_OUT_DIV_MASK,
+			     ((div - 1) << CLK_MAC_OUT_DIV_SHIFT));
+	default:
+		return -ENOENT;
+	}
+
+	return rk3506_mac_get_rate(priv, clk_id);
+}
+
 static ulong rk3506_clk_get_rate(struct clk *clk)
 {
 	struct rk3506_clk_priv *priv = dev_get_priv(clk->dev);
@@ -1025,6 +1070,11 @@ static ulong rk3506_clk_get_rate(struct clk *clk)
 		break;
 	case DCLK_VOP:
 		rate = rk3506_vop_dclk_get_rate(priv);
+		break;
+	case CLK_MAC0:
+	case CLK_MAC1:
+	case CLK_MAC_OUT:
+		rate = rk3506_mac_get_rate(priv, clk->id);
 		break;
 	default:
 		return -ENOENT;
@@ -1097,6 +1147,11 @@ static ulong rk3506_clk_set_rate(struct clk *clk, ulong rate)
 		break;
 	case DCLK_VOP:
 		ret = rk3506_vop_dclk_set_rate(priv, rate);
+		break;
+	case CLK_MAC0:
+	case CLK_MAC1:
+	case CLK_MAC_OUT:
+		ret = rk3506_mac_set_rate(priv, clk->id, rate);
 		break;
 	default:
 		return -ENOENT;

@@ -18,6 +18,7 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/hardware.h>
 #ifdef CONFIG_DWC_ETH_QOS
+#include <asm/arch/grf_rk3506.h>
 #include <asm/arch/grf_rk3528.h>
 #include <asm/arch/grf_rk3562.h>
 #include <asm/arch/ioc_rk3562.h>
@@ -520,6 +521,42 @@ static int rv1108_set_rmii_speed(struct gmac_rockchip_platdata *pdata,
 	return 0;
 }
 #else
+static int rk3506_set_rmii_speed(struct gmac_rockchip_platdata *pdata,
+				 struct rockchip_eth_dev *dev)
+{
+	struct eqos_priv *priv = &dev->eqos;
+	struct rk3506_grf_reg *grf;
+	unsigned int div;
+
+	enum {
+		RK3506_GMAC_CLK_RMII_DIV_SHIFT = 3,
+		RK3506_GMAC_CLK_RMII_DIV_MASK = BIT(3),
+		RK3506_GMAC_CLK_RMII_DIV2 = BIT(3),
+		RK3506_GMAC_CLK_RMII_DIV20 = 0,
+	};
+
+	grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
+
+	switch (priv->phy->speed) {
+	case 10:
+		div = RK3506_GMAC_CLK_RMII_DIV20;
+		break;
+	case 100:
+		div = RK3506_GMAC_CLK_RMII_DIV2;
+		break;
+	default:
+		debug("Unknown phy speed: %d\n", priv->phy->speed);
+		return -EINVAL;
+	}
+
+	if (pdata->bus_id)
+		rk_clrsetreg(&grf->soc_con11, RK3506_GMAC_CLK_RMII_DIV_MASK, div);
+	else
+		rk_clrsetreg(&grf->soc_con8, RK3506_GMAC_CLK_RMII_DIV_MASK, div);
+
+	return 0;
+}
+
 static int rk3528_set_rgmii_speed(struct gmac_rockchip_platdata *pdata,
 				  struct rockchip_eth_dev *dev)
 {
@@ -1213,6 +1250,26 @@ static void rk3328_gmac_integrated_phy_powerup(struct gmac_rockchip_platdata *pd
 }
 
 #else
+static void rk3506_set_to_rmii(struct gmac_rockchip_platdata *pdata)
+{
+	unsigned int clk_mode;
+	struct rk3506_grf_reg *grf;
+
+	enum {
+		RK3506_GMAC_CLK_RMII_MODE_SHIFT = 0x1,
+		RK3506_GMAC_CLK_RMII_MODE_MASK = BIT(1),
+		RK3506_GMAC_CLK_RMII_MODE = BIT(1),
+	};
+
+	grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
+	clk_mode = RK3506_GMAC_CLK_RMII_MODE;
+
+	if (pdata->bus_id == 1)
+		rk_clrsetreg(&grf->soc_con11, RK3506_GMAC_CLK_RMII_MODE_MASK, clk_mode);
+	else
+		rk_clrsetreg(&grf->soc_con8, RK3506_GMAC_CLK_RMII_MODE_MASK, clk_mode);
+}
+
 static void rk3528_gmac_integrated_phy_powerup(struct gmac_rockchip_platdata *pdata)
 {
 	struct rk3528_grf *grf;
@@ -1850,6 +1907,29 @@ static void rv1126_set_to_rgmii(struct gmac_rockchip_platdata *pdata)
 #endif
 
 #ifdef CONFIG_DWC_ETH_QOS
+static void rk3506_set_clock_selection(struct gmac_rockchip_platdata *pdata)
+{
+	struct rk3506_grf_reg *grf;
+	unsigned int val;
+
+	enum {
+		RK3506_GMAC_CLK_SELET_SHIFT = 5,
+		RK3506_GMAC_CLK_SELET_MASK = BIT(5),
+		RK3506_GMAC_CLK_SELET_CRU = 0,
+		RK3506_GMAC_CLK_SELET_IO = BIT(5),
+	};
+
+	grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
+
+	val = pdata->clock_input ? RK3506_GMAC_CLK_SELET_IO :
+				   RK3506_GMAC_CLK_SELET_CRU;
+
+	if (pdata->bus_id)
+		rk_clrsetreg(&grf->soc_con11, RK3506_GMAC_CLK_SELET_MASK, val);
+	else
+		rk_clrsetreg(&grf->soc_con8, RK3506_GMAC_CLK_SELET_MASK, val);
+}
+
 static void rk3528_set_clock_selection(struct gmac_rockchip_platdata *pdata)
 {
 	struct rk3528_grf *grf;
@@ -2029,8 +2109,10 @@ static int gmac_rockchip_probe(struct udevice *dev)
 	case PHY_INTERFACE_MODE_RMII:
 		/* The commet is the same as RGMII mode */
 		if (!pdata->clock_input) {
+			printf("%s line: %d\n", __func__, __LINE__);
 			if (clk.id) {
 				rate = clk_set_rate(&clk, 50000000);
+				printf("%s line: %d\n", __func__, __LINE__);
 				if (rate != 50000000)
 					return -EINVAL;
 			}
@@ -2197,6 +2279,12 @@ const struct rk_gmac_ops rv1108_gmac_ops = {
 	.set_to_rmii = rv1108_gmac_set_to_rmii,
 };
 #else
+const struct rk_gmac_ops rk3506_gmac_ops = {
+	.fix_mac_speed = rk3506_set_rmii_speed,
+	.set_to_rmii = rk3506_set_to_rmii,
+	.set_clock_selection = rk3506_set_clock_selection,
+};
+
 const struct rk_gmac_ops rk3528_gmac_ops = {
 	.fix_mac_speed = rk3528_set_rgmii_speed,
 	.set_to_rgmii = rk3528_set_to_rgmii,
@@ -2291,6 +2379,11 @@ static const struct udevice_id rockchip_gmac_ids[] = {
 	  .data = (ulong)&rv1108_gmac_ops },
 #endif
 #else
+#ifdef CONFIG_ROCKCHIP_RK3506
+	{ .compatible = "rockchip,rk3506-gmac",
+	  .data = (ulong)&rk3506_gmac_ops },
+#endif
+
 #ifdef CONFIG_ROCKCHIP_RK3528
 	{ .compatible = "rockchip,rk3528-gmac",
 	  .data = (ulong)&rk3528_gmac_ops },

@@ -2109,10 +2109,8 @@ static int gmac_rockchip_probe(struct udevice *dev)
 	case PHY_INTERFACE_MODE_RMII:
 		/* The commet is the same as RGMII mode */
 		if (!pdata->clock_input) {
-			printf("%s line: %d\n", __func__, __LINE__);
 			if (clk.id) {
 				rate = clk_set_rate(&clk, 50000000);
-				printf("%s line: %d\n", __func__, __LINE__);
 				if (rate != 50000000)
 					return -EINVAL;
 			}

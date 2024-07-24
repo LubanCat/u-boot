@@ -356,17 +356,6 @@ void spl_board_init(void)
 }
 #endif
 
-void spl_perform_fixups(struct spl_image_info *spl_image)
-{
-#ifdef CONFIG_ROCKCHIP_PRELOADER_ATAGS
-	atags_set_bootdev_by_spl_bootdevice(spl_image->boot_device);
-  #ifdef BUILD_SPL_TAG
-	atags_set_shared_fwver(FW_SPL, "spl-"BUILD_SPL_TAG);
-  #endif
-#endif
-	return;
-}
-
 #ifdef CONFIG_SPL_KERNEL_BOOT
 static int spl_rockchip_dnl_key_pressed(void)
 {
@@ -480,7 +469,58 @@ const char *spl_kernel_partition(struct spl_image_info *spl,
 
 	return (boot_mode == BOOT_RECOVERY) ? PART_RECOVERY : PART_BOOT;
 }
+
+static void spl_fdt_fixup_memory(struct spl_image_info *spl_image)
+{
+	void *blob = spl_image->fdt_addr;
+	struct tag *t;
+	u64 start[CONFIG_NR_DRAM_BANKS];
+	u64 size[CONFIG_NR_DRAM_BANKS];
+	int i, count, err;
+
+	err = fdt_check_header(blob);
+	if (err < 0) {
+		printf("Invalid dtb\n");
+		return;
+	}
+
+	/* Fixup memory node based on ddr_mem atags */
+	t = atags_get_tag(ATAG_DDR_MEM);
+	if (t && t->u.ddr_mem.count) {
+		count = t->u.ddr_mem.count;
+		for (i = 0; i < count; i++) {
+			start[i] = t->u.ddr_mem.bank[i];
+			size[i] = t->u.ddr_mem.bank[i + count];
+			if (size[i] == 0)
+				continue;
+			debug("Adding bank: 0x%08llx - 0x%08llx (size: 0x%08llx)\n",
+			       start[i], start[i] + size[i], size[i]);
+		}
+		err = fdt_fixup_memory_banks(blob, start, size, count);
+		if (err < 0) {
+			printf("Fixup kernel dtb memory node failed: %s\n", fdt_strerror(err));
+			return;
+		}
+	}
+
+	return;
+}
 #endif
+
+void spl_perform_fixups(struct spl_image_info *spl_image)
+{
+#ifdef CONFIG_ROCKCHIP_PRELOADER_ATAGS
+	atags_set_bootdev_by_spl_bootdevice(spl_image->boot_device);
+  #ifdef BUILD_SPL_TAG
+	atags_set_shared_fwver(FW_SPL, "spl-"BUILD_SPL_TAG);
+  #endif
+#endif
+#if defined(CONFIG_SPL_KERNEL_BOOT)
+	if (spl_image->next_stage == SPL_NEXT_STAGE_KERNEL)
+		spl_fdt_fixup_memory(spl_image);
+#endif
+	return;
+}
 
 void spl_hang_reset(void)
 {

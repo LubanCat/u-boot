@@ -124,6 +124,7 @@ int soc_clk_dump(void)
 	ulong clk_count = ARRAY_SIZE(clks_dump);
 	ulong rate;
 	int i, ret;
+	u32 sel;
 
 	ret = uclass_get_device_by_driver(UCLASS_CLK,
 					  DM_GET_DRIVER(rockchip_rk3506_cru),
@@ -134,12 +135,18 @@ int soc_clk_dump(void)
 	}
 
 	priv = dev_get_priv(cru_dev);
-	printf("CLK: (%s. arm: enter %lu KHz, init %lu KHz, kernel %lu%s)\n",
-	       priv->sync_kernel ? "sync kernel" : "uboot",
-	       priv->armclk_enter_hz / 1000,
-	       priv->armclk_init_hz / 1000,
-	       priv->set_armclk_rate ? priv->armclk_hz / 1000 : 0,
-	       priv->set_armclk_rate ? " KHz" : "N/A");
+	sel = (readl(&priv->cru->clksel_con[15]) &
+	       CLK_CORE_SRC_PVTMUX_SEL_MASK) >>
+	       CLK_CORE_SRC_PVTMUX_SEL_SHIFT;
+	if (sel == CLK_CORE_PVTPLL_SRC)
+		printf("CLK: (arm clk use pvtpll, rate = 1200M)\n");
+	else
+		printf("CLK: (%s. arm: enter %lu KHz, init %lu KHz, kernel %lu%s)\n",
+		       priv->sync_kernel ? "sync kernel" : "uboot",
+		       priv->armclk_enter_hz / 1000,
+		       priv->armclk_init_hz / 1000,
+		       priv->set_armclk_rate ? priv->armclk_hz / 1000 : 0,
+		       priv->set_armclk_rate ? " KHz" : "N/A");
 	for (i = 0; i < clk_count; i++) {
 		clk_dump = &clks_dump[i];
 		if (clk_dump->name) {
@@ -1167,8 +1174,6 @@ static struct clk_ops rk3506_clk_ops = {
 
 static void rk3506_clk_init(struct rk3506_clk_priv *priv)
 {
-	int ret;
-
 	priv->sync_kernel = false;
 
 	if (!priv->gpll_hz) {
@@ -1203,13 +1208,9 @@ static void rk3506_clk_init(struct rk3506_clk_priv *priv)
 		priv->v1pll_div_hz = roundup(priv->v1pll_div_hz, 1000);
 	}
 
-	if (!priv->armclk_enter_hz)
+	if (!priv->armclk_enter_hz) {
 		priv->armclk_enter_hz = rk3506_armclk_get_rate(priv);
-
-	if (!priv->armclk_init_hz) {
-		ret = rk3506_armclk_set_rate(priv, CPU_FREQ_HZ);
-		if (!ret)
-			priv->armclk_init_hz = CPU_FREQ_HZ;
+		priv->armclk_init_hz = priv->armclk_enter_hz;
 	}
 }
 

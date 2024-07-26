@@ -11,7 +11,7 @@
 
 	chosen: chosen {
 		stdout-path = &uart0;
-		u-boot,spl-boot-order = &mmc, &spi_nand, &spi_nor;
+		u-boot,spl-boot-order = &spi_nand, &spi_nor;
 	};
 };
 
@@ -100,7 +100,7 @@
 	status = "okay";
 };
 
-&sfc {
+&fspi {
 	u-boot,dm-spl;
 	status = "okay";
 

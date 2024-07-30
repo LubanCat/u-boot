@@ -572,7 +572,7 @@ static int spl_load_kernel_fit(struct spl_image_info *spl_image,
 			char slot_suffix[3] = {0};
 
 			if (!spl_get_current_slot(info->dev, "misc", slot_suffix))
-				fdt_bootargs_append_ab((void *)image_info.load_addr, slot_suffix);
+				spl_ab_bootargs_append_slot((void *)image_info.load_addr, slot_suffix);
 #endif
 
 #ifdef CONFIG_SPL_MTD_SUPPORT

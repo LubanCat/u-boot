@@ -43,7 +43,6 @@
 
 &sdmmc0 {
 	u-boot,dm-spl;
-	pwr-en-gpios = <&gpio0 RK_PA4 GPIO_ACTIVE_LOW>;
 	pinctrl-names = "default", "idle";
 	pinctrl-0 = <&sdmmc0_clk_pins &sdmmc0_cmd_pins &sdmmc0_det_pins &sdmmc0_bus4_pins>;
 	status = "okay";

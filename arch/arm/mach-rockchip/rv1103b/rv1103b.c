@@ -22,11 +22,20 @@ DECLARE_GLOBAL_DATA_PTR;
 #define GRF_SYS_BASE			0x20150000
 #define GRF_SYS_HPMCU_CACHE_MISC	0x0214
 
+#define GPIO0_IOC_BASE			0x201B0000
+#define GPIO0A_IOMUX_SEL_H		0x04
+#define GPIO0_BASE			0x20520000
+#define GPIO_SWPORT_DR_L		0x00
+#define GPIO_SWPORT_DDR_L		0x08
+
 #define GPIO1_IOC_BASE			0x20170000
-#define GPIO1A_IOMUX_SEL_L		0x20
-#define GPIO1A_IOMUX_SEL_H		0x24
-#define GPIO1B_IOMUX_SEL_L		0x10028
-#define GPIO1B_IOMUX_SEL_H		0x1002c
+#define GPIO1A_IOMUX_SEL_0		0x20
+#define GPIO1A_IOMUX_SEL_1_0	0x24
+#define GPIO1A_IOMUX_SEL_1_1	0x10024
+#define GPIO1B_IOMUX_SEL_0		0x10028
+#define GPIO1B_IOMUX_SEL_1		0x1002c
+#define GPIO1_IOC_GPIO1A_PULL_1		0x10210
+#define GPIO1_IOC_GPIO1B_PULL		0x10214
 #define GPIO1_IOC_JTAG_M2_CON		0x10810
 
 #define SGRF_SYS_BASE			0x20250000
@@ -84,19 +93,36 @@ void board_set_iomux(enum if_type if_type, int devnum, int routing)
 	switch (if_type) {
 	case IF_TYPE_MMC:
 		if (devnum == 0) {
-			writel(0xffff1111, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_L);
-			writel(0x00ff0011, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_H);
+			writel(0xffff1111, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_0);
+			writel(0x00ff0011, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_1_0);
 		} else if (devnum == 1) {
-			writel(0xff001100, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_H);
-			writel(0xffff1111, GPIO1_IOC_BASE + GPIO1B_IOMUX_SEL_L);
-			writel(0x000f0001, GPIO1_IOC_BASE + GPIO1B_IOMUX_SEL_H);
+#if CONFIG_SPL_BUILD
+			/* set SDMMC D0-3/CMD/CLK to gpio and pull down */
+			writel(0xf0000000, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_1_1);
+			writel(0xffff0000, GPIO1_IOC_BASE + GPIO1B_IOMUX_SEL_0);
+			writel(0x000f0000, GPIO1_IOC_BASE + GPIO1B_IOMUX_SEL_1);
+			writel(0xc0008000, GPIO1_IOC_BASE + GPIO1_IOC_GPIO1A_PULL_1);
+			writel(0x03ff02AA, GPIO1_IOC_BASE + GPIO1_IOC_GPIO1B_PULL);
+
+			/* SDMMC PWREN GPIO0A4 power down and power up */
+			writel(0x00100010, GPIO0_BASE + GPIO_SWPORT_DR_L);
+			writel(0x00100010, GPIO0_BASE + GPIO_SWPORT_DDR_L);
+			mdelay(50);
+			writel(0x00100000, GPIO0_BASE + GPIO_SWPORT_DR_L);
+#endif
+			/* set SDMMC D0-3/CMD/CLK and pull up */
+			writel(0xff001100, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_1_1);
+			writel(0xffff1111, GPIO1_IOC_BASE + GPIO1B_IOMUX_SEL_0);
+			writel(0x000f0001, GPIO1_IOC_BASE + GPIO1B_IOMUX_SEL_1);
+			writel(0xc0004000, GPIO1_IOC_BASE + GPIO1_IOC_GPIO1A_PULL_1);
+			writel(0x03ff0155, GPIO1_IOC_BASE + GPIO1_IOC_GPIO1B_PULL);
 		}
 		break;
 	case IF_TYPE_MTD:
 		if (routing == 0) {
 			/* FSPI0 M0 */
-			writel(0xffff2222, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_L);
-			writel(0x00ff0022, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_H);
+			writel(0xffff2222, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_0);
+			writel(0x00ff0022, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_1_0);
 		}
 		break;
 	default:
@@ -157,6 +183,11 @@ int arch_cpu_init(void)
 #elif defined(CONFIG_ROCKCHIP_SFC_IOMUX)
 	/* Set the fspi iomux */
 	board_set_iomux(IF_TYPE_MTD, 0, 0);
+#endif
+
+#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_MMC_DW_ROCKCHIP)
+	/* Set the sdmmc iomux and power cycle */
+	board_set_iomux(IF_TYPE_MMC, 1, 0);
 #endif
 	/* Enable force_jtag */
 	writel(0x00010001, GPIO1_IOC_BASE + GPIO1_IOC_JTAG_M2_CON);

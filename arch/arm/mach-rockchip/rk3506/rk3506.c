@@ -14,6 +14,13 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+#define GRF_BASE		0xff288000
+#define GRF_SOC_CON28		0X0070
+
+#define USBPHY_APB_BASE		0xff2b0000
+#define USBPHY_DIFF_RECEIVER_0	0x0030
+#define USBPHY_DIFF_RECEIVER_1	0x0430
+
 #define FIREWALL_DDR_BASE	0xff5f0000
 #define FW_DDR_MST1_REG 	0x24
 
@@ -100,6 +107,15 @@ int arch_cpu_init(void)
 	 * Wdt0 and WDT1 trigger first global reset.
 	 */
 	writel(0x18c0, CRU_BASE + CRU_GLB_RST_CON);
+
+	/*
+	 * Set the USB2 PHY Port1 in suspend mode and
+	 * turn off the differential receiver for both
+	 * Port0 and Port1 to save power.
+	 */
+	writel(0x01ff01d1, GRF_BASE + GRF_SOC_CON28);
+	writel(0x00000079, USBPHY_APB_BASE + USBPHY_DIFF_RECEIVER_0);
+	writel(0x00000079, USBPHY_APB_BASE + USBPHY_DIFF_RECEIVER_1);
 #endif
 	return 0;
 }

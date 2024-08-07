@@ -194,6 +194,31 @@ static inline bool property_enabled(struct regmap *base,
 	return tmp == reg->enable;
 }
 
+static inline void phy_clear_bits(void __iomem *reg, u32 bits)
+{
+	u32 tmp = readl(reg);
+
+	tmp &= ~bits;
+	writel(tmp, reg);
+}
+
+static inline void phy_set_bits(void __iomem *reg, u32 bits)
+{
+	u32 tmp = readl(reg);
+
+	tmp |= bits;
+	writel(tmp, reg);
+}
+
+static inline void phy_update_bits(void __iomem *reg, u32 mask, u32 val)
+{
+	u32 tmp = readl(reg);
+
+	tmp &= ~mask;
+	tmp |= val & mask;
+	writel(tmp, reg);
+}
+
 static const char *chg_to_string(enum power_supply_type chg_type)
 {
 	switch (chg_type) {
@@ -812,98 +837,58 @@ static int rk3328_usb2phy_tuning(struct rockchip_usb2phy *rphy)
 
 static int rv1106_usb2phy_tuning(struct rockchip_usb2phy *rphy)
 {
-	u32 reg;
-
 	/* Set HS disconnect detect mode to single ended detect mode */
-	reg = readl(rphy->phy_base + 0x70);
-	writel(reg | BIT(2), rphy->phy_base + 0x70);
+	phy_set_bits(rphy->phy_base + 0x70, BIT(2));
 
 	return 0;
 }
 
 static int rk3528_usb2phy_tuning(struct rockchip_usb2phy *rphy)
 {
-	u32 reg;
-	int ret = 0;
-
 	if (IS_ERR(rphy->phy_base)) {
 		return PTR_ERR(rphy->phy_base);
 	}
 
 	/* Turn off otg port differential receiver in suspend mode */
-	reg = readl(rphy->phy_base + 0x30);
-	writel(reg & ~BIT(2), rphy->phy_base + 0x30);
+	phy_clear_bits(rphy->phy_base + 0x30, BIT(2));
 
 	/* Turn off host port differential receiver in suspend mode */
-	reg = readl(rphy->phy_base + 0x0430);
-	writel(reg & ~BIT(2), rphy->phy_base + 0x0430);
+	phy_clear_bits(rphy->phy_base + 0x430, BIT(2));
 
 	/* Set otg port HS eye height to 400mv(default is 450mv) */
-	reg = readl(rphy->phy_base + 0x30);
-	reg &= ~GENMASK(6, 4);
-	reg |= (0x00 << 4);
-	writel(reg, rphy->phy_base + 0x30);
+	phy_update_bits(rphy->phy_base + 0x30, GENMASK(6, 4), (0x00 << 4));
 
 	/* Set host port HS eye height to 400mv(default is 450mv) */
-	reg = readl(rphy->phy_base + 0x430);
-	reg &= ~GENMASK(6, 4);
-	reg |= (0x00 << 4);
-	writel(reg, rphy->phy_base + 0x430);
+	phy_update_bits(rphy->phy_base + 0x430, GENMASK(6, 4), (0x00 << 4));
 
 	/* Choose the Tx fs/ls data as linestate from TX driver for otg port */
-	reg = readl(rphy->phy_base + 0x94);
-	reg &= ~GENMASK(6, 3);
-	reg |= (0x03 << 3);
-	writel(reg, rphy->phy_base + 0x94);
+	phy_update_bits(rphy->phy_base + 0x94, GENMASK(6, 3), (0x03 << 3));
 
 	/* Turn on output clk of phy*/
-	reg = readl(rphy->phy_base + 0x41c);
-	reg &= ~GENMASK(7, 2);
-	reg |= (0x27 << 2);
-	writel(reg, rphy->phy_base + 0x41c);
+	phy_update_bits(rphy->phy_base + 0x41c, GENMASK(7, 2), (0x27 << 2));
 
-	return ret;
+	return 0;
 }
 
 static int rk3562_usb2phy_tuning(struct rockchip_usb2phy *rphy)
 {
-	u32 reg;
-	int ret = 0;
-
 	if (IS_ERR(rphy->phy_base)) {
 		return PTR_ERR(rphy->phy_base);
 	}
 
 	/* Turn off differential receiver by default to save power */
-	reg = readl(rphy->phy_base + 0x30);
-	writel(reg & ~BIT(2), rphy->phy_base + 0x30);
-
-	reg = readl(rphy->phy_base + 0x0430);
-	writel(reg & ~BIT(2), rphy->phy_base + 0x0430);
+	phy_clear_bits(rphy->phy_base + 0x0030, BIT(2));
+	phy_clear_bits(rphy->phy_base + 0x0430, BIT(2));
 
 	/* Enable pre-emphasis during non-chirp phase */
-	reg = readl(rphy->phy_base);
-	reg &= ~GENMASK(2, 0);
-	reg |= 0x04;
-	writel(reg, rphy->phy_base);
-
-	reg = readl(rphy->phy_base + 0x0400);
-	reg &= ~GENMASK(2, 0);
-	reg |= 0x04;
-	writel(reg, rphy->phy_base + 0x0400);
+	phy_update_bits(rphy->phy_base, GENMASK(2, 0), 0x04);
+	phy_update_bits(rphy->phy_base + 0x0400, GENMASK(2, 0), 0x04);
 
 	/* Set HS eye height to 425mv(default is 400mv) */
-	reg = readl(rphy->phy_base + 0x0030);
-	reg &= ~GENMASK(6, 4);
-	reg |= (0x05 << 4);
-	writel(reg, rphy->phy_base + 0x0030);
+	phy_update_bits(rphy->phy_base + 0x0030, GENMASK(6, 4), (0x05 << 4));
+	phy_update_bits(rphy->phy_base + 0x0430, GENMASK(6, 4), (0x05 << 4));
 
-	reg = readl(rphy->phy_base + 0x0430);
-	reg &= ~GENMASK(6, 4);
-	reg |= (0x05 << 4);
-	writel(reg, rphy->phy_base + 0x0430);
-
-	return ret;
+	return 0;
 }
 
 static int rk3576_usb2phy_tuning(struct rockchip_usb2phy *rphy)

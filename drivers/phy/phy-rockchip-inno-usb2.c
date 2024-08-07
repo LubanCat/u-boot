@@ -15,6 +15,7 @@
 #include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/cpu.h>
+#include <asm/gpio.h>
 #include <reset-uclass.h>
 
 #include "../usb/gadget/dwc2_udc_otg_priv.h"
@@ -151,6 +152,7 @@ struct rockchip_usb2phy_cfg {
  * @usbgrf_base : USB General Register Files register base.
  * @phy_base: the base address of USB PHY.
  * @phy_rst: phy reset control.
+ * @vbus_det_gpio: VBUS detection via GPIO.
  * @phy_cfg: phy register configuration, assigned by driver data.
  */
 struct rockchip_usb2phy {
@@ -161,6 +163,7 @@ struct rockchip_usb2phy {
 	void __iomem	*phy_base;
 	struct udevice	*vbus_supply[USB2PHY_NUM_PORTS];
 	struct reset_ctl phy_rst;
+	struct gpio_desc vbus_det_gpio;
 	const struct rockchip_usb2phy_cfg	*phy_cfg;
 };
 
@@ -280,6 +283,32 @@ static bool rockchip_chg_primary_det_retry(struct rockchip_usb2phy *rphy)
 	return vout;
 }
 
+#ifdef CONFIG_ROCKCHIP_RK3506
+static void rockchip_u2phy_get_vbus_gpio(struct udevice *dev)
+{
+	ofnode otg_node, extcon_usb_node;
+	struct rockchip_usb2phy *rphy = dev_get_priv(dev);
+
+	rphy->vbus_det_gpio.dev = NULL;
+	otg_node = dev_read_subnode(dev, "otg-port");
+	if (!ofnode_valid(otg_node)) {
+		debug("%s: %s otg subnode not found!\n", __func__, dev->name);
+		return;
+	}
+
+	if (ofnode_read_bool(otg_node, "rockchip,gpio-vbus-det")) {
+		extcon_usb_node = ofnode_path("/extcon-usb");
+		if (!ofnode_valid(extcon_usb_node)) {
+			debug("%s: extcon-usb node not found\n", __func__);
+			return;
+		}
+
+		gpio_request_by_name_nodev(extcon_usb_node, "vbus-gpio", 0,
+					   &rphy->vbus_det_gpio, GPIOD_IS_IN);
+	}
+}
+#endif
+
 int rockchip_chg_get_type(void)
 {
 	const struct rockchip_usb2phy_port_cfg *port_cfg;
@@ -303,8 +332,21 @@ int rockchip_chg_get_type(void)
 	base = get_reg_base(rphy);
 	port_cfg = &rphy->phy_cfg->port_cfgs[USB2PHY_PORT_OTG];
 
+#ifdef CONFIG_ROCKCHIP_RK3506
+	rockchip_u2phy_get_vbus_gpio(udev);
+#else
+	rphy->vbus_det_gpio.dev = NULL;
+#endif
+
 	/* Check USB-Vbus status first */
-	if (!property_enabled(base, &port_cfg->utmi_bvalid)) {
+	if (dm_gpio_is_valid(&rphy->vbus_det_gpio)) {
+		if (dm_gpio_get_value(&rphy->vbus_det_gpio)) {
+			pr_info("%s: vbus gpio voltage valid\n", __func__);
+		} else {
+			pr_info("%s: vbus gpio voltage invalid\n", __func__);
+			return POWER_SUPPLY_TYPE_UNKNOWN;
+		}
+	} else if (!property_enabled(base, &port_cfg->utmi_bvalid)) {
 		pr_info("%s: no charger found\n", __func__);
 		return POWER_SUPPLY_TYPE_UNKNOWN;
 	}

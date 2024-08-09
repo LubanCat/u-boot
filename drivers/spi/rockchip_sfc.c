@@ -238,6 +238,9 @@ static u32 rockchip_sfc_get_max_iosize(struct rockchip_sfc *sfc)
 
 static u32 rockchip_sfc_get_max_dll_cells(struct rockchip_sfc *sfc)
 {
+	if (sfc->max_dll_cells)
+		return sfc->max_dll_cells;
+
 	if (sfc->version > SFC_VER_4)
 		return SFC_DLL_CTRL0_DLL_MAX_VER5;
 	else if (sfc->version == SFC_VER_4)
@@ -336,6 +339,9 @@ static int rockchip_sfc_ofdata_to_platdata(struct udevice *bus)
 	else
 		sfc->use_dma = true;
 	sfc->sclk_x2_bypass = ofnode_read_bool(dev_ofnode(bus), "rockchip,sclk-x2-bypass");
+	sfc->max_dll_cells = dev_read_u32_default(bus, "rockchip,max-dll", 0);
+	if (sfc->max_dll_cells > SFC_DLL_CTRL0_DLL_MAX_VER5)
+		sfc->max_dll_cells = SFC_DLL_CTRL0_DLL_MAX_VER5;
 #if CONFIG_IS_ENABLED(CLK)
 	int ret;
 

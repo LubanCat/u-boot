@@ -3165,6 +3165,7 @@
 		clock-names = "clk_sfc", "hclk_sfc";
 		assigned-clocks = <&cru SCLK_FSPI1_X2>;
 		assigned-clock-rates = <80000000>;
+		rockchip,max-dll = <0xFF>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 		status = "disabled";
@@ -3230,6 +3231,7 @@
 		clock-names = "clk_sfc", "hclk_sfc";
 		assigned-clocks = <&cru SCLK_FSPI_X2>;
 		assigned-clock-rates = <80000000>;
+		rockchip,max-dll = <0xFF>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 		status = "disabled";

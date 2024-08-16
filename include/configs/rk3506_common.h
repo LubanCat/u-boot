@@ -54,10 +54,10 @@
 #define ENV_MEM_LAYOUT_SETTINGS \
 	"scriptaddr=0x00b00000\0"	\
 	"pxefile_addr_r=0x00c00000\0"	\
-	"fdt_addr_r=0x00800000\0"	\
-	"kernel_addr_c=0x00900000\0"	\
-	"kernel_addr_r=0x00008000\0"	\
-	"ramdisk_addr_r=0x000d00000\0"
+	"fdt_addr_r=0x01f00000\0"	\
+	"kernel_addr_c=0x01100000\0"	\
+	"kernel_addr_r=0x00108000\0"	\
+	"ramdisk_addr_r=0x02000000\0"
 
 #include <config_distro_bootcmd.h>
 

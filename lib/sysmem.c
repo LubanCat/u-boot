@@ -467,12 +467,21 @@ static void *sysmem_alloc_align_base(enum memblk_id id,
 			SYSMEM_E("Failed to double alloc for existence \"%s\"\n", name);
 			goto out;
 		} else if (sysmem_is_overlap(mem->base, mem->size, base, size)) {
-			SYSMEM_E("\"%s\" (0x%08lx - 0x%08lx) alloc is "
-				 "overlap with existence \"%s\" (0x%08lx - "
-				 "0x%08lx)\n",
-				 name, (ulong)base, (ulong)(base + size),
-				 mem->attr.name, (ulong)mem->base,
-				 (ulong)(mem->base + mem->size));
+			if (attr.flags & F_FAIL_WARNING)
+				SYSMEM_W("**Maybe** \"%s\" (0x%08lx - 0x%08lx) alloc is "
+					 "overlap with existence \"%s\" (0x%08lx - "
+					 "0x%08lx)\n",
+					 name, (ulong)base, (ulong)(base + size),
+					 mem->attr.name, (ulong)mem->base,
+					 (ulong)(mem->base + mem->size));
+
+			else
+				SYSMEM_E("\"%s\" (0x%08lx - 0x%08lx) alloc is "
+					 "overlap with existence \"%s\" (0x%08lx - "
+					 "0x%08lx)\n",
+					 name, (ulong)base, (ulong)(base + size),
+					 mem->attr.name, (ulong)mem->base,
+					 (ulong)(mem->base + mem->size));
 			goto out;
 		}
 	}

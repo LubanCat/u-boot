@@ -335,6 +335,13 @@ static void *sysmem_alloc_align_base(enum memblk_id id,
 	if (!sysmem_has_init())
 		goto out;
 
+	/* If out of management range, just return */
+	if (base < CONFIG_SYS_SDRAM_BASE)
+		return (void *)base;
+	if ((base + size >= CONFIG_SYS_SDRAM_BASE + SDRAM_MAX_SIZE) &&
+	    (base + size <= SZ_4G))
+	   	return (void *)base;
+
 	if (id == MEM_BY_NAME || id == MEM_KMEM_RESERVED) {
 		if (!mem_name) {
 			SYSMEM_E("NULL name for alloc sysmem\n");

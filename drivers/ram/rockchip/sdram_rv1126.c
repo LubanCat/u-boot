@@ -1338,16 +1338,6 @@ u32 read_mr(struct dram_info *dram, u32 rank, u32 mr_num, u32 dramtype)
 	return ret;
 }
 
-/* before call this function autorefresh should be disabled */
-void send_a_refresh(struct dram_info *dram)
-{
-	void __iomem *pctl_base = dram->pctl;
-
-	while (readl(pctl_base + DDR_PCTL2_DBGSTAT) & 0x3)
-		continue;
-	writel(0x3, pctl_base + DDR_PCTL2_DBGCMD);
-}
-
 static void enter_sr(struct dram_info *dram, u32 en)
 {
 	void __iomem *pctl_base = dram->pctl;
@@ -1894,7 +1884,7 @@ static int data_training_wr(struct dram_info *dram, u32 cs, u32 dramtype,
 	/* PHY_0x7a [1] reg_dq_wr_train_en */
 	setbits_le32(PHY_REG(phy_base, 0x7a), BIT(1));
 
-	send_a_refresh(dram);
+	send_a_refresh(dram->pctl, 0x3);
 
 	while (1) {
 		if ((readl(PHY_REG(phy_base, 0x92)) >> 7) & 0x1)
@@ -2691,7 +2681,7 @@ static u64 dram_detect_cap(struct dram_info *dram,
 			if (sdram_detect_col(cap_info, coltmp) != 0)
 				goto cap_err;
 
-			sdram_detect_bank(cap_info, coltmp, bktmp);
+			sdram_detect_bank(cap_info, pctl_base, coltmp, bktmp);
 			if (dram_type != LPDDR3)
 				sdram_detect_dbw(cap_info, dram_type);
 		} else {
@@ -2701,7 +2691,7 @@ static u64 dram_detect_cap(struct dram_info *dram,
 
 			cap_info->col = 10;
 			cap_info->bk = 2;
-			sdram_detect_bg(cap_info, coltmp);
+			sdram_detect_bg(cap_info, pctl_base, coltmp);
 		}
 
 		if (sdram_detect_row(cap_info, coltmp, bktmp, rowtmp) != 0)

@@ -14,6 +14,16 @@
 		stdout-path = &uart0;
 		u-boot,spl-boot-order = &sdmmc0, &spi_nand, &spi_nor, &emmc;
 	};
+
+	secure-otp@20790000 {
+		compatible = "rockchip,rv1103b-secure-otp";
+		reg = <0x20790000 0x10000>;
+		secure_conf = <0x20250018>;
+		cru_rst_addr = <0x20000a20>;
+		mask_addr = <0x209d0000>;
+		u-boot,dm-spl;
+		status = "okay";
+	};
 };
 
 &hw_decompress {

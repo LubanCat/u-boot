@@ -11,6 +11,7 @@
 #include <dm.h>
 #include <linux/err.h>
 #include <linux/ioport.h>
+#include <reset.h>
 #include <ufs.h>
 
 #include "ufs.h"
@@ -220,6 +221,12 @@ static int ufs_rockchip_common_init(struct ufs_hba *hba)
 
 	host->phy_config_mode = dev_read_u32_default(dev, "ufs-phy-config-mode", 0);
 
+	err = reset_get_bulk(dev, &host->rsts);
+	if (err) {
+		dev_err(dev, "Can't get reset: %d\n", err);
+		return err;
+	}
+
 	host->hba = hba;
 
 	return 0;
@@ -227,6 +234,8 @@ static int ufs_rockchip_common_init(struct ufs_hba *hba)
 
 static int ufs_rockchip_rk3576_init(struct ufs_hba *hba)
 {
+	struct udevice *dev = hba->dev;
+	struct ufs_rockchip_host *host = dev_get_priv(dev);
 	int ret = 0;
 
 	ret = ufs_rockchip_common_init(hba);
@@ -239,10 +248,17 @@ static int ufs_rockchip_rk3576_init(struct ufs_hba *hba)
 	writel(0x00030002, 0x2722030C);
 	/* Set UFS_REFCLK, UFS_RSTN */
 	writel(0x00FF0011, 0x2604B398);
-	/* Reset ufs device */
+
+	/* Reset ufs controller and device */
+	reset_assert_bulk(&host->rsts);
 	writel(0x00100000, 0x2604B400);
+
 	udelay(20);
+
 	writel(0x00100010, 0x2604B400);
+	reset_deassert_bulk(&host->rsts);
+
+	udelay(20);
 
 	return 0;
 }

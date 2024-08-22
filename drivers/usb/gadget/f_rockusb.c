@@ -243,6 +243,12 @@ static int rkusb_do_read_flash_id(struct fsg_common *common,
 		else
 			str = "NOR  ";
 		break;
+	case IF_TYPE_SCSI:
+		str = "SATA ";
+		break;
+	case IF_TYPE_NVME:
+		str = "PCIE ";
+		break;
 	default:
 		str = "UNKN "; /* unknown */
 		break;

@@ -1947,6 +1947,9 @@ static const struct rockchip_usb2phy_cfg rk3588_phy_cfgs[] = {
 };
 
 static const struct udevice_id rockchip_usb2phy_ids[] = {
+#ifdef CONFIG_ROCKCHIP_PX30
+	{ .compatible = "rockchip,px30-usb2phy", .data = (ulong)&rk3328_phy_cfgs },
+#endif
 #ifdef CONFIG_ROCKCHIP_RK1808
 	{ .compatible = "rockchip,rk1808-usb2phy", .data = (ulong)&rk1808_phy_cfgs },
 #endif
@@ -1962,7 +1965,7 @@ static const struct udevice_id rockchip_usb2phy_ids[] = {
 #ifdef CONFIG_ROCKCHIP_RK3308
 	{ .compatible = "rockchip,rk3308-usb2phy", .data = (ulong)&rk3308_phy_cfgs },
 #endif
-#if defined CONFIG_ROCKCHIP_RK3328 || defined CONFIG_ROCKCHIP_PX30
+#ifdef CONFIG_ROCKCHIP_RK3328
 	{ .compatible = "rockchip,rk3328-usb2phy", .data = (ulong)&rk3328_phy_cfgs },
 #endif
 #ifdef CONFIG_ROCKCHIP_RK3368

@@ -811,65 +811,49 @@ static int rk3308_usb2phy_tuning(struct rockchip_usb2phy *rphy)
 static int rk3328_usb2phy_tuning(struct rockchip_usb2phy *rphy)
 {
 	struct regmap *base = get_reg_base(rphy);
-	unsigned int tmp, orig;
 	int ret;
 
 	if (soc_is_px30s()) {
 		/* Enable otg/host port pre-emphasis during non-chirp phase */
-		ret = regmap_read(base, 0x8000, &orig);
-		if (ret)
-			return ret;
-		tmp = orig & ~GENMASK(2, 0);
-		tmp |= BIT(2) & GENMASK(2, 0);
-		ret = regmap_write(base, 0x8000, tmp);
+		ret = regmap_update_bits(base, 0x8000, GENMASK(2, 0), BIT(2));
 		if (ret)
 			return ret;
 
 		/* Set otg port squelch trigger point configure to 100mv */
-		ret = regmap_read(base, 0x8004, &orig);
-		if (ret)
-			return ret;
-		tmp = orig & ~GENMASK(7, 5);
-		tmp |= 0x40 & GENMASK(7, 5);
-		ret = regmap_write(base, 0x8004, tmp);
+		ret = regmap_update_bits(base, 0x8004, GENMASK(7, 5), 0x40);
 		if (ret)
 			return ret;
 
-		ret = regmap_read(base, 0x8008, &orig);
-		if (ret)
-			return ret;
-		tmp = orig & ~BIT(0);
-		tmp |= 0x1 & BIT(0);
-		ret = regmap_write(base, 0x8008, tmp);
+		ret = regmap_update_bits(base, 0x8008, BIT(0), 0x1);
 		if (ret)
 			return ret;
 
 		/* Enable host port pre-emphasis during non-chirp phase */
-		ret = regmap_read(base, 0x8400, &orig);
-		if (ret)
-			return ret;
-		tmp = orig & ~GENMASK(2, 0);
-		tmp |= BIT(2) & GENMASK(2, 0);
-		ret = regmap_write(base, 0x8400, tmp);
+		ret = regmap_update_bits(base, 0x8400, GENMASK(2, 0), BIT(2));
 		if (ret)
 			return ret;
 
 		/* Set host port squelch trigger point configure to 100mv */
-		ret = regmap_read(base, 0x8404, &orig);
-		if (ret)
-			return ret;
-		tmp = orig & ~GENMASK(7, 5);
-		tmp |= 0x40 & GENMASK(7, 5);
-		ret = regmap_write(base, 0x8404, tmp);
+		ret = regmap_update_bits(base, 0x8404, GENMASK(7, 5), 0x40);
 		if (ret)
 			return ret;
 
-		ret = regmap_read(base, 0x8408, &orig);
+		ret = regmap_update_bits(base, 0x8408, BIT(0), 0x1);
 		if (ret)
 			return ret;
-		tmp = orig & ~BIT(0);
-		tmp |= 0x1 & BIT(0);
-		ret = regmap_write(base, 0x8408, tmp);
+	} else {
+		/* Open debug mode for tuning */
+		ret = regmap_write(base, 0x2c, 0xffff0400);
+		if (ret)
+			return ret;
+
+		/* Open pre-emphasize in non-chirp state for otg port */
+		ret = regmap_write(base, 0x0, 0x00070004);
+		if (ret)
+			return ret;
+
+		/* Open pre-emphasize in non-chirp state for host port */
+		ret = regmap_write(base, 0x30, 0x00070004);
 		if (ret)
 			return ret;
 	}

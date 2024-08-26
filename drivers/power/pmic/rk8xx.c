@@ -204,6 +204,8 @@ static const struct pmic_child_info pmic_children_info[] = {
 	{ .prefix = "PLDO", .driver = "rk8xx_pldo"},
 	{ .prefix = "LDO", .driver = "rk8xx_ldo"},
 	{ .prefix = "SWITCH", .driver = "rk8xx_switch"},
+	{ .prefix = "BOOST", .driver = "rk8xx_boost"},
+
 	{ },
 };
 

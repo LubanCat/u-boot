@@ -593,6 +593,7 @@ static int rk_pcie_link_up(struct rk_pcie *priv, u32 cap_speed)
 	}
 
 	dev_err(priv->dev, "PCIe-%d Link Fail\n", priv->dev->seq);
+	rk_pcie_disable_ltssm(priv);
 	return -EINVAL;
 }
 
@@ -627,7 +628,7 @@ static int rockchip_pcie_init_port(struct udevice *dev)
 	ret = generic_phy_init(&priv->phy);
 	if (ret) {
 		dev_err(dev, "failed to init phy (ret=%d)\n", ret);
-		return ret;
+		goto err_disable_3v3;
 	}
 
 	ret = generic_phy_power_on(&priv->phy);
@@ -670,6 +671,9 @@ err_power_off_phy:
 	generic_phy_power_off(&priv->phy);
 err_exit_phy:
 	generic_phy_exit(&priv->phy);
+err_disable_3v3:
+	if(priv->vpcie3v3)
+		regulator_set_enable(priv->vpcie3v3, false);
 	return ret;
 }
 
@@ -752,7 +756,7 @@ static int rockchip_pcie_probe(struct udevice *dev)
 
 	ret = rockchip_pcie_init_port(dev);
 	if (ret)
-		return ret;
+		goto free_rst;
 
 	dev_info(dev, "PCIE-%d: Link up (Gen%d-x%d, Bus%d)\n",
 		 dev->seq, rk_pcie_get_link_speed(priv),
@@ -801,6 +805,9 @@ static int rockchip_pcie_probe(struct udevice *dev)
 					 priv->mem.phys_start,
 					 priv->mem.bus_start, priv->mem.size);
 	return 0;
+free_rst:
+	dm_gpio_free(dev, &priv->rst_gpio);
+	return ret;
 }
 
 static const struct dm_pci_ops rockchip_pcie_ops = {

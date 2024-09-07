@@ -27,6 +27,11 @@ struct resource_file {
 extern struct list_head entry_head;
 
 /*
+ * resource_destroy() - Destroy resource file list
+ */
+void resource_destroy(void);
+
+/*
  * resource_setup_ram_list() - setup resource file list by given resource image.
  *
  * @dev_desc: boot device

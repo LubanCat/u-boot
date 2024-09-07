@@ -149,6 +149,11 @@ static int resource_add_file(const char *name, u32 size,
 	return 0;
 }
 
+void resource_destroy(void)
+{
+	INIT_LIST_HEAD(&entry_head);
+}
+
 #ifdef CONFIG_ANDROID_BOOT_IMAGE
 /*
  * Add logo.bmp and logo_kernel.bmp from "logo" parititon

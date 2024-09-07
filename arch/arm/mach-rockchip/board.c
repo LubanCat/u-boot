@@ -257,6 +257,8 @@ static int boot_from_udisk(void)
 {
 	struct blk_desc *desc;
 	struct udevice *dev;
+	void *fdt_addr;
+	u32 fdt_size;
 	int devnum = -1;
 	char buf[32];
 
@@ -296,6 +298,28 @@ static int boot_from_udisk(void)
 			env_set("devtype", "usb");
 			env_set("devnum", buf);
 			printf("=== Booting from usb %d ===\n", devnum);
+
+			/*
+			 * If current kernel dtb is not from embedded dtb:
+			 *
+			 * Use 'gd->fdt_blob_kern' to reload the kernel dtb
+			 * from current bootdev(udisk) in the late bootflow.
+			 */
+			if (!gd->fdt_blob_kern) {
+				fdt_size = fdt_totalsize(gd->fdt_blob);
+				fdt_addr = memalign(ARCH_DMA_MINALIGN, fdt_size);
+				if (!fdt_addr)
+					return -ENOMEM;
+
+				/* destroy kernel dtb and resource list */
+				memcpy(fdt_addr, gd->fdt_blob, fdt_size);
+				fdt_set_magic((void *)gd->fdt_blob, ~0);
+				sysmem_free((phys_addr_t)gd->fdt_blob);
+				resource_destroy();
+
+				gd->fdt_blob_kern = fdt_addr;
+				gd->fdt_blob = fdt_addr;
+			}
 		} else {
 			printf("No available udisk image on usb %d\n", devnum);
 			return -ENODEV;

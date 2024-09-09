@@ -493,6 +493,9 @@ static int ufshcd_link_startup(struct ufs_hba *hba)
 	int retries = DME_LINKSTARTUP_RETRIES;
 	bool link_startup_again = true;
 
+	if (ufshcd_is_device_present(hba))
+		goto  device_present;
+
 link_startup:
 	do {
 		ufshcd_ops_link_startup_notify(hba, PRE_CHANGE);
@@ -525,6 +528,7 @@ link_startup:
 		goto link_startup;
 	}
 
+device_present:
 	/* Mark that link is up in PWM-G1, 1-lane, SLOW-AUTO mode */
 	ufshcd_init_pwr_info(hba);
 

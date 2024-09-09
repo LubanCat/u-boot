@@ -45,7 +45,7 @@ static int ufs_rockchip_test_linkup(struct ufs_hba *hba)
 		enabled_intr_status = intr_status & hba->intr_mask;
 		ufshcd_writel(hba, intr_status, REG_INTERRUPT_STATUS);
 
-		if (get_timer(start) > 50) {
+		if (get_timer(start) > 100) {
 			dev_err(hba->dev,
 				"Timedout waiting for UIC response\n");
 			return -ETIMEDOUT;
@@ -74,19 +74,15 @@ static int ufs_rockchip_hce_enable_notify(struct ufs_hba *hba,
 
 #if !defined(CONFIG_SPL_BUILD) && !defined(CONFIG_ROCKCHIP_UFS_DISABLED_LINKUP_TEST)
 		/* Try linkup to test if mphy has power supply */
-		if (ufs_rockchip_test_linkup(hba)) {
+		if (ufs_rockchip_test_linkup(hba))
 			return -EIO;
-		} else {
-			ufshcd_dme_reset(hba);
-			ufshcd_dme_enable(hba);
-		}
 #endif
 		if (hba->ops->phy_initialization) {
-                       err = hba->ops->phy_initialization(hba);
-                       if (err) {
-                               dev_err(hba->dev, "Phy setup failed (%d)\n", err);
-                       }
-               }
+			err = hba->ops->phy_initialization(hba);
+			if (err) {
+				dev_err(hba->dev, "Phy setup failed (%d)\n", err);
+			}
+		}
 	}
 
 	return err;

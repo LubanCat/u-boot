@@ -255,6 +255,14 @@ static int spinand_read_from_cache_op(struct spinand_device *spinand,
 		nbytes = adjreq.datalen;
 	}
 
+	if (spinand->support_cont_read && req->datalen) {
+		adjreq.datalen = req->datalen;
+		adjreq.dataoffs = 0;
+		adjreq.databuf.in = req->databuf.in;
+		buf = req->databuf.in;
+		nbytes = adjreq.datalen;
+	}
+
 	if (req->ooblen) {
 		adjreq.ooblen = nanddev_per_page_oobsize(nand);
 		adjreq.ooboffs = 0;
@@ -281,6 +289,8 @@ static int spinand_read_from_cache_op(struct spinand_device *spinand,
 		if (ret)
 			return ret;
 
+		if (spinand->support_cont_read)
+			op.addr.nbytes = 3;
 		ret = spi_mem_exec_op(spinand->slave, &op);
 		if (ret)
 			return ret;
@@ -290,9 +300,8 @@ static int spinand_read_from_cache_op(struct spinand_device *spinand,
 		op.addr.val += op.data.nbytes;
 	}
 
-	if (req->datalen)
-		memcpy(req->databuf.in, spinand->databuf + req->dataoffs,
-		       req->datalen);
+	if (!spinand->support_cont_read && req->datalen)
+		memcpy(req->databuf.in, spinand->databuf + req->dataoffs, req->datalen);
 
 	if (req->ooblen) {
 		if (req->mode == MTD_OPS_AUTO_OOB)
@@ -540,6 +549,9 @@ static int spinand_read_page(struct spinand_device *spinand,
 	if (ret)
 		return ret;
 
+	if (spinand->support_cont_read && !(spinand->slave->mode & SPI_DMA_PREPARE))
+		spinand_wait(spinand, &status);
+
 	if (!ecc_enabled)
 		return 0;
 
@@ -598,6 +610,10 @@ static int spinand_mtd_read(struct mtd_info *mtd, loff_t from,
 		if (ret)
 			break;
 
+		if (spinand->support_cont_read) {
+			iter.req.datalen = ops->len;
+			iter.req.ooblen = 0;
+		}
 		ret = spinand_read_page(spinand, &iter.req, enable_ecc);
 		if (ret < 0 && ret != -EBADMSG)
 			break;
@@ -611,6 +627,12 @@ static int spinand_mtd_read(struct mtd_info *mtd, loff_t from,
 		}
 
 		ret = 0;
+		if (spinand->support_cont_read) {
+			ops->retlen = ops->len;
+			ops->oobretlen = ops->ooblen;
+			break;
+		}
+
 		ops->retlen += iter.req.datalen;
 		ops->oobretlen += iter.req.ooblen;
 	}

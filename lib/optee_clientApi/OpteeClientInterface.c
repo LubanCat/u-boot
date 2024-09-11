@@ -782,7 +782,7 @@ uint32_t trusty_write_oem_huk(uint32_t *buf, uint32_t length)
 
 static void trusty_select_security_level(void)
 {
-#if (CONFIG_OPTEE_SECURITY_LEVEL > 0)
+#ifdef CONFIG_OPTEE_SECURITY_LEVEL
 	TEEC_Result TeecResult;
 
 	TeecResult = trusty_check_security_level_flag(CONFIG_OPTEE_SECURITY_LEVEL);
@@ -793,6 +793,8 @@ static void trusty_select_security_level(void)
 
 	if (TeecResult == TEEC_SUCCESS)
 		debug("optee select security level success!");
+	else if (TeecResult == TEEC_ERROR_NOT_SUPPORTED)
+		debug("optee not support security level!");
 	else
 		panic("optee select security level fail!");
 

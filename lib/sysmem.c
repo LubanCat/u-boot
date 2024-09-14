@@ -336,7 +336,7 @@ static void *sysmem_alloc_align_base(enum memblk_id id,
 		goto out;
 
 	/* If out of management range, just return */
-	if (base < CONFIG_SYS_SDRAM_BASE)
+	if (base != SYSMEM_ALLOC_ANYWHERE && base < CONFIG_SYS_SDRAM_BASE)
 		return (void *)base;
 	if ((base + size >= CONFIG_SYS_SDRAM_BASE + SDRAM_MAX_SIZE) &&
 	    (base + size <= SZ_4G))

@@ -250,6 +250,12 @@ int arch_cpu_init(void)
 	 */
 	writel(0x01ff01d1, SYS_GRF_BASE + GRF_SYS_USBPHY_CON0);
 	writel(0x00000000, USBPHY_APB_BASE + USBPHY_FSLS_DIFF_RECEIVER);
+
+#ifdef CONFIG_SPI_FLASH_AUTO_MERGE
+	/* gpio1a5/gpio1a6 cs-gpio */
+	writel(0x00F00000, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_1_0);
+	writel(0x0F000000, GPIO1_IOC_BASE + GPIO1A_IOMUX_SEL_1_1);
+#endif
 #endif
 
 	return 0;

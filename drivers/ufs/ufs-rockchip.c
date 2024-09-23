@@ -20,49 +20,6 @@
 
 extern int ufshcd_dme_enable(struct ufs_hba *hba);
 
-static inline bool ufshcd_is_hba_active(struct ufs_hba *hba)
-{
-	return ufshcd_readl(hba, REG_CONTROLLER_ENABLE) & CONTROLLER_ENABLE;
-}
-
-#if !defined(CONFIG_SPL_BUILD) && !defined(CONFIG_ROCKCHIP_UFS_DISABLED_LINKUP_TEST)
-static int ufs_rockchip_test_linkup(struct ufs_hba *hba)
-{
-	unsigned long start = 0;
-	u32 intr_status;
-	u32 enabled_intr_status;
-
-	/* Write Args */
-	ufshcd_writel(hba, 0, REG_UIC_COMMAND_ARG_1);
-	ufshcd_writel(hba, 0, REG_UIC_COMMAND_ARG_2);
-	ufshcd_writel(hba, 0, REG_UIC_COMMAND_ARG_3);
-	/* Write UIC Cmd */
-	ufshcd_writel(hba, UIC_CMD_DME_LINK_STARTUP & COMMAND_OPCODE_MASK, REG_UIC_COMMAND);
-
-	start = get_timer(0);
-	do {
-		intr_status = ufshcd_readl(hba, REG_INTERRUPT_STATUS);
-		enabled_intr_status = intr_status & hba->intr_mask;
-		ufshcd_writel(hba, intr_status, REG_INTERRUPT_STATUS);
-
-		if (get_timer(start) > 100) {
-			dev_err(hba->dev,
-				"Timedout waiting for UIC response\n");
-			return -ETIMEDOUT;
-		}
-
-		if (enabled_intr_status & UFSHCD_ERROR_MASK) {
-			dev_err(hba->dev, "Error in status:%08x\n",
-				enabled_intr_status);
-
-			return -1;
-		}
-	} while (!(enabled_intr_status & UFSHCD_UIC_MASK));
-
-	return 0;
-}
-#endif
-
 static int ufs_rockchip_hce_enable_notify(struct ufs_hba *hba,
 					  enum ufs_notify_change_status status)
 {
@@ -72,13 +29,25 @@ static int ufs_rockchip_hce_enable_notify(struct ufs_hba *hba,
 		ufshcd_dme_reset(hba);
 		ufshcd_dme_enable(hba);
 
-#if !defined(CONFIG_SPL_BUILD) && !defined(CONFIG_ROCKCHIP_UFS_DISABLED_LINKUP_TEST)
-		/* Try linkup to test if mphy has power supply */
-		if (ufs_rockchip_test_linkup(hba))
-			return -EIO;
-#endif
 		if (hba->ops->phy_initialization) {
 			err = hba->ops->phy_initialization(hba);
+			if (err) {
+				dev_err(hba->dev, "Phy setup failed (%d)\n", err);
+			}
+		}
+	}
+
+	return err;
+}
+
+static int ufs_rockchip_startup_notify(struct ufs_hba *hba,
+				       enum ufs_notify_change_status status)
+{
+	int err = 0;
+
+	if (status == POST_CHANGE) {
+		if (hba->ops->phy_parameter_initialization) {
+			err = hba->ops->phy_parameter_initialization(hba);
 			if (err) {
 				dev_err(hba->dev, "Phy setup failed (%d)\n", err);
 			}
@@ -106,35 +75,10 @@ static const unsigned char rk3576_phy_value[15][4] = {
 	{0x43, 0x5A, 0x58, 0xC0}
 };
 
-static int ufs_rockchip_rk3576_phy_init(struct ufs_hba *hba)
+static int ufs_rockchip_rk3576_phy_parameter_init(struct ufs_hba *hba)
 {
 	struct ufs_rockchip_host *host = dev_get_priv(hba->dev);
 	int try_case = host->phy_config_mode, value;
-
-	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(PA_LOCAL_TX_LCC_ENABLE, 0x0), 0x0);
-	/* enable the mphy DME_SET cfg */
-	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x200, 0x0), 0x40);
-	for (int i = 0; i < 2; i++) {
-		/* Configuration M-TX */
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xaa, SEL_TX_LANE0 + i), 0x06);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xa9, SEL_TX_LANE0 + i), 0x02);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xad, SEL_TX_LANE0 + i), 0x44);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xac, SEL_TX_LANE0 + i), 0xe6);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xab, SEL_TX_LANE0 + i), 0x07);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x94, SEL_TX_LANE0 + i), 0x93);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x93, SEL_TX_LANE0 + i), 0xc9);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x7f, SEL_TX_LANE0 + i), 0x00);
-		/* Configuration M-RX */
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x12, SEL_RX_LANE0 + i), 0x06);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x11, SEL_RX_LANE0 + i), 0x00);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x1d, SEL_RX_LANE0 + i), 0x58);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x1c, SEL_RX_LANE0 + i), 0x8c);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x1b, SEL_RX_LANE0 + i), 0x02);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x25, SEL_RX_LANE0 + i), 0xf6);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x2f, SEL_RX_LANE0 + i), 0x69);
-	}
-	/* disable the mphy DME_SET cfg */
-	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x200, 0x0), 0x00);
 
 	ufs_sys_writel(host->mphy_base, 0x80, 0x08C);
 	ufs_sys_writel(host->mphy_base, 0xB5, 0x110);
@@ -172,6 +116,38 @@ static int ufs_rockchip_rk3576_phy_init(struct ufs_hba *hba)
 	ufs_sys_writel(host->mphy_base, 0x00, 0x08C);
 
 	udelay(200);
+
+	return 0;
+}
+
+static int ufs_rockchip_rk3576_phy_init(struct ufs_hba *hba)
+{
+	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(PA_LOCAL_TX_LCC_ENABLE, 0x0), 0x0);
+	/* enable the mphy DME_SET cfg */
+	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x200, 0x0), 0x40);
+	for (int i = 0; i < 2; i++) {
+		/* Configuration M-TX */
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xaa, SEL_TX_LANE0 + i), 0x06);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xa9, SEL_TX_LANE0 + i), 0x02);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xad, SEL_TX_LANE0 + i), 0x44);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xac, SEL_TX_LANE0 + i), 0xe6);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xab, SEL_TX_LANE0 + i), 0x07);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x94, SEL_TX_LANE0 + i), 0x93);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x93, SEL_TX_LANE0 + i), 0xc9);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x7f, SEL_TX_LANE0 + i), 0x00);
+		/* Configuration M-RX */
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x12, SEL_RX_LANE0 + i), 0x06);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x11, SEL_RX_LANE0 + i), 0x00);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x1d, SEL_RX_LANE0 + i), 0x58);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x1c, SEL_RX_LANE0 + i), 0x8c);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x1b, SEL_RX_LANE0 + i), 0x02);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x25, SEL_RX_LANE0 + i), 0xf6);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x2f, SEL_RX_LANE0 + i), 0x69);
+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x1e, SEL_RX_LANE0 + i), 0x18);
+	}
+
+	/* disable the mphy DME_SET cfg */
+	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x200, 0x0), 0x00);
 
 	/* start link up */
 	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(MIB_T_DBG_CPORT_TX_ENDIAN, 0), 0x0);
@@ -263,6 +239,8 @@ static struct ufs_hba_ops ufs_hba_rk3576_vops = {
 	.init = ufs_rockchip_rk3576_init,
 	.phy_initialization = ufs_rockchip_rk3576_phy_init,
 	.hce_enable_notify = ufs_rockchip_hce_enable_notify,
+	.link_startup_notify = ufs_rockchip_startup_notify,
+	.phy_parameter_initialization = ufs_rockchip_rk3576_phy_parameter_init,
 };
 
 static const struct udevice_id ufs_rockchip_of_match[] = {

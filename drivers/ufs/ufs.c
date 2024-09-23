@@ -47,13 +47,15 @@
 
 /* maximum timeout in ms for a general UIC command */
 #define UFS_UIC_CMD_TIMEOUT	1000
+
+#define UFS_UIC_LINKUP_TIMEOUT	150
 /* NOP OUT retries waiting for NOP IN response */
 /* Polling time to wait for fDeviceInit */
 #define FDEVICEINIT_COMPL_TIMEOUT 1500 /* millisecs */
 
 #define NOP_OUT_RETRIES    10
 /* Timeout after 30 msecs if NOP OUT hangs without response */
-#define NOP_OUT_TIMEOUT    30 /* msecs */
+#define NOP_OUT_TIMEOUT    1500 /* msecs */
 
 /* Only use one Task Tag for all requests */
 #define TASK_TAG	0
@@ -180,12 +182,16 @@ static int ufshcd_send_uic_cmd(struct ufs_hba *hba, struct uic_command *uic_cmd)
 	unsigned long start = 0;
 	u32 intr_status;
 	u32 enabled_intr_status;
+	int timeout = UFS_UIC_CMD_TIMEOUT;
 
 	if (!ufshcd_ready_for_uic_cmd(hba)) {
 		dev_err(hba->dev,
 			"Controller not ready to accept UIC commands\n");
 		return -EIO;
 	}
+
+	if (uic_cmd->command == UIC_CMD_DME_LINK_STARTUP)
+		timeout = UFS_UIC_LINKUP_TIMEOUT;
 
 	debug("sending uic command:%d\n", uic_cmd->command);
 
@@ -204,7 +210,7 @@ static int ufshcd_send_uic_cmd(struct ufs_hba *hba, struct uic_command *uic_cmd)
 		enabled_intr_status = intr_status & hba->intr_mask;
 		ufshcd_writel(hba, intr_status, REG_INTERRUPT_STATUS);
 
-		if (get_timer(start) > UFS_UIC_CMD_TIMEOUT) {
+		if (get_timer(start) > timeout) {
 			dev_err(hba->dev,
 				"Timedout waiting for UIC response\n");
 
@@ -1899,15 +1905,20 @@ static void ufshcd_def_desc_sizes(struct ufs_hba *hba)
 
 int _ufs_start(struct ufs_hba *hba)
 {
-	int ret;
+	int ret, retry_count = 1;
 
+retry:
 	ret = ufshcd_link_startup(hba);
 	if (ret)
 		return ret;
 
 	ret = ufshcd_verify_dev_init(hba);
-	if (ret)
+	if (ret) {
+		ufshcd_hba_enable(hba);
+		if (retry_count--)
+			goto retry;
 		return ret;
+	}
 
 	ret = ufshcd_complete_dev_init(hba);
 	if (ret)

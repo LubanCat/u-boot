@@ -744,6 +744,7 @@ struct ufs_hba_ops {
 	int (*link_startup_notify)(struct ufs_hba *hba,
 				   enum ufs_notify_change_status);
 	int (*phy_initialization)(struct ufs_hba *hba);
+	int (*phy_parameter_initialization)(struct ufs_hba *hba);
 };
 
 struct ufs_hba {

@@ -98,6 +98,8 @@ DECLARE_GLOBAL_DATA_PTR;
 #define DMAC0_PRIORITY_REG		0xfdf32208
 #define VOP_M0_PRIORITY_REG		0xfdf82008
 #define VOP_M1_PRIORITY_REG		0xfdf82208
+#define MMU600PHP_TBU_PRIORITY_REG	0xfdf3a608
+#define MMU600PHP_TCU_PRIORITY_REG	0xfdf3a808
 #define QOS_PRIORITY_LEVEL(h, l)	((((h) & 7) << 8) | ((l) & 7))
 
 #ifdef CONFIG_ARM64
@@ -1060,6 +1062,11 @@ int arch_cpu_init(void)
 	 */
 	writel(QOS_PRIORITY_LEVEL(3, 3), VOP_M0_PRIORITY_REG);
 	writel(QOS_PRIORITY_LEVEL(3, 3), VOP_M1_PRIORITY_REG);
+	/*
+	 * set SATA,USB,GMAC to priority 0x404
+	 */
+	writel(QOS_PRIORITY_LEVEL(4, 4), MMU600PHP_TBU_PRIORITY_REG);
+	writel(QOS_PRIORITY_LEVEL(4, 4), MMU600PHP_TCU_PRIORITY_REG);
 #endif
 
 	/* Select usb otg0 phy status to 0 that make rockusb can work at high-speed */

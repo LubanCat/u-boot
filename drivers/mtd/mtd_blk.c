@@ -666,6 +666,7 @@ ulong mtd_derase(struct udevice *udev, lbaint_t start,
 		return 0;
 
 	pr_debug("mtd derase %s %lx %lx\n", mtd->name, start, blkcnt);
+	len = round_up(len, mtd->erasesize);
 
 	if (blkcnt == 0)
 		return 0;

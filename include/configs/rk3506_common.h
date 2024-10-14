@@ -38,9 +38,6 @@
 #define CONFIG_BOUNCE_BUFFER
 
 #ifndef CONFIG_SPL_BUILD
-/* tee area when dram is 64MB size */
-#define CONFIG_PRAM			1024
-
 /* usb mass storage */
 #define CONFIG_USB_FUNCTION_MASS_STORAGE
 #define CONFIG_ROCKUSB_G_DNL_PID	0x350f

@@ -20,10 +20,7 @@
 #include <scsi.h>
 #include <stdlib.h>
 #include <usbplug.h>
-
-#ifdef CONFIG_ROCKCHIP_VENDOR_PARTITION
 #include <asm/arch/vendor.h>
-#endif
 #include <rockusb.h>
 
 #define ROCKUSB_INTERFACE_CLASS	0xff
@@ -457,7 +454,6 @@ out:
 	return rc;
 }
 
-#ifdef CONFIG_ROCKCHIP_VENDOR_PARTITION
 static int rkusb_do_vs_write(struct fsg_common *common)
 {
 	struct fsg_lun		*curlun = &common->luns[common->lun];
@@ -520,8 +516,7 @@ static int rkusb_do_vs_write(struct fsg_common *common)
 			/* Perform the write */
 			vhead = (struct vendor_item *)bh->buf;
 			data  = bh->buf + sizeof(struct vendor_item);
-
-			if (!type) {
+			if (CONFIG_IS_ENABLED(ROCKCHIP_VENDOR_PARTITION) && !type) {
 				#ifndef CONFIG_SUPPORT_USBPLUG
 				if (vhead->id == HDCP_14_HDMI_ID ||
 				    vhead->id == HDCP_14_HDMIRX_ID ||
@@ -679,8 +674,7 @@ static int rkusb_do_vs_read(struct fsg_common *common)
 		vhead = (struct vendor_item *)bh->buf;
 		data  = bh->buf + sizeof(struct vendor_item);
 		vhead->id = get_unaligned_be16(&common->cmnd[2]);
-
-		if (!type) {
+		if (CONFIG_IS_ENABLED(ROCKCHIP_VENDOR_PARTITION) && !type) {
 			/* Vendor storage */
 			rc = vendor_storage_read(vhead->id,
 						 (char __user *)data,
@@ -750,7 +744,6 @@ static int rkusb_do_vs_read(struct fsg_common *common)
 
 	return -EIO; /* No default reply */
 }
-#endif
 
 static int rkusb_do_switch_storage(struct fsg_common *common)
 {
@@ -1055,7 +1048,6 @@ static int rkusb_cmd_process(struct fsg_common *common,
 		rc = RKUSB_RC_FINISHED;
 		break;
 
-#ifdef CONFIG_ROCKCHIP_VENDOR_PARTITION
 	case RKUSB_VS_WRITE:
 		*reply = rkusb_do_vs_write(common);
 		rc = RKUSB_RC_FINISHED;
@@ -1065,11 +1057,12 @@ static int rkusb_cmd_process(struct fsg_common *common,
 		*reply = rkusb_do_vs_read(common);
 		rc = RKUSB_RC_FINISHED;
 		break;
-#endif
+
 	case RKUSB_SWITCH_STORAGE:
 		*reply = rkusb_do_switch_storage(common);
 		rc = RKUSB_RC_FINISHED;
 		break;
+
 	case RKUSB_GET_STORAGE_MEDIA:
 		*reply = rkusb_do_get_storage_info(common, bh);
 		rc = RKUSB_RC_FINISHED;

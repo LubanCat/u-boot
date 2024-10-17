@@ -608,6 +608,17 @@ static void sanity_cpu_swap(void *blob)
 }
 #endif
 
+static int rockchip_dm_late_init(void *blob)
+{
+	struct udevice *dev;
+
+	/* Prepare for board_rng_seed(), dryrun and ignore result */
+	if (IS_ENABLED(CONFIG_BOARD_RNG_SEED) && IS_ENABLED(CONFIG_DM_RNG))
+		uclass_get_device(UCLASS_RNG, 0, &dev);
+
+	return 0;
+}
+
 int board_fdt_fixup(void *blob)
 {
 #ifdef CONFIG_SANITY_CPU_SWAP
@@ -616,8 +627,11 @@ int board_fdt_fixup(void *blob)
 	/*
 	 * Device's platdata points to orignal fdt blob property,
 	 * access DM device before any fdt fixup.
+	 *
+	 * Do board specific init and common init.
 	 */
 	rk_board_dm_fdt_fixup(blob);
+	rockchip_dm_late_init(blob);
 
 	/* Common fixup for DRM */
 #ifdef CONFIG_DRM_ROCKCHIP

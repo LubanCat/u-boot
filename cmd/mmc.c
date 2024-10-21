@@ -244,11 +244,12 @@ int finish_rpmb(void)
 int do_readcounter(struct s_rpmb *requestpackets)
 {
 	int ret;
-	struct mmc *mmc = find_mmc_device(curr_device);
-	if (!mmc)
-		return -1;
 
 	if (init_rpmb() != 0)
+		return -1;
+
+	struct mmc *mmc = find_mmc_device(curr_device);
+	if (!mmc)
 		return -1;
 
 	ret = read_counter(mmc, requestpackets);

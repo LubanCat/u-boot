@@ -778,6 +778,7 @@ static int rkusb_do_switch_storage(struct fsg_common *common)
 	case BOOT_TYPE_SATA:
 		type = IF_TYPE_SCSI;
 		devnum = 0;
+		scsi_scan(true);
 		break;
 #endif
 	default:

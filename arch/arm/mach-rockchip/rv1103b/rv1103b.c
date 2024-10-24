@@ -136,14 +136,8 @@ void rockchip_stimer_init(void)
 int spl_fit_standalone_release(char *id, uintptr_t entry_point)
 {
 	if (!strcmp(id, "mcu0")) {
-		/* reset hpmcu */
-		writel(0x00f000f0, PERI_CRU_BASE + PERICRU_PERISOFTRST_CON10);
-		writel(0x00080008, SGRF_SYS_BASE + SGRF_SYS_SOC_CON2);
 		/* set the hpmcu boot address */
 		writel(entry_point, SGRF_SYS_BASE + SGRF_SYS_HPMCU_BOOT_DDR);
-		writel(0x80000000, SGRF_SYS_BASE + SGRF_SYS_SOC_CON3);
-		/* release hpmcu */
-		writel(0x00f00000, PERI_CRU_BASE + PERICRU_PERISOFTRST_CON10);
 	} else if (!strcmp(id, "mcu1")) {
 		/* reset lpmcu */
 		writel(0x000f000f, PMU0_CRU_BASE + PMUCRU_PMUSOFTRST_CON02);

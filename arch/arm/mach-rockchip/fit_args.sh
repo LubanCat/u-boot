@@ -52,6 +52,10 @@ else
 				COMPRESSION=$2
 				shift 2
 				;;
+			-i0)
+				INIT0_OFFSET=$2
+				shift 2
+				;;
 			-m0)
 				MCU0_OFFSET=$2
 				shift 2
@@ -125,6 +129,11 @@ fi
 # tee
 if [ ! -z "${TEE_OFFSET}" ]; then
 	TEE_LOAD_ADDR="0x"$(echo "obase=16;$((DARM_BASE+TEE_OFFSET))"|bc)
+fi
+
+# init
+if [ ! -z "${INIT0_OFFSET}" ]; then
+	INIT0_LOAD_ADDR="0x"$(echo "obase=16;$((DARM_BASE+$INIT0_OFFSET))"|bc)
 fi
 
 # mcu

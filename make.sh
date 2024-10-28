@@ -579,6 +579,24 @@ function pack_uboot_itb_image()
 		fi
 	fi
 
+	# Inits
+	for ((i=0; i<5; i++))
+	do
+		INIT_BIN="init${i}.bin"
+		INIT_IDX="INIT${i}"
+		ENABLED=`awk -F "," '/'${INIT_IDX}'=/  { printf $3 }' ${INI} | tr -d ' '`
+		if [ "${ENABLED}" == "enabled" -o "${ENABLED}" == "okay" ]; then
+			NAME=`awk -F "," '/'${INIT_IDX}'=/ { printf $1 }' ${INI} | tr -d ' ' | awk -F "=" '{ print $2 }'`
+			OFFS=`awk -F "," '/'${INIT_IDX}'=/ { printf $2 }' ${INI} | tr -d ' '`
+			cp ${RKBIN}/${NAME} ${INIT_BIN}
+			if [ -z ${OFFS} ]; then
+				echo "ERROR: No ${INIT_BIN} address in ${INI}"
+				exit 1
+			fi
+			INIT_ARG=${INIT_ARG}" -i${i} ${OFFS}"
+		fi
+	done
+
 	# MCUs
 	for ((i=0; i<5; i++))
 	do
@@ -648,7 +666,7 @@ function pack_uboot_itb_image()
 		if [[ ${SPL_FIT_GENERATOR} == *.py ]]; then
 			${SPL_FIT_GENERATOR} u-boot.dtb > u-boot.its
 		else
-			${SPL_FIT_GENERATOR} ${TEE_ARG} ${COMPRESSION_ARG} ${MCU_ARG} ${LOAD_ARG} > u-boot.its
+			${SPL_FIT_GENERATOR} ${TEE_ARG} ${COMPRESSION_ARG} ${INIT_ARG} ${MCU_ARG} ${LOAD_ARG} > u-boot.its
 		fi
 	fi
 

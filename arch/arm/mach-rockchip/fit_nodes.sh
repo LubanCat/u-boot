@@ -279,6 +279,24 @@ function gen_mcu_node()
 		STANDALONE_SIGN=", \"standalone\""
 		STANDALONE_MCU="standalone = ${STANDALONE_LIST};"
 	done
+
+	if [ -z ${INIT0_LOAD_ADDR} ]; then
+		return
+	fi
+
+	INIT="init0"
+	echo "		${INIT} {
+			description = \"${INIT}\";
+			type = \"standalone\";
+			arch = \"${ARCH}\";
+			load = <"${INIT0_LOAD_ADDR}">;
+			data = /incbin/(\"./${INIT}.bin\");
+			compression = \"none\";
+			hash {
+				algo = \"sha256\";
+			};
+		};"
+	STANDALONE_MCU="standalone = \"init0\",${STANDALONE_LIST};"
 }
 
 function gen_loadable_node()

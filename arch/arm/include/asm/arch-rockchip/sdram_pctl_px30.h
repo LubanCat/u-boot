@@ -11,7 +11,7 @@ struct ddr_pctl_regs {
 	u32 pctl[35][2];
 };
 
-/* ddr pctl registers define */
+/* DDRCTL registers define */
 #define DDR_PCTL2_MSTR			0x0
 #define DDR_PCTL2_STAT			0x4
 #define DDR_PCTL2_MSTR1			0x8

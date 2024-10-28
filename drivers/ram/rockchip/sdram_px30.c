@@ -120,7 +120,7 @@ static void rkclk_set_dpll(struct dram_info *dram, unsigned int hz)
 static void rkclk_configure_ddr(struct dram_info *dram,
 				struct px30_sdram_params *sdram_params)
 {
-	/* for inno ddr phy need 2*freq */
+	/* for ddr phy need 2*freq */
 	rkclk_set_dpll(dram,  sdram_params->base.ddr_freq * MHz * 2);
 }
 

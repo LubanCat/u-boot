@@ -389,7 +389,7 @@ static void rkclk_set_dpll(struct dram_info *dram, unsigned int hz)
 static void rkclk_configure_ddr(struct dram_info *dram,
 				struct rv1126_sdram_params *sdram_params)
 {
-	/* for inno ddr phy need freq / 2 */
+	/* for ddr phy need freq / 2 */
 	rkclk_set_dpll(dram, sdram_params->base.ddr_freq * MHZ / 2);
 }
 
@@ -2961,7 +2961,7 @@ static void pre_set_rate(struct dram_info *dram,
 	u32 dramtype = sdram_params->base.dramtype;
 
 	sw_set_req(dram);
-	/* pctl timing update */
+	/* DDRCTL timing update */
 	for (i = 0, find = 0; i < ARRAY_SIZE(pctl_need_update_reg); i++) {
 		for (j = find; sdram_params->pctl_regs.pctl[j][0] != 0xFFFFFFFF;
 		     j++) {

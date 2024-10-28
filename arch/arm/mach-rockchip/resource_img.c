@@ -103,15 +103,15 @@ static int resource_check_header(struct resource_img_hdr *hdr)
 static void resource_dump(struct resource_file *f)
 {
 	printf("%s\n", f->name);
-	printf("  blk_start:  0x%08lx\n", (ulong)f->blk_start);
-	printf("  blk_offset: 0x%08lx\n", (ulong)f->blk_offset);
+	printf("  blk_start:  0x%08llx\n", f->blk_start);
+	printf("  blk_offset: 0x%08llx\n", f->blk_offset);
 	printf("  size:       0x%08x\n", f->size);
 	printf("  in_ram:     %d\n", f->in_ram);
 	printf("  hash_size:  %d\n\n", f->hash_size);
 }
 
 static int resource_add_file(const char *name, u32 size,
-			     u32 blk_start,  u32 blk_offset,
+			     u64 blk_start,  u32 blk_offset,
 			     char *hash, u32 hash_size,
 			     bool in_ram)
 {
@@ -216,7 +216,7 @@ static int resource_setup_logo_bmp(struct blk_desc *desc)
 }
 #endif
 
-static int resource_setup_list(struct blk_desc *desc, ulong blk_start,
+static int resource_setup_list(struct blk_desc *desc, u64 blk_start,
 			       void *resc_hdr, bool in_ram)
 {
 	struct resource_img_hdr *hdr = resc_hdr;
@@ -253,11 +253,11 @@ int resource_setup_ram_list(struct blk_desc *desc, void *hdr)
 	}
 
 	/* @blk_start: set as 'hdr' point addr, to be used in byte */
-	return resource_setup_list(desc, (ulong)hdr, hdr, true);
+	return resource_setup_list(desc, (u64)hdr, hdr, true);
 }
 
 #ifdef CONFIG_ANDROID_BOOT_IMAGE
-static int resource_setup_blk_list(struct blk_desc *desc, ulong blk_start)
+static int resource_setup_blk_list(struct blk_desc *desc, u64 blk_start)
 {
 	struct resource_img_hdr *hdr;
 	int blk_cnt;
@@ -338,6 +338,7 @@ static int resource_init(struct blk_desc *desc,
 		if (resc_buf && !resource_check_header((void *)resc_buf))
 			return resource_setup_ram_list(desc, (void *)resc_buf);
 	}
+
 #endif
 
 	return resource_setup_blk_list(desc, part->start + blk_offset);
@@ -433,7 +434,7 @@ int rockchip_read_resource_file(void *buf, const char *name, int blk_offset, int
 	struct blk_desc *desc = rockchip_get_bootdev();
 	struct resource_file *f;
 	int blk_cnt;
-	ulong pos;
+	u64 pos;
 
 	if (!desc)
 		return -ENODEV;

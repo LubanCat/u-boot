@@ -495,6 +495,9 @@ static void spl_fdt_fixup_memory(struct spl_image_info *spl_image)
 			debug("Adding bank: 0x%08llx - 0x%08llx (size: 0x%08llx)\n",
 			       start[i], start[i] + size[i], size[i]);
 		}
+
+		fdt_increase_size(blob, 512);
+
 		err = fdt_fixup_memory_banks(blob, start, size, count);
 		if (err < 0) {
 			printf("Fixup kernel dtb memory node failed: %s\n", fdt_strerror(err));

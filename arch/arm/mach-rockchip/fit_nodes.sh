@@ -21,7 +21,7 @@ MAX_ADDR_VAL=$((0xf0000000))
 fi
 
 # dram base
-DRAM_BASE_VAL=$((DRAM_BASE))
+DRAM_BASE_VAL=`sed -n "/CONFIG_SYS_SDRAM_BASE=/s/CONFIG_SYS_SDRAM_BASE=//p" ${srctree}/include/autoconf.mk|tr -d '\r'`
 
 # compression
 if [ "${COMPRESSION}" == "gzip" ]; then

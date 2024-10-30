@@ -556,8 +556,8 @@ function pack_uboot_itb_image()
 		cp ${RKBIN}/${BL31_ELF} bl31.elf
 		if grep BL32_OPTION -A 1 ${INI} | grep SEC=1 ; then
 			cp ${RKBIN}/${BL32_BIN} tee.bin
-			TEE_OFFSET=`grep BL32_OPTION -A 3 ${INI} | grep ADDR= | awk -F "=" '{ printf $2 }' | tr -d '\r'`
-			TEE_ARG="-t ${TEE_OFFSET}"
+			TEE_ADDR=`grep BL32_OPTION -A 3 ${INI} | grep ADDR= | awk -F "=" '{ printf $2 }' | tr -d '\r'`
+			TEE_ARG="-t ${TEE_ADDR}"
 		fi
 	else
 		# TOS
@@ -571,11 +571,12 @@ function pack_uboot_itb_image()
 			echo "WARN: No tee bin"
 		fi
 		if [ ! -z "${TOSTA}" -o ! -z "${TOS}" ]; then
-			TEE_OFFSET=`filt_val "ADDR" ${INI}`
-			if [ "${TEE_OFFSET}" == "" ]; then
-				TEE_OFFSET=0x8400000
+			TEE_ADDR=`filt_val "ADDR" ${INI}`
+			if [ "${TEE_ADDR}" == "" ]; then
+				DRAM_BASE=`sed -n "/CONFIG_SYS_SDRAM_BASE=/s/CONFIG_SYS_SDRAM_BASE=//p" ${srctree}/include/autoconf.mk|tr -d '\r'`
+				TEE_ADDR="0x"$(echo "obase=16;$((DRAM_BASE+0x8400000))"|bc)
 			fi
-			TEE_ARG="-t ${TEE_OFFSET}"
+			TEE_ARG="-t ${TEE_ADDR}"
 		fi
 	fi
 

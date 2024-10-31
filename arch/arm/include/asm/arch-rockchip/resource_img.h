@@ -15,8 +15,8 @@
 
 struct resource_file {
 	char		name[MAX_FILE_NAME_LEN];
-	uint64_t	blk_start;
-	uint64_t	blk_offset;
+	ulong		blk_start;
+	ulong		blk_offset;
 	char		hash[MAX_HASH_LEN];
 	uint32_t	hash_size;
 	uint32_t	size;		/* in byte */

@@ -804,10 +804,14 @@ static int spl_internal_load_simple_fit(struct spl_image_info *spl_image,
 			spl_image->entry_point = image_info.entry_point;
 
 		/* Record our loadables into the FDT */
-		if (spl_image->fdt_addr)
+		if (spl_image->fdt_addr && spl_image->next_stage == SPL_NEXT_STAGE_UBOOT)
 			spl_fit_record_loadable(fit, images, index,
 						spl_image->fdt_addr,
 						&image_info);
+#if CONFIG_IS_ENABLED(ATF)
+		else if (os_type == IH_OS_OP_TEE)
+			spl_image->entry_point_bl32 = image_info.load_addr;
+#endif
 	}
 
 	/*

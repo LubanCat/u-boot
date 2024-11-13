@@ -63,6 +63,14 @@
 #define CONFIG_ROCKUSB_G_DNL_PID	0x350b
 #define ROCKUSB_FSG_BUFLEN		0x400000
 
+/* Nand */
+#define CONFIG_SYS_NAND_BASE		0
+#define CONFIG_SYS_MAX_NAND_DEVICE	1
+#define CONFIG_SYS_NAND_ONFI_DETECTION
+#define CONFIG_SYS_NAND_PAGE_SIZE	2048
+#define CONFIG_SYS_NAND_PAGE_COUNT	64
+#define CONFIG_SYS_NAND_SIZE		(256 * 1024 * 1024)
+
 /*
  * decompressed kernel:  4M ~ 84M
  *	Why not start from 2M ? if kernel < 5.10 in Android image,

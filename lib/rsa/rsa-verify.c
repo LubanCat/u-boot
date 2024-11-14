@@ -639,10 +639,6 @@ int rsa_burn_key_hash(struct image_sign_info *info)
 	if (!(prop.burn_key))
 		return 0;
 
-	/* Delay 3 seconds to make sure power supply is steady. */
-	printf("Waiting for power supply steady. Please don't turn off the device\n");
-	mdelay(3000);
-
 	/* Handle burn_key_hash process from now on */
 	dev = misc_otp_get_device(OTP_S);
 	if (!dev)
@@ -700,6 +696,10 @@ int rsa_burn_key_hash(struct image_sign_info *info)
 		ret = -EINVAL;
 		goto error;
 	}
+
+	/* Delay 3 seconds to make sure power supply is steady. */
+	printf("Waiting for power supply steady for OTP write. Please don't turn off the device\n");
+	mdelay(3000);
 
 	/* Burn key hash here */
 	ret = misc_otp_read(dev, OTP_RSA_HASH_ADDR, digest_read, OTP_RSA_HASH_SIZE);

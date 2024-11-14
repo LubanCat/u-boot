@@ -83,6 +83,7 @@ enum {
 };
 
 #define msleep(a)		udelay((a) * 1000)
+#define MAX_LINKUP_RETRIES		2
 
 /* Parameters for the waiting for iATU enabled routine */
 #define PCIE_CLIENT_GENERAL_DEBUG	0x104
@@ -657,12 +658,15 @@ static int rk_pcie_link_up(struct rk_pcie *priv, u32 cap_speed, u32 cap_lanes)
 
 	dev_err(priv->dev, "PCIe-%d Link Fail\n", priv->dev->seq);
 	rk_pcie_disable_ltssm(priv);
+	if (dm_gpio_is_valid(&priv->rst_gpio))
+		dm_gpio_set_value(&priv->rst_gpio, 0);
+
 	return -EINVAL;
 }
 
 static int rockchip_pcie_init_port(struct udevice *dev)
 {
-	int ret;
+	int ret, retries;
 	u32 val;
 	struct rk_pcie *priv = dev_get_priv(dev);
 	union phy_configure_opts phy_cfg;
@@ -721,8 +725,18 @@ static int rockchip_pcie_init_port(struct udevice *dev)
 	rk_pcie_writel_apb(priv, 0x0, 0xf00040);
 	rk_pcie_setup_host(priv);
 
-	ret = rk_pcie_link_up(priv, priv->gen, priv->lanes);
-	if (ret < 0)
+	for (retries = MAX_LINKUP_RETRIES; retries > 0; retries--) {
+		ret = rk_pcie_link_up(priv, priv->gen, priv->lanes);
+		if (ret >= 0)
+			return 0;
+		if(priv->vpcie3v3) {
+			regulator_set_enable(priv->vpcie3v3, false);
+			msleep(200);
+			regulator_set_enable(priv->vpcie3v3, true);
+		}
+	}
+
+	if (retries <= 0)
 		goto err_link_up;
 
 	return 0;

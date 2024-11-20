@@ -45,6 +45,7 @@
 
 /* MMC/SD IP block */
 #define CONFIG_BOUNCE_BUFFER
+#define CONFIG_PRAM			6144
 
 #ifndef CONFIG_SPL_BUILD
 /* usb mass storage */

@@ -588,6 +588,9 @@ static int spl_load_kernel_fit(struct spl_image_info *spl_image,
 #if CONFIG_IS_ENABLED(ATF)
 			spl_image->entry_point_bl33 = image_info.load_addr;
 #endif
+		} else if (!strcmp(images[i], FIT_RAMDISK_PROP)) {
+			fdt_initrd(spl_image->fdt_addr, image_info.load_addr,
+				   image_info.load_addr + image_info.size);
 		}
 	}
 

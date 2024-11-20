@@ -8,6 +8,7 @@
 #define __DRM_ANALOGIX_DP_H__
 
 #include <generic-phy.h>
+#include <power-domain.h>
 #include <regmap.h>
 #include <reset.h>
 
@@ -649,6 +650,10 @@ struct analogix_dp_device {
 	void *reg_base;
 	struct regmap *grf;
 	struct phy phy;
+#if defined(CONFIG_MOS_SUPPORT) && !defined(CONFIG_SPL_BUILD)
+	struct power_domain pwrdom;
+	struct clk_bulk clks;
+#endif
 	struct reset_ctl_bulk resets;
 	struct gpio_desc hpd_gpio;
 	bool force_hpd;

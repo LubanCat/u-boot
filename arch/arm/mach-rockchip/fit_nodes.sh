@@ -249,8 +249,8 @@ function gen_mcu_node()
 		# When allow to be compressed?
 		# DRAM base < load addr < Periph register base
 		# Periph register base < DRAM base < load addr
-		if [ "${COMPRESSION}" != "none" -a ${MCU_ADDR_VAL} -gt ${DRAM_BASE_VAL} ] &&
-		   [ ${DRAM_BASE_VAL} -gt ${MAX_ADDR_VAL} -o ${MCU_ADDR_VAL} -lt ${MAX_ADDR_VAL} ]; then
+		if [ "${COMPRESSION}" != "none" -a "$((MCU_ADDR_VAL))" -gt "$((DRAM_BASE_VAL))" ] &&
+		   [ "$((DRAM_BASE_VAL))" -gt "$((MAX_ADDR_VAL))" -o "$((MCU_ADDR_VAL))" -lt "$((MAX_ADDR_VAL))" ]; then
 				openssl dgst -sha256 -binary -out ${MCU}.bin.digest ${MCU}.bin
 				${COMPRESS_CMD} ${MCU}.bin
 				echo "			data = /incbin/(\"./${MCU}.bin${SUFFIX}\");
@@ -330,8 +330,8 @@ function gen_loadable_node()
 		# When allow to be compressed?
 		# DRAM base < load addr < Periph register base
 		# Periph register base < DRAM base < load addr
-		if [ "${COMPRESSION}" != "none" -a ${LOAD_ADDR_VAL} -gt ${DRAM_BASE_VAL} ] &&
-		   [ ${DRAM_BASE_VAL} -gt ${MAX_ADDR_VAL} -o ${LOAD_ADDR_VAL} -lt ${MAX_ADDR_VAL} ]; then
+		if [ "${COMPRESSION}" != "none" -a "$((MCU_ADDR_VAL))" -gt "$((DRAM_BASE_VAL))" ] &&
+		   [ "$((DRAM_BASE_VAL))" -gt "$((MAX_ADDR_VAL))" -o "$((MCU_ADDR_VAL))" -lt "$((MAX_ADDR_VAL))" ]; then
 				openssl dgst -sha256 -binary -out ${LOAD}.bin.digest ${LOAD}.bin
 				${COMPRESS_CMD} ${LOAD}.bin
 				echo "			data = /incbin/(\"./${LOAD}.bin${SUFFIX}\");

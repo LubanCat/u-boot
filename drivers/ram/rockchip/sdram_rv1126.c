@@ -2517,7 +2517,7 @@ int sdram_init_(struct dram_info *dram, struct rv1126_sdram_params *sdram_params
 	void __iomem *phy_base = dram->phy;
 	u32 ddr4_vref;
 	u32 mr_tmp, tmp;
-	int delay = 1000;
+	int delay = 3000;
 
 	rkclk_configure_ddr(dram, sdram_params);
 

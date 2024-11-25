@@ -1312,27 +1312,32 @@ static int update_refresh_reg(struct dram_info *dram)
  * rank = 1: cs0
  * rank = 2: cs1
  */
-u32 read_mr(struct dram_info *dram, u32 rank, u32 mr_num, u32 dramtype)
+u32 read_mr(struct dram_info *dram, u32 rank, u32 byte, u32 mr_num, u32 dramtype)
 {
 	u32 ret;
 	u32 i, temp;
 	void __iomem *pctl_base = dram->pctl;
-	struct sdram_head_info_index_v2 *index =
-		(struct sdram_head_info_index_v2 *)common_info;
+	struct sdram_head_info_index_v2 *index;
 	struct dq_map_info *map_info;
-
-	map_info = (struct dq_map_info *)((void *)common_info +
-		index->dq_map_index.offset * 4);
 
 	pctl_read_mr(pctl_base, rank, mr_num);
 
-	if (dramtype == LPDDR3) {
-		temp = (readl(&dram->ddrgrf->ddr_grf_status[0]) & 0xff);
-		ret = 0;
-		for (i = 0; i < 8; i++)
-			ret |= ((temp >> i) & 0x1) << ((map_info->lp3_dq0_7_map >> (i * 4)) & 0xf);
+	if (dramtype != LPDDR4 && dramtype != LPDDR4X) {
+		temp = (readl(&dram->ddrgrf->ddr_grf_status[0]) >> (byte * 8)) & 0xff;
+
+		if (byte == 0) {
+			index = (struct sdram_head_info_index_v2 *)common_info;
+			map_info = (struct dq_map_info *)((void *)common_info +
+							  index->dq_map_index.offset * 4);
+			ret = 0;
+			for (i = 0; i < 8; i++)
+				ret |= ((temp >> i) & 0x1) <<
+				       ((map_info->lp3_dq0_7_map >> (i * 4)) & 0xf);
+		} else {
+			ret = temp;
+		}
 	} else {
-		ret = readl(&dram->ddrgrf->ddr_grf_status[1]) & 0xff;
+		ret = (readl(&dram->ddrgrf->ddr_grf_status[1]) >> (byte * 8)) & 0xff;
 	}
 
 	return ret;
@@ -2619,7 +2624,7 @@ int sdram_init_(struct dram_info *dram, struct rv1126_sdram_params *sdram_params
 	}
 
 	if (sdram_params->base.dramtype == LPDDR4) {
-		mr_tmp = read_mr(dram, 1, 14, LPDDR4);
+		mr_tmp = read_mr(dram, 1, 0, 14, LPDDR4);
 
 		if (mr_tmp != 0x4d)
 			return -1;
@@ -2706,7 +2711,7 @@ static u64 dram_detect_cap(struct dram_info *dram,
 	} else {
 		cap_info->col = 10;
 		cap_info->bk = 3;
-		mr8 = read_mr(dram, 1, 8, dram_type);
+		mr8 = read_mr(dram, 1, 0, 8, dram_type);
 		cap_info->dbw = ((mr8 >> 6) & 0x3) == 0 ? 1 : 0;
 		mr8 = (mr8 >> 2) & 0xf;
 		if (mr8 >= 0 && mr8 <= 6) {

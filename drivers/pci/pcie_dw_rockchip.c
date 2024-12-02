@@ -745,11 +745,13 @@ err_link_up:
 err_deassert_bulk:
 	reset_assert_bulk(&priv->rsts);
 err_power_off_phy:
-	generic_phy_power_off(&priv->phy);
+	if (!priv->is_bifurcation)
+		generic_phy_power_off(&priv->phy);
 err_exit_phy:
-	generic_phy_exit(&priv->phy);
+	if (!priv->is_bifurcation)
+		generic_phy_exit(&priv->phy);
 err_disable_3v3:
-	if(priv->vpcie3v3)
+	if(priv->vpcie3v3 && !priv->is_bifurcation)
 		regulator_set_enable(priv->vpcie3v3, false);
 	return ret;
 }

@@ -2264,6 +2264,11 @@ static int split_setup(struct dram_info *dram,
 
 	cs_cap[0] = sdram_get_cs_cap(cap_info, 0, dramtype);
 	cs_cap[1] = sdram_get_cs_cap(cap_info, 1, dramtype);
+
+	/* The ddr split only support 1 rank and less than 4GB capacity. */
+	if ((cs_cap[1]) || (cs_cap[0] >= 0x100000000ULL))
+		goto out;
+
 	/* only support the larger cap is in low 16bit */
 	if (cap_info->cs0_high16bit_row < cap_info->cs0_row) {
 		cap = cs_cap[0] / (1 << (cap_info->cs0_row -

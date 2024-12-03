@@ -2515,7 +2515,7 @@ static int check_lp4_rzqi(struct dram_info *dram, struct rv1126_sdram_params *sd
 	return ret;
 }
 
-static int modify_ddr34_bw_byte_map(u8 rg_result, struct rv1126_sdram_params *sdram_params)
+int modify_ddr34_bw_byte_map(u8 rg_result, struct rv1126_sdram_params *sdram_params)
 {
 	struct sdram_head_info_index_v2 *index = (struct sdram_head_info_index_v2 *)common_info;
 	struct dq_map_info *map_info = (struct dq_map_info *)

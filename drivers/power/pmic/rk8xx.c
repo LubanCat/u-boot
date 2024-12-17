@@ -905,6 +905,13 @@ static int rk8xx_probe(struct udevice *dev)
 				return ret;
 		}
 
+		if ((priv->rst_fun > RK8xx_RST_MODE0) &&
+		    (priv->rst_fun <= RK8xx_RST_MODE2)) {
+			rk8xx_read(dev, RK817_PMIC_SYS_CFG3, &value, 1);
+			value &=  RK8xx_RESET_FUN_CLR;
+			value |= (priv->rst_fun << 6);
+			rk8xx_write(dev, RK817_PMIC_SYS_CFG3, &value, 1);
+		}
 		/* judge whether save the PMIC_POWER_EN register */
 		if (!priv->not_save_power_en) {
 			ret = rk8xx_read(dev, RK817_POWER_EN0, &power_en0, 1);

@@ -199,6 +199,12 @@ enum {
 	RK817_POWER_EN2,
 	RK817_POWER_EN3,
 };
+
+#define RK8xx_RST_MODE0		0x00
+#define RK8xx_RST_MODE1		0x01
+#define RK8xx_RST_MODE2		0x02
+#define RK8xx_RESET_FUN_CLR	0x3f
+
 #define RK817_POWER_EN_SAVE0	0x99
 #define RK817_POWER_EN_SAVE1	0xa4
 

@@ -17,6 +17,9 @@ SIG_BIN="data2sign.bin"
 SIG_UBOOT="${FIT_DIR}/uboot.data2sign"
 SIG_BOOT="${FIT_DIR}/boot.data2sign"
 SIG_RECOVERY="${FIT_DIR}/recovery.data2sign"
+SIG_CFG_DIR="${FIT_DIR}/fit_signcfg"
+SIG_CONFIG="${SIG_CFG_DIR}/sign.readonly_config"
+MINIALL_INI="${SIG_CFG_DIR}/MINIALL.ini"
 # offs
 OFFS_DATA="0x1200"
 # placeholder address
@@ -240,7 +243,7 @@ function fit_raw_compile()
 	if [ "${ARG_SIGN}" == "y" ]; then
 		./make.sh --raw-compile
 	fi
-	rm ${FIT_DIR} -rf && mkdir -p ${FIT_DIR}
+	rm ${FIT_DIR} -rf && mkdir -p ${FIT_DIR} && mkdir -p ${SIG_CFG_DIR}
 }
 
 function fit_gen_uboot_itb()
@@ -722,5 +725,47 @@ function fit_msg_u_boot_loader()
 		echo "Image(signed): ${LOADER} (with u-boot, ddr...) is ready"
 	else
 		echo "Image(no-signed): ${LOADER} (with u-boot, ddr...) is ready"
+	fi
+}
+
+function fit_signcfg_export()
+{
+	if [ "${ARG_NO_SIGN}" == "y" ]; then
+		if ls *loader*.bin >/dev/null 2>&1 ; then
+			LOADER=`ls *loader*.bin`
+		elif ls *download*.bin >/dev/null 2>&1 ; then
+			LOADER=`ls *download*.bin`
+		else
+			echo "ERROR: No loader found"
+			exit 1
+		fi
+		cp ${ARG_INI_LOADER} ${MINIALL_INI}
+		cp .config ${SIG_CONFIG}
+
+		mkdir -p ${SIG_CFG_DIR}/test_images/
+		cp uboot.img ${SIG_CFG_DIR}/test_images/
+		cp ${LOADER} ${SIG_CFG_DIR}/test_images/
+		tar zcvf ${SIG_CFG_DIR}/test_images.tar.gz ${SIG_CFG_DIR}/test_images >/dev/null 2>&1
+		rm -rf ${SIG_CFG_DIR}/test_images/
+
+		FDT_ADDR_R=`strings env/built-in.o | grep 'fdt_addr_r=' | awk -F "=" '{ print $2 }'`
+		KERNEL_ADDR_R=`strings env/built-in.o | grep 'kernel_addr_r=' | awk -F "=" '{ print $2 }'`
+		RMADISK_ADDR_R=`strings env/built-in.o | grep 'ramdisk_addr_r=' | awk -F "=" '{ print $2 }'`
+		echo "fdt_addr_r=${FDT_ADDR_R}" >> ${SIG_CONFIG}
+		echo "kernel_addr_r=${KERNEL_ADDR_R}" >> ${SIG_CONFIG}
+		echo "ramdisk_addr_r=${RMADISK_ADDR_R}" >> ${SIG_CONFIG}
+
+		CSUM=`sha256sum u-boot-nodtb.bin  | awk '{ print $1 }'`
+		echo "uboot_sha256sum=${CSUM}" >> ${SIG_CONFIG}
+		CSUM=`sha256sum spl/u-boot-spl-nodtb.bin  | awk '{ print $1 }'`
+		echo "spl_sha256sum=${CSUM}" >> ${SIG_CONFIG}
+		SIZE=`ls -l  spl/u-boot-spl-nodtb.bin | awk '{ print $5 }'`
+		echo "spl_size=${SIZE}" >> ${SIG_CONFIG}
+
+		BUILD_MAIL=`git config --get user.email`
+		BUILD_HOST=`hostname`
+		BUILD_USER=${USER}
+		BUILD_DATE=`date`
+		echo "BUILD: ${BUILD_MAIL} # ${BUILD_USER}@${BUILD_HOST} # ${BUILD_DATE}" >> ${SIG_CONFIG}
 	fi
 }

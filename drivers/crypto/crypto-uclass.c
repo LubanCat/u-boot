@@ -69,6 +69,14 @@ u32 crypto_algo_nbits(u32 algo)
 		return 3072;
 	case CRYPTO_RSA4096:
 		return 4096;
+	case CRYPTO_SM2:
+		return 256;
+	case CRYPTO_ECC_192R1:
+		return 192;
+	case CRYPTO_ECC_224R1:
+		return 224;
+	case CRYPTO_ECC_256R1:
+		return 256;
 	}
 
 	printf("Unknown crypto algorithm: 0x%x\n", algo);
@@ -262,6 +270,19 @@ int crypto_rsa_verify(struct udevice *dev, rsa_key *ctx, u8 *sign, u8 *output)
 		return -EINVAL;
 
 	return ops->rsa_verify(dev, ctx, sign, output);
+}
+
+int crypto_ec_verify(struct udevice *dev, ec_key *ctx, u8 *hash, u32 hash_len, u8 *sign)
+{
+	const struct dm_crypto_ops *ops = device_get_ops(dev);
+
+	if (!ops || !ops->ec_verify)
+		return -ENOSYS;
+
+	if (!ctx || !ctx->x || !ctx->y || !ctx->y || !hash || hash_len == 0 || !sign)
+		return -EINVAL;
+
+	return ops->ec_verify(dev, ctx, hash, hash_len, sign);
 }
 
 int crypto_cipher(struct udevice *dev, cipher_context *ctx,

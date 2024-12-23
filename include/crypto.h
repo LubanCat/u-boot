@@ -23,6 +23,10 @@
 #define CRYPTO_RSA2048		BIT(12)
 #define CRYPTO_RSA3072		BIT(13)
 #define CRYPTO_RSA4096		BIT(14)
+#define CRYPTO_SM2		BIT(15)
+#define CRYPTO_ECC_192R1	BIT(16)
+#define CRYPTO_ECC_224R1	BIT(17)
+#define CRYPTO_ECC_256R1	BIT(18)
 
 #define CRYPTO_DES		BIT(20)
 #define CRYPTO_AES		BIT(21)
@@ -37,6 +41,7 @@
 #define BYTE2WORD(bytes)	((bytes) / 4)
 #define BITS2BYTE(nbits)	((nbits) / 8)
 #define BITS2WORD(nbits)	((nbits) / 32)
+#define WORD2BYTE(words)	((words) * 4)
 
 enum RK_CRYPTO_MODE {
 	RK_MODE_ECB = 0,
@@ -67,6 +72,13 @@ typedef struct {
 } rsa_key;
 
 typedef struct {
+	u32 algo;	/* Algorithm: CRYPTO_SM2/CRYPTO_ECC_192R1/CRYPTO_ECC_224R1... */
+	u32 *x;		/* public key x */
+	u32 *y;		/* public key y */
+	u32 *d;		/* private key */
+} ec_key;
+
+typedef struct {
 	u32		algo;
 	u32		mode;
 	const u8	*key;
@@ -88,6 +100,11 @@ struct dm_crypto_ops {
 	/* RSA verify */
 	int (*rsa_verify)(struct udevice *dev, rsa_key *ctx,
 			  u8 *sign, u8 *output);
+
+	/* EC verify */
+	int (*ec_verify)(struct udevice *dev, ec_key *ctx,
+			 u8 *hash, u32 hash_len, u8 *sign);
+
 	/* HMAC init/update/final */
 	int (*hmac_init)(struct udevice *dev, sha_context *ctx,
 			 u8 *key, u32 key_len);
@@ -197,6 +214,19 @@ int crypto_sha_regions_csum(struct udevice *dev, sha_context *ctx,
  * @return 0 on success, otherwise failed
  */
 int crypto_rsa_verify(struct udevice *dev, rsa_key *ctx, u8 *sign, u8 *output);
+
+/**
+ * crypto_ec_verify() - Crypto ec verify
+ *
+ * @dev: crypto device
+ * @ctx: ec key context
+ * @hash: hash data buffer
+ * @hash_len: hash data length
+ * @sign: signature
+ *
+ * @return 0 on success, otherwise failed
+ */
+int crypto_ec_verify(struct udevice *dev, ec_key *ctx, u8 *hash, u32 hash_len, u8 *sign);
 
 /**
  * crypto_hmac_init() - Crypto hmac init

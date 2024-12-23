@@ -11,6 +11,7 @@
 #include <clk-uclass.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/clock.h>
+#include <rockchip/crypto_ecc.h>
 #include <rockchip/crypto_hash_cache.h>
 #include <rockchip/crypto_v2.h>
 #include <rockchip/crypto_v2_pka.h>
@@ -306,6 +307,13 @@ static u32 crypto_v3_dynamic_cap(void)
 		     CRYPTO_RSA2048 |
 		     CRYPTO_RSA3072 |
 		     CRYPTO_RSA4096;
+
+#if CONFIG_IS_ENABLED(ROCKCHIP_EC)
+	capability |= (CRYPTO_SM2 |
+		       CRYPTO_ECC_192R1 |
+		       CRYPTO_ECC_224R1 |
+		       CRYPTO_ECC_256R1);
+#endif
 
 	for (i = 0; i < ARRAY_SIZE(cap_tbl); i++) {
 		ver_reg = crypto_read(cap_tbl[i].ver_offset);
@@ -1446,6 +1454,55 @@ exit:
 }
 #endif
 
+#if CONFIG_IS_ENABLED(ROCKCHIP_EC)
+static int rockchip_crypto_ec_verify(struct udevice *dev, ec_key *ctx,
+				     u8 *hash, u32 hash_len, u8 *sign)
+{
+	struct mpa_num *bn_sign = NULL;
+	struct rk_ecp_point point_P, point_sign;
+	u32 n_bits, n_words;
+	int ret;
+
+	if (!ctx)
+		return -EINVAL;
+
+	if (ctx->algo != CRYPTO_SM2 &&
+	    ctx->algo != CRYPTO_ECC_192R1 &&
+	    ctx->algo != CRYPTO_ECC_224R1 &&
+	    ctx->algo != CRYPTO_ECC_256R1)
+		return -EINVAL;
+
+	n_bits = crypto_algo_nbits(ctx->algo);
+	n_words = BITS2WORD(n_bits);
+
+	ret = rk_mpa_alloc(&bn_sign, sign, n_words);
+	if (ret)
+		goto exit;
+
+	ret = rk_mpa_alloc(&point_P.x, ctx->x, n_words);
+	ret |= rk_mpa_alloc(&point_P.y, ctx->y, n_words);
+	if (ret)
+		goto exit;
+
+	ret = rk_mpa_alloc(&point_sign.x, sign, n_words);
+	ret |= rk_mpa_alloc(&point_sign.y, sign + WORD2BYTE(n_words), n_words);
+	if (ret)
+		goto exit;
+
+	rk_crypto_enable_clk(dev);
+	ret = rockchip_ecc_verify(ctx->algo, hash, hash_len, &point_P, &point_sign);
+	rk_crypto_disable_clk(dev);
+exit:
+	rk_mpa_free(&bn_sign);
+	rk_mpa_free(&point_P.x);
+	rk_mpa_free(&point_P.y);
+	rk_mpa_free(&point_sign.x);
+	rk_mpa_free(&point_sign.y);
+
+	return ret;
+}
+#endif
+
 static const struct dm_crypto_ops rockchip_crypto_ops = {
 	.capability   = rockchip_crypto_capability,
 	.sha_init     = rockchip_crypto_sha_init,
@@ -1453,6 +1510,9 @@ static const struct dm_crypto_ops rockchip_crypto_ops = {
 	.sha_final    = rockchip_crypto_sha_final,
 #if CONFIG_IS_ENABLED(ROCKCHIP_RSA)
 	.rsa_verify   = rockchip_crypto_rsa_verify,
+#endif
+#if CONFIG_IS_ENABLED(ROCKCHIP_EC)
+	.ec_verify    = rockchip_crypto_ec_verify,
 #endif
 #if CONFIG_IS_ENABLED(ROCKCHIP_HMAC)
 	.hmac_init    = rockchip_crypto_hmac_init,

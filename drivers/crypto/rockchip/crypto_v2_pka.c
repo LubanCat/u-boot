@@ -15,14 +15,12 @@
 
 void rk_pka_ram_ctrl_enable(void)
 {
-	crypto_write((CRYPTO_RAM_PKA_RDY << CRYPTO_WRITE_MASK_SHIFT) |
-		     CRYPTO_RAM_PKA_RDY, CRYPTO_RAM_CTL);
+	crypto_write(CRYPTO_RAM_CTL_SEL_MASK | CRYPTO_RAM_CTL_PKA, CRYPTO_RAM_CTL);
 }
 
 void rk_pka_ram_ctrl_disable(void)
 {
-	crypto_write((CRYPTO_RAM_PKA_RDY << CRYPTO_WRITE_MASK_SHIFT),
-		     CRYPTO_RAM_CTL);
+	crypto_write(CRYPTO_RAM_CTL_SEL_MASK | CRYPTO_RAM_CTL_CPU, CRYPTO_RAM_CTL);
 }
 
 void rk_pka_wait_on_ram_ready(void)
@@ -493,6 +491,7 @@ u32 rk_pka_init(u32 regs_sizes_ptr[RK_PKA_MAX_REGS_COUNT], u32 count_of_sizes,
 void rk_pka_finish(void)
 {
 	RK_PKA_Terminate(0);
+	rk_pka_ram_ctrl_disable();
 	PKA_CLK_DISABLE();
 }
 

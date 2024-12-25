@@ -63,6 +63,7 @@ function help()
 	echo "    --ini-loader               <loader ini file>"
 	echo "    --ini-trust                <trust ini file>"
 	echo "    --no-check"
+	echo "    --no-sign"
 	echo "    --spl-new"
 	echo
 }
@@ -124,7 +125,7 @@ function check_rsa_keys()
 function validate_arg()
 {
 	case $1 in
-		--no-check|--spl-new|--burn-key-hash)
+		--no-check|--no-sign|--spl-new|--burn-key-hash)
 			shift=1
 			;;
 		--ini-trust|--ini-loader|--rollback-index-boot|--rollback-index-recovery|--rollback-index-uboot|--boot_img|--recovery_img|--version-uboot|--version-boot|--version-recovery|--chip)
@@ -142,6 +143,10 @@ function fit_process_args()
 	if [ $# -eq 0 ]; then
 		help
 		exit 0
+	fi
+
+	if grep -q '^CONFIG_FIT_SIGNATURE=y' .config ; then
+		ARG_SIGN="y"
 	fi
 
 	while [ $# -gt 0 ]; do
@@ -168,6 +173,11 @@ function fit_process_args()
 				;;
 			--no-check)     # No hostcc fit signature check
 				ARG_NO_CHECK="y"
+				shift 1
+				;;
+			--no-sign)
+				ARG_NO_SIGN="y"
+				ARG_SIGN="n"
 				shift 1
 				;;
 			--ini-trust)    # Assign trust ini file
@@ -222,10 +232,6 @@ function fit_process_args()
 				;;
 		esac
 	done
-
-	if grep -q '^CONFIG_FIT_SIGNATURE=y' .config ; then
-		ARG_SIGN="y"
-	fi
 }
 
 function fit_raw_compile()
@@ -391,7 +397,7 @@ function fit_gen_boot_itb()
 
 		check_rsa_algo ${ITS_BOOT}
 
-		if ! grep -q '^CONFIG_FIT_SIGNATURE=y' .config ; then
+		if [ "${ARG_SIGN}" != "y" ]; then
 			echo "ERROR: CONFIG_FIT_SIGNATURE is disabled"
 			exit 1
 		fi
@@ -478,7 +484,7 @@ function fit_gen_recovery_itb()
 
 		check_rsa_algo ${ITS_RECOVERY}
 
-		if ! grep -q '^CONFIG_FIT_SIGNATURE=y' .config ; then
+		if [ "${ARG_SIGN}" != "y" ]; then
 			echo "ERROR: CONFIG_FIT_SIGNATURE is disabled"
 			exit 1
 		fi
@@ -602,7 +608,7 @@ function fit_gen_recovery_img()
 
 function fit_gen_loader()
 {
-	if grep -Eq '^CONFIG_FIT_SIGNATURE=y' .config ; then
+	if [ "${ARG_SIGN}" == "y" ]; then
 		${RK_SIGN_TOOL} cc --chip ${ARG_CHIP: 2: 6}
 		${RK_SIGN_TOOL} lk --key ${RSA_PRI_KEY} --pubkey ${RSA_PUB_KEY}
 		if ls *loader*.bin >/dev/null 2>&1 ; then
@@ -695,7 +701,7 @@ function fit_msg_loader()
 		LOADER=`ls *idblock*.img`
 	fi
 
-	if grep -q '^CONFIG_FIT_SIGNATURE=y' .config ; then
+	if [ "${ARG_SIGN}" == "y" ]; then
 		echo "Image(signed): ${LOADER} (with spl, ddr...) is ready"
 	else
 		echo "Image(no-signed): ${LOADER} (with spl, ddr...) is ready"
@@ -712,7 +718,7 @@ function fit_msg_u_boot_loader()
 		LOADER=`ls *idblock*.img`
 	fi
 
-	if grep -q '^CONFIG_FIT_SIGNATURE=y' .config ; then
+	if [ "${ARG_SIGN}" == "y" ]; then
 		echo "Image(signed): ${LOADER} (with u-boot, ddr...) is ready"
 	else
 		echo "Image(no-signed): ${LOADER} (with u-boot, ddr...) is ready"

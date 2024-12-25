@@ -102,6 +102,13 @@ DECLARE_GLOBAL_DATA_PTR;
 #define MMU600PHP_TCU_PRIORITY_REG	0xfdf3a808
 #define QOS_PRIORITY_LEVEL(h, l)	((((h) & 7) << 8) | ((l) & 7))
 
+#define SATA0_BASE_ADDR			0xfe210000
+#define SATA1_BASE_ADDR			0xfe220000
+#define SATA2_BASE_ADDR			0xfe230000
+#define SATA_PI				0xC
+#define SATA_PORT_CMD			0x118
+#define SATA_FBS_ENABLE			BIT(22)
+
 #ifdef CONFIG_ARM64
 #include <asm/armv8/mmu.h>
 
@@ -1067,6 +1074,16 @@ int arch_cpu_init(void)
 	 */
 	writel(QOS_PRIORITY_LEVEL(4, 4), MMU600PHP_TBU_PRIORITY_REG);
 	writel(QOS_PRIORITY_LEVEL(4, 4), MMU600PHP_TCU_PRIORITY_REG);
+
+	/*
+	 * Set SATA FBSCP and PORTS_IMPL for kernel drivers
+	 */
+	writel(SATA_FBS_ENABLE, SATA0_BASE_ADDR + SATA_PORT_CMD);
+	writel(1, SATA0_BASE_ADDR + SATA_PI);
+	writel(SATA_FBS_ENABLE, SATA1_BASE_ADDR + SATA_PORT_CMD);
+	writel(1, SATA1_BASE_ADDR + SATA_PI);
+	writel(SATA_FBS_ENABLE, SATA2_BASE_ADDR + SATA_PORT_CMD);
+	writel(1, SATA2_BASE_ADDR + SATA_PI);
 #endif
 
 	/* Select usb otg0 phy status to 0 that make rockusb can work at high-speed */

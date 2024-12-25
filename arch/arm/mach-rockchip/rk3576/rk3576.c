@@ -94,6 +94,12 @@ DECLARE_GLOBAL_DATA_PTR;
 #define PMU1_CRU_GATE_CON03	0x080C
 #define PMU1_CRU_SOFTRST_CON03	0x0a0C
 
+#define SATA0_BASE_ADDR			0x2a240000
+#define SATA1_BASE_ADDR			0x2a250000
+#define SATA_PI				0xC
+#define SATA_PORT_CMD			0x118
+#define SATA_FBS_ENABLE			BIT(22)
+
 #ifdef CONFIG_ARM64
 #include <asm/armv8/mmu.h>
 
@@ -400,6 +406,14 @@ int arch_cpu_init(void)
 	 * Module: GMAC0/1, MMU0/1(PCIe, SATA, USB3)
 	 */
 	writel(0xffffff00, SYS_SGRF_BASE + SYS_SGRF_SOC_CON20);
+#else
+	/*
+	 * Set SATA FBSCP and PORTS_IMPL for kernel drivers
+	 */
+	writel(SATA_FBS_ENABLE, SATA0_BASE_ADDR + SATA_PORT_CMD);
+	writel(1, SATA0_BASE_ADDR + SATA_PI);
+	writel(SATA_FBS_ENABLE, SATA1_BASE_ADDR + SATA_PORT_CMD);
+	writel(1, SATA1_BASE_ADDR + SATA_PI);
 #endif
 
 #if defined(CONFIG_ROCKCHIP_EMMC_IOMUX)

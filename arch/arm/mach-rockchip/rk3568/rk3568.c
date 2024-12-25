@@ -61,6 +61,13 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define EBC_PRIORITY_REG	(0xfe158008)
 
+#define SATA0_BASE_ADDR			0xfc000000
+#define SATA1_BASE_ADDR			0xfc400000
+#define SATA2_BASE_ADDR			0xfc800000
+#define SATA_PI				0xC
+#define SATA_PORT_CMD			0x118
+#define SATA_FBS_ENABLE			BIT(22)
+
 enum {
 	/* PMU_GRF_GPIO0C_IOMUX_L */
 	GPIO0C1_SHIFT		= 4,
@@ -945,6 +952,15 @@ int arch_cpu_init(void)
 	writel((0x77771111), GRF_BASE + GRF_GPIO1C_IOMUX_L);
 	writel((0x07770111), GRF_BASE + GRF_GPIO1C_IOMUX_H);
 #endif
+	/*
+	 * Set SATA FBSCP and PORTS_IMPL for kernel drivers
+	 */
+	writel(SATA_FBS_ENABLE, SATA0_BASE_ADDR + SATA_PORT_CMD);
+	writel(1, SATA0_BASE_ADDR + SATA_PI);
+	writel(SATA_FBS_ENABLE, SATA1_BASE_ADDR + SATA_PORT_CMD);
+	writel(1, SATA1_BASE_ADDR + SATA_PI);
+	writel(SATA_FBS_ENABLE, SATA2_BASE_ADDR + SATA_PORT_CMD);
+	writel(1, SATA2_BASE_ADDR + SATA_PI);
 #endif
 
 	return 0;

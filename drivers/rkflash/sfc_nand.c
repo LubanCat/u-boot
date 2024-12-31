@@ -25,6 +25,7 @@ static u32 sfc_nand_get_ecc_status7(void);
 static u32 sfc_nand_get_ecc_status8(void);
 static u32 sfc_nand_get_ecc_status9(void);
 static u32 sfc_nand_get_ecc_status10(void);
+static u32 sfc_nand_get_ecc_status11(void);
 
 static struct nand_info spi_nand_tbl[] = {
 	/* TC58CVG0S0HxAIx */
@@ -273,6 +274,10 @@ static struct nand_info spi_nand_tbl[] = {
 	{ 0xB0, 0x0D, 0x00, 4, 0x40, 1, 512, 0x4C, 17, 0x4, 1, { 0x04, 0x08, 0xFF, 0xFF }, &sfc_nand_get_ecc_status0 },
 	/* UM19A9HISW */
 	{ 0xB0, 0x0C, 0x00, 4, 0x40, 1, 512, 0x4C, 17, 0x4, 1, { 0x04, 0x08, 0xFF, 0xFF }, &sfc_nand_get_ecc_status0 },
+	/* UM19A0HISW */
+	{ 0xB0, 0x14, 0x00, 4, 0x40, 1, 1024, 0x4C, 18, 0x8, 1, { 0x04, 0x08, 0xFF, 0xFF }, &sfc_nand_get_ecc_status11 },
+	/* UM19A0LISW */
+	{ 0xB0, 0x15, 0x00, 4, 0x40, 1, 1024, 0x4C, 18, 0x8, 1, { 0x04, 0x08, 0xFF, 0xFF }, &sfc_nand_get_ecc_status11 },
 
 	/* ATO25D1GA */
 	{ 0x9B, 0x12, 0x00, 4, 0x40, 1, 1024, 0x40, 18, 0x1, 1, { 0x14, 0x24, 0xFF, 0xFF }, &sfc_nand_get_ecc_status1 },
@@ -880,7 +885,7 @@ static u32 sfc_nand_get_ecc_status9(void)
 }
 
 /*
- * ecc spectial type8:
+ * ecc spectial type10:
  * ecc bits: 0xC0[4,6]
  * [0b000], No bit errors were detected;
  * [0b001, 0b101], 3~7 Bit errors were detected and corrected. Not
@@ -913,6 +918,47 @@ static u32 sfc_nand_get_ecc_status10(void)
 	if (ecc < 6)
 		ret = SFC_NAND_ECC_OK;
 	else if (ecc == 6)
+		ret = SFC_NAND_ECC_REFRESH;
+	else
+		ret = (u32)SFC_NAND_ECC_ERROR;
+
+	return ret;
+}
+
+/*
+ * ecc spectial type11:
+ * ecc bits: 0xC0[4,6]
+ * [0b000], No bit errors were detected;
+ * [0b001, 0b101], 3~7 Bit errors were detected and corrected. Not
+ *	reach Flipping Bits;
+ * [0b110], Bit error count equals the bit flip detection threshold
+ * [0b111], Bit errors greater than ECC capability(8 bits) and not corrected;
+ */
+static u32 sfc_nand_get_ecc_status11(void)
+{
+	u32 ret;
+	u32 i;
+	u8 ecc;
+	u8 status;
+	u32 timeout = 1000 * 1000;
+
+	for (i = 0; i < timeout; i++) {
+		ret = sfc_nand_read_feature(0xC0, &status);
+
+		if (ret != SFC_OK)
+			return SFC_NAND_ECC_ERROR;
+
+		if (!(status & (1 << 0)))
+			break;
+
+		sfc_delay(1);
+	}
+
+	ecc = (status >> 4) & 0x07;
+
+	if (ecc <= 1)
+		ret = SFC_NAND_ECC_OK;
+	else if (ecc == 3 || ecc == 5)
 		ret = SFC_NAND_ECC_REFRESH;
 	else
 		ret = (u32)SFC_NAND_ECC_ERROR;

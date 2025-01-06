@@ -305,6 +305,24 @@ struct nvme_dsm_range {
 	__le64			slba;
 };
 
+struct nvme_write_zeroes_cmd {
+        __u8                    opcode;
+	__u8                    flags;
+	__u16                   command_id;
+	__le32                  nsid;
+	__u64                   rsvd2;
+	__le64                  metadata;
+	__le64                  prp1;
+	__le64                  prp2;
+	__le64                  slba;
+	__le16                  length;
+	__le16                  control;
+	__le32                  dsmgmt;
+	__le32                  reftag;
+	__le16                  apptag;
+	__le16                  appmask;
+};
+
 /* Admin commands */
 
 enum nvme_admin_opcode {
@@ -464,6 +482,7 @@ struct nvme_command {
 		struct nvme_download_firmware dlfw;
 		struct nvme_format_cmd format;
 		struct nvme_dsm_cmd dsm;
+		struct nvme_write_zeroes_cmd write_zeroes;
 		struct nvme_abort_cmd abort;
 	};
 };

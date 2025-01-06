@@ -850,9 +850,29 @@ static ulong nvme_blk_erase(struct udevice *udev, lbaint_t blknr,
 	return blkcnt;
 }
 
+static ulong nvme_blk_write_zeroes(struct udevice *udev, lbaint_t blknr, lbaint_t blkcnt)
+{
+	struct nvme_ns *ns = dev_get_priv(udev);
+	struct nvme_dev *dev = ns->dev;
+	struct nvme_command cmnd;
+
+	memset(&cmnd, 0, sizeof(cmnd));
+
+	cmnd.write_zeroes.opcode = nvme_cmd_write_zeroes;
+	cmnd.write_zeroes.nsid = cpu_to_le32(ns->ns_id);
+	cmnd.write_zeroes.slba = cpu_to_le64(blknr);
+	cmnd.write_zeroes.length = cpu_to_le16(blkcnt - 1);
+	cmnd.write_zeroes.control = 0;
+	cmnd.write_zeroes.command_id = nvme_get_cmd_id();
+
+	nvme_submit_cmd(dev->queues[NVME_IO_Q], &cmnd);
+	return blkcnt;
+}
+
 static const struct blk_ops nvme_blk_ops = {
 	.read	= nvme_blk_read,
 	.write	= nvme_blk_write,
+	.write_zeroes = nvme_blk_write_zeroes,
 	.erase  = nvme_blk_erase,
 };
 

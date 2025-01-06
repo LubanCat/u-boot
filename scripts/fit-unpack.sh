@@ -115,14 +115,14 @@ function gen_its()
 	# data and digest value
 	for NAME in `fdtget -l ${ITB} /images`; do
 		COMPRESSION=`fdtget -ts ${ITB} /images/${NAME} compression`
-		if [ "${COMPRESSION}" == "gzip" ]; then
+		if [ "${COMPRESSION}" == "gzip" ] && fdtget -l "${TMP_ITB}" /images/${NAME}/digest >/dev/null 2>&1; then
 			fdtput -t s ${TMP_ITB} /images/${NAME} data "/INCBIN/(${NAME}.gz)"
 
 			mv ${OUT}/${NAME} ${OUT}/${NAME}.gz
 			gzip -dk ${OUT}/${NAME}.gz
 			openssl dgst -sha256 -binary -out ${OUT}/${NAME}.digest ${OUT}/${NAME}
 			fdtput -t s ${TMP_ITB} /images/${NAME}/digest digest "/INCBIN/(${NAME}.digest)"
-		elif [ "${COMPRESSION}" == "lzma" ]; then
+		elif [ "${COMPRESSION}" == "lzma" ] && fdtget -l "${TMP_ITB}" /images/${NAME}/digest >/dev/null 2>&1; then
 			fdtput -t s ${TMP_ITB} /images/${NAME} data "/INCBIN/(${NAME}.lzma)"
 
 			SIZE=`ls -l ${OUT}/${NAME} | awk '{ print $5 }'`

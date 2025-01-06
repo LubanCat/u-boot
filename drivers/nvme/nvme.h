@@ -624,6 +624,31 @@ enum {
 	NVME_CSTS_SHST_MASK	= 3 << 2,
 };
 
+#define NVME_QUIRK_DELAY_AMOUNT               2300
+
+/*
+ * List of workarounds for devices that required behavior not specified in
+ * the standard.
+ */
+enum nvme_quirks {
+	/*
+	 * The controller deterministically returns O's on reads to
+	 * logical blocks that deallocate was called on.
+	 */
+	NVME_QUIRK_DEALLOCATE_ZEROES            = (1 << 2),
+
+	/*
+	 * The controller needs a delay before starts checking the device
+	 * readiness, which is done by reading the NVME_CSTS_RDY bit.
+	 */
+	NVME_QUIRK_DELAY_BEFORE_CHK_RDY		= (1 << 3),
+
+	/*
+	 * Limit io queue depth to 32
+	 */
+	NVME_QUIRK_LIMIT_IOQD32			= (1 << 31),
+};
+
 /* Represents an NVM Express device. Each nvme_dev is a PCI function. */
 struct nvme_dev {
 	struct list_head node;
@@ -633,6 +658,7 @@ struct nvme_dev {
 	unsigned queue_count;
 	unsigned online_queues;
 	unsigned max_qid;
+	unsigned long quirks;
 	int q_depth;
 	u32 db_stride;
 	u32 ctrl_config;

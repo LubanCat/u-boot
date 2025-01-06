@@ -342,6 +342,18 @@ ulong blk_write_devnum(enum if_type if_type, int devnum, lbaint_t start,
 	return blk_dwrite(desc, start, blkcnt, buffer);
 }
 
+ulong blk_write_zeroes_devnum(enum if_type if_type, int devnum, lbaint_t start,
+			      lbaint_t blkcnt)
+{
+	struct blk_desc *desc;
+	int ret;
+
+	ret = get_desc(if_type, devnum, &desc);
+	if (ret)
+		return ret;
+	return blk_dwrite_zeroes(desc, start, blkcnt);
+}
+
 ulong blk_erase_devnum(enum if_type if_type, int devnum, lbaint_t start,
 		       lbaint_t blkcnt)
 {
@@ -478,6 +490,19 @@ unsigned long blk_dwrite(struct blk_desc *block_dev, lbaint_t start,
 
 	blkcache_invalidate(block_dev->if_type, block_dev->devnum);
 	return ops->write(dev, start, blkcnt, buffer);
+}
+
+unsigned long blk_dwrite_zeroes(struct blk_desc *block_dev, lbaint_t start,
+			       lbaint_t blkcnt)
+{
+	struct udevice *dev = block_dev->bdev;
+	const struct blk_ops *ops = blk_get_ops(dev);
+
+	if (!ops->write_zeroes)
+		return -ENOSYS;
+
+	blkcache_invalidate(block_dev->if_type, block_dev->devnum);
+	return ops->write_zeroes(dev, start, blkcnt);
 }
 
 unsigned long blk_derase(struct blk_desc *block_dev, lbaint_t start,

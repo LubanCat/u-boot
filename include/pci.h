@@ -419,6 +419,11 @@
 #define PCI_FIND_CAP_TTL 0x48
 #define CAP_START_POS 0x40
 
+/* AER register offsets (relative to the AER Capability base address) */
+#define PCI_AER_STATUS		0x08  /* AER Status Register */
+#define PCI_AER_MASK		0x0C  /* AER Mask Register */
+#define PCI_AER_SEVERITY	0x10  /* AER Severity Register */
+
 /* Extended Capabilities (PCI-X 2.0 and Express) */
 #define PCI_EXT_CAP_ID(header)		(header & 0x0000ffff)
 #define PCI_EXT_CAP_VER(header)		((header >> 16) & 0xf)
@@ -1192,6 +1197,15 @@ struct udevice *pci_get_controller(struct udevice *dev);
  */
 int pci_get_regions(struct udevice *dev, struct pci_region **iop,
 		    struct pci_region **memp, struct pci_region **prefp);
+
+/**
+ * pci_aer_dump() - dump AER (Advanced Error Reporting) information for a PCIe device
+ *
+ * @udev:	PCI device to dump AER information
+ * @dev:	PCI device and function address
+ * @return:	0 if successful, negative error code on failure
+ */
+int pci_aer_dump(struct udevice *udev, pci_dev_t dev);
 
 /**
  * dm_pci_write_bar32() - Write the address of a BAR

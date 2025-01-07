@@ -420,14 +420,23 @@
 #define CAP_START_POS 0x40
 
 /* AER register offsets (relative to the AER Capability base address) */
-#define PCI_AER_STATUS		0x08  /* AER Status Register */
-#define PCI_AER_MASK		0x0C  /* AER Mask Register */
-#define PCI_AER_SEVERITY	0x10  /* AER Severity Register */
+#define PCI_AER_STATUS		0x08	/* AER Status Register */
+#define PCI_AER_MASK		0x0C	/* AER Mask Register */
+#define PCI_AER_SEVERITY	0x10	/* AER Severity Register */
 
 /* Extended Capabilities (PCI-X 2.0 and Express) */
 #define PCI_EXT_CAP_ID(header)		(header & 0x0000ffff)
 #define PCI_EXT_CAP_VER(header)		((header >> 16) & 0xf)
 #define PCI_EXT_CAP_NEXT(header)	((header >> 20) & 0xffc)
+
+/* PCIe Capability Registers */
+#define PCI_EXP_LNKCTL          0x10	/* Link Control Register */
+#define PCI_EXP_LNKSTA          0x12	/* Link Status Register */
+
+/* Link Status Register bits */
+#define PCI_EXP_LNKSTA_LT	0x0800	/* Link Training */
+#define PCI_EXP_LNKSTA_CLS      0x000f	/* Current Link Speed */
+#define PCI_EXP_LNKSTA_NLW      0x03f0	/* Negotiated Link Width */
 
 #define PCI_EXT_CAP_ID_ERR	0x01	/* Advanced Error Reporting */
 #define PCI_EXT_CAP_ID_VC	0x02	/* Virtual Channel Capability */
@@ -1206,6 +1215,15 @@ int pci_get_regions(struct udevice *dev, struct pci_region **iop,
  * @return:	0 if successful, negative error code on failure
  */
 int pci_aer_dump(struct udevice *udev, pci_dev_t dev);
+
+/**
+ * pci_retrain_link - Trigger PCIe link retrain for a device
+ * @udev: PCI device to retrain link
+ * @dev: PCI device and function address
+ *
+ * Return: 0 on success, negative error code on failure.
+ */
+int pci_retrain_link(struct udevice *udev, pci_dev_t dev);
 
 /**
  * dm_pci_write_bar32() - Write the address of a BAR

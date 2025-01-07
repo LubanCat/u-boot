@@ -237,6 +237,65 @@ int dm_pci_find_class(uint find_class, int index, struct udevice **devp)
 	return -ENODEV;
 }
 
+/**
+ * pci_retrain_link - Trigger PCIe link retrain for a device
+ * @udev: PCI device to retrain link
+ * @dev:  PCI device and function address
+ *
+ * Return: 0 on success, negative error code on failure.
+ */
+int pci_retrain_link(struct udevice *udev, pci_dev_t dev)
+{
+	u16 link_control, link_status;
+	int pcie_cap_ptr;
+	int timeout = 100; /* Timeout in milliseconds */
+
+	/* Find the PCIe Capability */
+	pcie_cap_ptr = dm_pci_find_capability(udev, PCI_CAP_ID_EXP);
+	if (!pcie_cap_ptr) {
+		printf("PCIe Capability not found for device %04x:%04x\n",
+			PCI_BUS(dev), PCI_DEV(dev));
+		return -ENODEV;
+	}
+
+	/* Read the Link Control Register */
+	dm_pci_read_config16(udev, pcie_cap_ptr + PCI_EXP_LNKCTL, &link_control);
+
+	/* Set the Retrain Link bit (bit 5) */
+	link_control |= (1 << 5);
+
+	/* Write the updated value back to the Link Control Register */
+	dm_pci_write_config16(udev, pcie_cap_ptr + PCI_EXP_LNKCTL, link_control);
+
+	printf("Retrain triggered for device %04x:%04x\n", PCI_BUS(dev), PCI_DEV(dev));
+
+	/* Wait for the link to complete training */
+	while (timeout--) {
+		/* Read the Link Status Register */
+		dm_pci_read_config16(udev, pcie_cap_ptr + PCI_EXP_LNKSTA, &link_status);
+
+		/* Check if the link is up and training is complete */
+		if (!(link_status & PCI_EXP_LNKSTA_LT))
+			break;
+
+		mdelay(10); /* Wait 1 millisecond */
+	}
+
+	if (link_status & PCI_EXP_LNKSTA_LT) {
+		printf("Link training failed for device %04x:%04x\n",
+			PCI_BUS(dev), PCI_DEV(dev));
+		return -ETIMEDOUT;
+	}
+
+	printf("Link Status for device %04x:%04x: 0x%x\n",
+		PCI_BUS(dev), PCI_DEV(dev), link_status);
+	printf("  Speed: Gen%d\n", (link_status & PCI_EXP_LNKSTA_CLS) >> 0);
+	printf("  Width: x%d\n", (link_status & PCI_EXP_LNKSTA_NLW) >> 4);
+	printf("  Link Up: %s\n", (link_status & PCI_EXP_LNKSTA_LT) ? "No" : "Yes");
+
+	return 0;
+}
+
 int pci_bus_write_config(struct udevice *bus, pci_dev_t bdf, int offset,
 			 unsigned long value, enum pci_size_t size)
 {

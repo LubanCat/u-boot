@@ -509,6 +509,7 @@ static int do_pci(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	case 'b':		/* bars */
 	case 'a':		/* AER */
 	case 'x':		/* retrain link */
+	case 'f':		/* FLR */
 		if (argc < 3)
 			goto usage;
 		if ((bdf = get_pci_dev(argv[2])) == -1)
@@ -601,6 +602,8 @@ static int do_pci(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		return pci_aer_dump(dev, bdf);
 	case 'x':		/* retrain link */
 		return pci_retrain_link(dev, bdf);
+	case 'f':		/* do FLR */
+		return pci_reset_function(dev, bdf);
 	default:
 		ret = CMD_RET_USAGE;
 		break;
@@ -621,6 +624,8 @@ static char pci_help_text[] =
 	"    - Dump PCI AER info\n"
 	"pci x b.d.f \n"
 	"    - Retrain the link\n"
+	"pci f b.d.f \n"
+	"    - Function level reset\n"
 	"pci enum\n"
 	"    - Enumerate PCI buses\n"
 	"pci header b.d.f\n"

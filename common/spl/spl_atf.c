@@ -76,13 +76,12 @@ static struct bl31_params *bl2_plat_get_bl31_params(struct spl_image_info *spl_i
 	bl33_ep_info->args.arg0 = 0xffff & read_mpidr();
 	bl33_ep_info->pc = bl33_entry;
 
-#ifdef CONFIG_SPL_ATF_AARCH32_BL33
-	bl33_ep_info->spsr = SPSR_32(MODE32_svc, SPSR_T_ARM, EP_EE_LITTLE,
-				     DISABLE_ALL_EXECPTIONS_32);
-#else
-	bl33_ep_info->spsr = SPSR_64(MODE_EL2, MODE_SP_ELX,
-				     DISABLE_ALL_EXECPTIONS);
-#endif
+	if (spl_image->flags & SPL_ATF_AARCH32_BL33)
+		bl33_ep_info->spsr = SPSR_32(MODE32_svc, SPSR_T_ARM, EP_EE_LITTLE,
+					     DISABLE_ALL_EXECPTIONS_32);
+	else
+		bl33_ep_info->spsr = SPSR_64(MODE_EL2, MODE_SP_ELX,
+					     DISABLE_ALL_EXECPTIONS);
 	/*
 	 * Reference: arch/arm/lib/bootm.c
 	 * boot_jump_linux(bootm_headers_t *images, int flag)

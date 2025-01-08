@@ -614,6 +614,9 @@ static int spl_internal_load_simple_fit(struct spl_image_info *spl_image,
 {
 	struct spl_image_info image_info;
 	char *desc;
+#if CONFIG_IS_ENABLED(ATF)
+	uint8_t ih_arch;
+#endif
 	int base_offset;
 	int images, ret;
 	int index = 0;
@@ -787,6 +790,10 @@ static int spl_internal_load_simple_fit(struct spl_image_info *spl_image,
 
 		if (os_type == IH_OS_U_BOOT) {
 #if CONFIG_IS_ENABLED(ATF)
+			fit_image_get_arch(fit, node, &ih_arch);
+			debug("Image ARCH is %s\n", genimg_get_arch_name(ih_arch));
+			if (ih_arch == IH_ARCH_ARM)
+				spl_image->flags |= SPL_ATF_AARCH32_BL33;
 			spl_image->entry_point_bl33 = image_info.load_addr;
 #elif CONFIG_IS_ENABLED(OPTEE)
 			spl_image->entry_point_os = image_info.load_addr;

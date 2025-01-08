@@ -447,15 +447,15 @@ endif
 
 config ROCKCHIP_RK3562
 	bool "Support Rockchip RK3562"
-	select GICV2
-	select ARM64
 	select ARM_SMCCC
-	select SUPPORT_TPL
-	select SUPPORT_SPL
+	select ARM64 if !ARM64_BOOT_AARCH32
+	select GICV2 if !ARM64_BOOT_AARCH32
+	select SUPPORT_TPL if !ARM64_BOOT_AARCH32
+	select SUPPORT_SPL if !ARM64_BOOT_AARCH32
 	select TPL_TINY_FRAMEWORK if TPL
 	select DEBUG_UART_BOARD_INIT
-	imply TPL
-	imply SPL
+	imply TPL if !ARM64_BOOT_AARCH32
+	imply SPL if !ARM64_BOOT_AARCH32
 	imply TPL_SERIAL_SUPPORT
 	help
 	  The Rockchip RK3562 is a ARM-based SoC with a quad-core Cortex-A53.

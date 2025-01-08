@@ -891,6 +891,13 @@ struct dm_pci_ops {
 	 */
 	int (*write_config)(struct udevice *bus, pci_dev_t bdf, uint offset,
 			    ulong value, enum pci_size_t size);
+	/**
+	 * vendor_aer_dump() - Dump vendor-specific aer information
+	 *
+	 * @bus:	Bus of pci_controller
+	 * @return 0 if OK, -ve on error
+	 */
+	int (*vendor_aer_dump)(struct udevice *bus);
 };
 
 /* Get access to a PCI bus' operations */

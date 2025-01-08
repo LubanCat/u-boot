@@ -11,6 +11,7 @@
 #include <common.h>
 #include <pci.h>
 #include <errno.h>
+#include <dm/device.h>
 
 /**
  * pci_aer_dump - Parse and print AER information in a human-readable format
@@ -23,6 +24,8 @@ int pci_aer_dump(struct udevice *udev, pci_dev_t dev)
 	int aer_cap_ptr;
 	u32 aer_status, aer_mask, aer_severity;
 	u32 aer_capabilities;
+	struct dm_pci_ops *ops;
+	struct udevice *bus;
 
 	/* Find the AER Capability */
 	aer_cap_ptr = dm_pci_find_ext_capability(udev, PCI_EXT_CAP_ID_ERR);
@@ -111,6 +114,13 @@ int pci_aer_dump(struct udevice *udev, pci_dev_t dev)
 	printf("CGenEn%c ", (aer_capabilities & (1 << 6)) ? '+' : '-');
 	printf("ChkCap%c ", (aer_capabilities & (1 << 7)) ? '+' : '-');
 	printf("ChkEn%c\n", (aer_capabilities & (1 << 8)) ? '+' : '-');
+
+	for (bus = udev; device_is_on_pci_bus(bus);)
+		bus = bus->parent;
+
+	ops = pci_get_ops(bus);
+	if (ops->vendor_aer_dump)
+		return ops->vendor_aer_dump(bus);
 
 	return 0;
 }

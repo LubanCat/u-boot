@@ -965,7 +965,7 @@ out:
 }
 #endif
 
-#if defined(CONFIG_CMD_DTIMG) && defined(CONFIG_OF_LIBFDT_OVERLAY)
+#if defined(CONFIG_OF_LIBFDT_OVERLAY)
 
 /*
  * Default return index 0.

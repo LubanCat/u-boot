@@ -87,3 +87,7 @@ GTAGS
 *.orig
 *~
 \#*#
+
+*.gz
+*.digest
+examples/standalone/rkspi

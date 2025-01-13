@@ -38,6 +38,8 @@
 #include <dm/of_access.h>
 #include <dm/ofnode.h>
 #include <asm/io.h>
+#include <boot_rkimg.h>
+#include <fs.h>
 
 #define DRIVER_VERSION	"v1.0.1"
 
@@ -1432,9 +1434,57 @@ static void *rockchip_logo_rotate(struct logo_info *logo, void *src)
 	return dst_rotate;
 }
 
+static int rockchip_read_distro_logo(void *logo_addr, const char *name, int size)
+{
+	const char *cmd = "part list ${devtype} ${devnum} -bootable devplist";
+	char *devnum, *devtype, *devplist;
+	char devnum_part[12];
+	char bmp_name[32];
+	char logo_hex_str[19];
+	char header_size_str[10];
+	char *fs_argv[6];
+	loff_t len = 0;
+
+	if (!rockchip_get_bootdev() || !logo_addr || !name)
+		return -ENODEV;
+
+	if (run_command_list(cmd, -1, 0)) {
+		printf("Failed to find -bootable\n");
+		return -EINVAL;
+	}
+
+	devplist = env_get("devplist");
+	if (!devplist)
+		return -ENODEV;
+
+	devtype = env_get("devtype");
+	devnum = env_get("devnum");
+	sprintf(devnum_part, "%s:%s", devnum, devplist);
+	sprintf(bmp_name, "%s", name);
+	sprintf(logo_hex_str, "0x%lx", (ulong)logo_addr);
+	sprintf(header_size_str, "0x%x", size);
+
+	/* if size==0, means read the whole file. */
+
+	fs_argv[0] = "load";
+	fs_argv[1] = devtype;
+	fs_argv[2] = devnum_part;
+	fs_argv[3] = logo_hex_str;
+	fs_argv[4] = bmp_name;
+	fs_argv[5] = header_size_str;
+
+	if (do_load(NULL, 0, 6, fs_argv, FS_TYPE_ANY))
+		return -EIO;
+
+	len = env_get_hex("filesize", 0);
+
+	printf("logo(Distro): %s\n", name);
+
+	return len;
+}
+
 static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 {
-#ifdef CONFIG_ROCKCHIP_RESOURCE_IMAGE
 	struct rockchip_logo_cache *logo_cache;
 	bmp_bitmap_callback_vt bitmap_callbacks = {
 		bitmap_create,
@@ -1443,7 +1493,7 @@ static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 	};
 	bmp_result code;
 	bmp_image bmp;
-	void *bmp_data;
+	void *bmp_data = NULL;
 	void *dst = NULL;
 	void *dst_rotate = NULL;
 	int len, dst_size;
@@ -1469,11 +1519,22 @@ static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 
 	bmp_create(&bmp, &bitmap_callbacks);
 
+#ifdef CONFIG_ROCKCHIP_RESOURCE_IMAGE
 	len = rockchip_read_resource_file(bmp_data, bmp_name, 0, MAX_IMAGE_BYTES);
 	if (len < 0) {
-		ret = -EINVAL;
+		len = rockchip_read_distro_logo(bmp_data, bmp_name, 0); 
+		if (len < 0) {
+			return -ENOENT;
+			goto free_bmp_data;
+		}
+	}
+#else
+	len = rockchip_read_distro_logo(bmp_data, bmp_name, 0); 
+	if (len < 0) {
+		return -ENOENT;
 		goto free_bmp_data;
 	}
+#endif
 
 	/* analyse the BMP */
 	code = bmp_analyse(&bmp, len, bmp_data);
@@ -1521,7 +1582,7 @@ static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 			dst = dst_rotate;
 			dst_size = logo->width * logo->height * logo->bpp >> 3;
 		}
-		printf("logo ratate %d\n", logo->rotate);
+		printf("logo rotate %d\n", logo->rotate);
 	}
 	logo->mem = dst;
 
@@ -1535,9 +1596,6 @@ free_bmp_data:
 	free(bmp_data);
 
 	return ret;
-#else
-	return -EINVAL;
-#endif
 }
 
 void rockchip_show_fbbase(ulong fbbase)

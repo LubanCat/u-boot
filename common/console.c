@@ -566,8 +566,9 @@ static void vspfunc(char *buf, size_t size, char *format, ...)
 
 void puts(const char *s)
 {
-	unsigned long ts_sec, ts_msec, ticks;
+	unsigned long ts_sec, ts_msec, us, delta_ms;
 	char pr_timestamp[32], *p;
+	int cpu;
 
 	while (*s) {
 		if (*s == '\n') {
@@ -577,12 +578,19 @@ void puts(const char *s)
 		}
 
 		if (gd->new_line) {
+			us = (get_ticks() / (gd->arch.timer_rate_hz / 1000000));
+			if (gd->last_us)
+				delta_ms = DIV_ROUND_UP(us - gd->last_us, 1000);
+			else
+				delta_ms = 0;
+			gd->last_us = us;
 			gd->new_line = 0;
-			ticks = (get_ticks() / (gd->arch.timer_rate_hz / 1000000));
-			ts_sec = ticks / 1000000;
-			ts_msec = ticks % 1000000;
+
+			ts_sec = us / 1000000;
+			ts_msec = us % 1000000;
+			cpu = read_mpidr() & 0xfff;
 			vspfunc(pr_timestamp, sizeof(pr_timestamp),
-				"[%5lu.%06lu] ", ts_sec, ts_msec);
+				"[%5lu.%06lu:%x:%03d] ", ts_sec, ts_msec, cpu, delta_ms);
 			p = pr_timestamp;
 			while (*p)
 				putc(*p++);

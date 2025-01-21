@@ -136,6 +136,7 @@ typedef struct global_data {
 
 #ifdef CONFIG_BOOTSTAGE_PRINTF_TIMESTAMP
 	int new_line;
+	u64 last_us;
 #endif
 	struct pre_serial serial;
 	ulong sys_start_tick;		/* For report system start-up time */

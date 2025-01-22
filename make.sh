@@ -193,10 +193,12 @@ function process_args()
 				shift 1
 				;;
 			--spl-fwver)
+				ARG_FIT_FWVER="${ARG_FIT_FWVER} --spl-fwver $2"
 				ARG_SPL_FWVER="SPL_FWVER=$2"
 				shift 2
 				;;
 			--fwver)
+				ARG_FIT_FWVER="${ARG_FIT_FWVER} --fwver $2"
 				ARG_FWVER="FWVER=$2"
 				shift 2
 				;;
@@ -755,7 +757,7 @@ function pack_fit_image()
 
 function handle_args_late()
 {
-	ARG_LIST_FIT="${ARG_LIST_FIT} --ini-trust ${INI_TRUST} --ini-loader ${INI_LOADER}"
+	ARG_LIST_FIT="${ARG_LIST_FIT} --ini-trust ${INI_TRUST} --ini-loader ${INI_LOADER} ${ARG_FIT_FWVER}"
 }
 
 function clean_files()

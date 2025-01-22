@@ -229,6 +229,14 @@ function fit_process_args()
 				ARG_BURN_KEY_HASH="y"
 				shift 1
 				;;
+			--spl-fwver)
+				ARG_FIT_FWVER="${ARG_FIT_FWVER} --spl-fwver $2"
+				shift 2
+				;;
+			--fwver)
+				ARG_FIT_FWVER="${ARG_FIT_FWVER} --fwver $2"
+				shift 2
+				;;
 			*)
 				help
 				exit 1
@@ -241,7 +249,7 @@ function fit_raw_compile()
 {
 	# Verified-boot: should rebuild code but don't need to repack images.
 	if [ "${ARG_SIGN}" == "y" ]; then
-		./make.sh --raw-compile
+		./make.sh --raw-compile ${ARG_FIT_FWVER}
 	fi
 	rm ${FIT_DIR} -rf && mkdir -p ${FIT_DIR} && mkdir -p ${SIG_CFG_DIR}
 }

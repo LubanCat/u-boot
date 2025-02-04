@@ -186,6 +186,7 @@ typedef struct global_data {
 #ifdef CONFIG_ARCH_ROCKCHIP
 /* BL32 is enabled */
 #define GD_FLG_BL32_ENABLED	0x20000
+#define GD_FLG_SMP		0x40000
 #endif
 
 #endif /* __ASM_GENERIC_GBL_DATA_H */

@@ -105,6 +105,8 @@ static int do_boot_fit(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 	env_update("bootargs", slot_info);
 #endif
 
+	smp_event2(SEVT_1, STID_17, (ulong)fit);
+
 	ret = do_bootm_states(NULL, 0, ARRAY_SIZE(bootm_args), bootm_args,
 		BOOTM_STATE_START |
 		BOOTM_STATE_FINDOS | BOOTM_STATE_FINDOTHER |

@@ -2073,6 +2073,11 @@ static int fit_image_select(const void *fit, int rd_noffset, int verify)
 	fit_image_print(fit, rd_noffset, "   ");
 #endif
 #endif
+
+#ifndef USE_HOSTCC
+	if (smp_event1(SEVT_3, STID_17))
+		return 0;
+#endif
 	if (verify) {
 		puts("   Verifying Hash Integrity ... ");
 		if (!fit_image_verify(fit, rd_noffset)) {

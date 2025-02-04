@@ -180,6 +180,18 @@ int print_cpuinfo(void);
 int update_flash_size(int flash_size);
 int arch_early_init_r(void);
 
+typedef struct uspinlock {
+	volatile uint32_t lock;
+} uspinlock_t;
+
+#if CONFIG_IS_ENABLED(SMP)
+void u_spin_lock(uspinlock_t *lock);
+void u_spin_unlock(uspinlock_t *lock);
+#else
+static inline void u_spin_lock(uspinlock_t *lock) {}
+static inline void u_spin_unlock(uspinlock_t *lock) {}
+#endif
+
 /*
  * setup_board_extra() - Fill in extra details in the bd_t structure
  *

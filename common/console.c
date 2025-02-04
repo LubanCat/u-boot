@@ -27,6 +27,8 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+static uspinlock_t console_lock;
+
 static int on_console(const char *name, const char *value, enum env_op op,
 	int flags)
 {
@@ -570,6 +572,8 @@ void puts(const char *s)
 	char pr_timestamp[32], *p;
 	int cpu;
 
+	u_spin_lock(&console_lock);
+
 	while (*s) {
 		if (*s == '\n') {
 			gd->new_line = 1;
@@ -598,12 +602,18 @@ void puts(const char *s)
 
 		putc(*s++);
 	}
+
+	u_spin_unlock(&console_lock);
 }
 #else
 void puts(const char *s)
 {
+	u_spin_lock(&console_lock);
+
 	while (*s)
 		putc(*s++);
+
+	u_spin_unlock(&console_lock);
 }
 #endif
 

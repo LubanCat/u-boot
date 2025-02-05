@@ -72,6 +72,7 @@ struct rk_pcie {
 	struct pci_region	mem;
 	struct pci_region	mem64;
 	bool		is_bifurcation;
+	u32 rasdes_off;
 	u32 gen;
 	u32 lanes;
 };
@@ -116,7 +117,6 @@ enum {
 #define LINK_SPEED_GEN_2		0x2
 #define LINK_SPEED_GEN_3		0x3
 
-#define PCIE_RASDES_REG			0x1a0
 #define PCIE_PORT_LINK_CONTROL          0x710
 #define PORT_LINK_FAST_LINK_MODE        BIT(7)
 #define PCIE_MISC_CONTROL_1_OFF		0x8bc
@@ -933,9 +933,12 @@ static int rockchip_pcie_probe(struct udevice *dev)
 					 priv->mem.phys_start,
 					 priv->mem.bus_start, priv->mem.size);
 
-	/* Enable RC's err dump */
-	writel(0x1c, priv->dbi_base + PCIE_RASDES_REG + 8);
-	writel(0x3, priv->dbi_base + PCIE_RASDES_REG + 8);
+	priv->rasdes_off = dm_pci_find_ext_capability(dev, PCI_EXT_CAP_ID_VNDR);
+	if (priv->rasdes_off) {
+		/* Enable RC's err dump */
+		writel(0x1c, priv->dbi_base + priv->rasdes_off + 8);
+		writel(0x3, priv->dbi_base + priv->rasdes_off + 8);
+	}
 
 	return 0;
 free_rst:
@@ -973,7 +976,9 @@ static int rockchip_pcie_err_dump(struct udevice *bus)
 
 	printf("Common event signal status: %s\n", pm);
 
-	cap_base = PCIE_RASDES_REG;
+	cap_base = priv->rasdes_off;
+	if (!priv->rasdes_off)
+		return 0;
 
 	RAS_DES_EVENT("EBUF Overflow: ", 0);
 	RAS_DES_EVENT("EBUF Under-run: ", 0x0010000);

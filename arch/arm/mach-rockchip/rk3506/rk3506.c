@@ -157,6 +157,12 @@ int arch_cpu_init(void)
 	writel(0x01ff01d1, GRF_BASE + GRF_SOC_CON28);
 	writel(0x00000079, USBPHY_APB_BASE + USBPHY_DIFF_RECEIVER_0);
 	writel(0x00000079, USBPHY_APB_BASE + USBPHY_DIFF_RECEIVER_1);
+
+	/*
+	 * Set mcu jtag clock un-gate.
+	 * Configure when in use.
+	 */
+	//writel(0x00220000, 0xff960000);
 #endif
 	return 0;
 }
@@ -183,7 +189,6 @@ int fit_standalone_release(char *id, uintptr_t entry_point)
 	writel(0x00060004, 0xff90000c);
 
 	/* select jtag m1 GPIO0C6 GPIO0C7 */
-	//writel(0x00220000, 0xff960000);
 	//writel(0x00300020, 0xff288000);
 	//writel(0x00ff0022, 0xff4d8064);
 	//writel(0xff002200, 0xff950014);

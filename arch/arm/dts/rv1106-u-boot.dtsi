@@ -202,13 +202,3 @@
 	u-boot,dm-pre-reloc;
 	status = "okay";
 };
-
-&usbdrd {
-	u-boot,dm-pre-reloc;
-	status = "okay";
-};
-
-&usbdrd_dwc3 {
-	u-boot,dm-pre-reloc;
-	status = "okay";
-};

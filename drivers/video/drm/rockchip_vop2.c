@@ -1212,6 +1212,12 @@ enum vop2_layer_type {
 	SMART_LAYER = 2,
 };
 
+enum vop2_plane_type {
+	VOP2_PLANE_TYPE_OVERLAY = 0,
+	VOP2_PLANE_TYPE_PRIMARY = 1,
+	VOP2_PLANE_TYPE_CURSOR = 2,
+};
+
 /* This define must same with kernel win phy id */
 enum vop2_layer_phy_id {
 	ROCKCHIP_VOP2_CLUSTER0 = 0,
@@ -1308,6 +1314,7 @@ struct vop2_win_data {
 	char *name;
 	u8 phys_id;
 	enum vop2_layer_type type;
+	enum vop2_plane_type plane_type;
 	u8 win_sel_port_offset;
 	u8 layer_sel_win_id[VOP2_VP_MAX];
 	u8 axi_id;
@@ -1418,8 +1425,6 @@ struct vop2_data {
 	struct vop2_dump_regs *dump_regs;
 	const struct vop2_esmart_lb_map *esmart_lb_mode_map;
 	const struct vop2_ops *ops;
-	u8 *vp_primary_plane_order;
-	u8 *vp_default_primary_plane;
 	u8 nr_vps;
 	u8 nr_layers;
 	u8 nr_mixers;
@@ -1431,6 +1436,7 @@ struct vop2_data {
 	u8 esmart_lb_mode_num;
 	u32 reg_len;
 	u32 dump_regs_size;
+	u32 plane_mask_base;
 };
 
 struct vop2 {
@@ -1605,16 +1611,27 @@ static inline int interpolate(int x1, int y1, int x2, int y2, int x)
 	return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
 }
 
-static int vop2_get_primary_plane(struct vop2 *vop2, u32 plane_mask)
+static inline bool vop2_win_can_attach_to_vp(struct vop2_win_data *win_data, u8 vp_id)
 {
+	return win_data->possible_vp_mask & BIT(vp_id);
+}
+
+static int vop2_vp_find_attachable_win(struct display_state *state, u8 vp_id)
+{
+	struct crtc_state *cstate = &state->crtc_state;
+	struct vop2 *vop2 = cstate->private;
+	u32 plane_mask = cstate->crtc->vps[vp_id].plane_mask;
 	int i = 0;
 
+	if (!plane_mask)
+		return ROCKCHIP_VOP2_PHY_ID_INVALID;
+
 	for (i = 0; i < vop2->data->nr_layers; i++) {
-		if (plane_mask & BIT(vop2->data->vp_primary_plane_order[i]))
-			return vop2->data->vp_primary_plane_order[i];
+		if (vop2_win_can_attach_to_vp(&vop2->data->win_data[i], vp_id))
+			break;
 	}
 
-	return vop2->data->vp_primary_plane_order[0];
+	return vop2->data->win_data[i].phys_id;
 }
 
 static inline u16 scl_cal_scale(int src, int dst, int shift)
@@ -2592,17 +2609,252 @@ static int vop3_get_esmart_lb_mode(struct vop2 *vop2)
 	return vop2->data->esmart_lb_mode_map[0].lb_map_value;
 }
 
+static inline void vop2_plane_mask_to_possible_vp_mask(struct display_state *state)
+{
+	struct crtc_state *cstate = &state->crtc_state;
+	struct vop2 *vop2 = cstate->private;
+	const struct vop2_data *vop2_data = vop2->data;
+	struct vop2_win_data *win_data;
+	u32 plane_mask;
+	u32 nr_planes;
+	u32 phys_id;
+	int i, j;
+
+	for (i = 0; i < vop2_data->nr_layers; i++) {
+		win_data = &vop2_data->win_data[i];
+		win_data->possible_vp_mask = 0;
+	}
+
+	for (i = 0; i < vop2_data->nr_vps; i++) {
+		plane_mask = cstate->crtc->vps[i].plane_mask;
+		nr_planes = hweight32(plane_mask);
+
+		for (j = 0; j < nr_planes; j++) {
+			phys_id = ffs(plane_mask) - 1;
+			win_data = vop2_find_win_by_phys_id(vop2, phys_id);
+			win_data->possible_vp_mask |= BIT(i);
+			plane_mask &= ~BIT(phys_id);
+		}
+	}
+}
+
+/*
+ * The function checks whether the 'rockchip,plane-mask' property assigned
+ * in DTS is valid.
+ */
+static bool vop2_plane_mask_check(struct display_state *state)
+{
+	struct crtc_state *cstate = &state->crtc_state;
+	struct vop2 *vop2 = cstate->private;
+	struct vop2_win_data *win_data;
+	u32 assigned_plane_mask = 0, plane_mask = 0;
+	u32 phys_id;
+	u32 nr_planes;
+	u8 primary_plane_id;
+	int i, j;
+
+	/*
+	 * If plane mask is assigned in DTS, then every plane need to be assigned to
+	 * one of all the VPs, and no single plane can be assigned to more than one
+	 * VP.
+	 */
+	for (i = 0; i < vop2->data->nr_vps; i++) {
+		plane_mask = cstate->crtc->vps[i].plane_mask;
+		primary_plane_id = cstate->crtc->vps[i].primary_plane_id;
+		nr_planes = hweight32(plane_mask);
+
+		/*
+		 * If the plane mask and primary plane both are assigned in DTS, the
+		 * primary plane should be included in the plane mask of VPx.
+		 */
+		if (plane_mask && primary_plane_id != ROCKCHIP_VOP2_PHY_ID_INVALID &&
+		    !(BIT(primary_plane_id) & plane_mask)) {
+			printf("Invalid primary plane %s[0x%lx] for VP%d[plane mask: 0x%08x]\n",
+			       vop2_plane_phys_id_to_string(primary_plane_id),
+			       BIT(primary_plane_id), i, plane_mask);
+			return false;
+		}
+
+		/*
+		 * Every plane assigned to the specific VP should follow the constraints
+		 * of default &vop2_win_data.possible_vp_mask.
+		 */
+		for (j = 0; j < nr_planes; j++) {
+			phys_id = ffs(plane_mask) - 1;
+			win_data = vop2_find_win_by_phys_id(vop2, phys_id);
+			if (!win_data) {
+				printf("Invalid plane id %d in VP%d assigned plane mask\n",
+				       phys_id, i);
+				return false;
+			}
+
+			if (!(vop2_win_can_attach_to_vp(win_data, i))) {
+				printf("%s can not attach to VP%d\n",
+				       vop2_plane_phys_id_to_string(phys_id), i);
+				return false;
+			}
+
+			plane_mask &= ~BIT(phys_id);
+		}
+
+		if (assigned_plane_mask & cstate->crtc->vps[i].plane_mask) {
+			printf("the same window can't be assigned to two vp\n");
+			return false;
+		}
+		assigned_plane_mask |= cstate->crtc->vps[i].plane_mask;
+	}
+
+	if (assigned_plane_mask != vop2->data->plane_mask_base) {
+		printf("all windows should be assigned, full plane mask: [0x%08x], current plane mask: [0x%08x]\n",
+		       vop2->data->plane_mask_base, assigned_plane_mask);
+		return false;
+	}
+
+	/*
+	 * If plane_mask assigned in DTS is valid, then convert it to &vop2_win_data.possible_vp_mask
+	 * and replace the default one with it.
+	 */
+	vop2_plane_mask_to_possible_vp_mask(state);
+
+	return true;
+}
+
+static void vop2_plane_mask_assign(struct display_state *state)
+{
+	struct crtc_state *cstate = &state->crtc_state;
+	struct vop2 *vop2 = cstate->private;
+	struct vop2_vp_plane_mask *plane_mask;
+	struct vop2_win_data *win_data;
+	u32 nr_planes = 0;
+	int active_vp_num = 0;
+	int main_vp_index = -1;
+	int layer_phy_id = 0;
+	int i, j, k;
+
+	printf("Assign default plane mask\n");
+
+	/*
+	 * For vop3, &vop2_vp_plane_mask.plane_mask will not be fixup in
+	 * &rockchip_crtc_funcs.fixup_dts(), because planes can be switched
+	 * between different CRTCs flexibly and the userspace do not need
+	 * the plane_mask to restrict the binding between the crtc and plane.
+	 * We just find a expected plane for logo display.
+	 */
+	if (is_vop3(vop2)) {
+		for (i = 0; i < vop2->data->nr_vps; i++) {
+			/*
+			 * mark the primary plane id of the VP that is
+			 * not enabled to invalid.
+			 */
+			vop2->vp_plane_mask[i].primary_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID;
+			if (!cstate->crtc->vps[i].enable)
+				continue;
+
+			for (j = 0; j < vop2->data->nr_layers; j++) {
+				win_data = &vop2->data->win_data[j];
+
+				if (win_data->plane_type != VOP2_PLANE_TYPE_PRIMARY)
+					continue;
+
+				if (!vop2_win_can_attach_to_vp(win_data, i))
+					continue;
+
+				for (k = 0; k < vop2->data->nr_vps; k++) {
+					if (win_data->phys_id == vop2->vp_plane_mask[k].primary_plane_id)
+						break;
+				}
+
+				/* The win has been used as the primary plane for other VPs */
+				if (k < vop2->data->nr_vps)
+					continue;
+
+				vop2->vp_plane_mask[i].attached_layers_nr = 1;
+				vop2->vp_plane_mask[i].primary_plane_id = win_data->phys_id;
+				vop2->vp_plane_mask[i].attached_layers[0] = win_data->phys_id;
+				vop2->vp_plane_mask[i].plane_mask |= BIT(win_data->phys_id);
+				active_vp_num++;
+				break;
+			}
+
+			if (vop2->vp_plane_mask[i].primary_plane_id == ROCKCHIP_VOP2_PHY_ID_INVALID)
+				printf("ERROR: No primary plane find for video_port%d\n", i);
+		}
+		printf("VOP have %d active VP\n", active_vp_num);
+	} else {
+		for (i = 0; i < vop2->data->nr_vps; i++) {
+			/*
+			 * mark the primary plane id of the VP that is
+			 * not enabled to invalid.
+			 */
+			vop2->vp_plane_mask[i].primary_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID;
+			if (cstate->crtc->vps[i].enable)
+				active_vp_num++;
+		}
+		printf("VOP have %d active VP\n", active_vp_num);
+
+		if (soc_is_rk3566() && active_vp_num > 2)
+			printf("ERROR: rk3566 only support 2 display output!!\n");
+		plane_mask = vop2->data->plane_mask;
+		plane_mask += (active_vp_num - 1) * VOP2_VP_MAX;
+
+		for (i = 0; i < vop2->data->nr_vps; i++) {
+			if (!is_hot_plug_devices(cstate->crtc->vps[i].output_type)) {
+				/* the first store main display plane mask */
+				vop2->vp_plane_mask[i] = plane_mask[0];
+				main_vp_index = i;
+				break;
+			}
+		}
+
+		/* if no find unplug devices, use vp0 as main display */
+		if (main_vp_index < 0) {
+			main_vp_index = 0;
+			vop2->vp_plane_mask[0] = plane_mask[0];
+		}
+
+		/* plane_mask[0] store main display, so we from plane_mask[1] */
+		j = 1;
+
+		/* init other display except main display */
+		for (i = 0; i < vop2->data->nr_vps; i++) {
+			/* main display or no connect devices */
+			if (i == main_vp_index || !cstate->crtc->vps[i].enable)
+				continue;
+			vop2->vp_plane_mask[i] = plane_mask[j++];
+			/*
+			 * For rk3588, the main window should attach to the VP0 while
+			 * the splice window should attach to the VP1 when the display
+			 * mode is over 4k.
+			 * If only one VP is enabled and the plane mask is not assigned
+			 * in DTS, all main windows will be assigned to the enabled VPx,
+			 * and all splice windows will be assigned to the VPx+1, in order
+			 * to ensure that the splice mode work well.
+			 */
+			if (vop2->version == VOP_VERSION_RK3588 && active_vp_num == 1)
+				vop2->vp_plane_mask[(i + 1) % vop2->data->nr_vps] = plane_mask[j++];
+		}
+
+		/* store plane mask for vop2_fixup_dts */
+		for (i = 0; i < vop2->data->nr_vps; i++) {
+			nr_planes = vop2->vp_plane_mask[i].attached_layers_nr;
+			for (j = 0; j < nr_planes; j++) {
+				layer_phy_id = vop2->vp_plane_mask[i].attached_layers[j];
+				vop2->vp_plane_mask[i].plane_mask |= BIT(layer_phy_id);
+			}
+		}
+	}
+}
+
 static void vop2_global_initial(struct vop2 *vop2, struct display_state *state)
 {
 	struct crtc_state *cstate = &state->crtc_state;
 	const struct vop2_data *vop2_data = vop2->data;
 	const struct vop2_ops *vop2_ops = vop2_data->ops;
-	struct vop2_vp_plane_mask *plane_mask;
-	int active_vp_num = 0;
-	int layer_phy_id = 0;
-	int i, j;
-	u32 layer_nr = 0;
+	u32 nr_planes = 0;
+	u32 plane_mask;
+	u8 primary_plane_id;
 	const u8 *tmp;
+	int i, j;
 
 	if (vop2->global_init)
 		return;
@@ -2612,124 +2864,40 @@ static void vop2_global_initial(struct vop2 *vop2, struct display_state *state)
 		vop2_mask_write(vop2, RK3568_SYS_OTP_WIN_EN, EN_MASK,
 				OTP_WIN_EN_SHIFT, 1, false);
 
-	if (cstate->crtc->assign_plane) {/* dts assign plane */
-		u32 plane_mask;
-		int primary_plane_id;
-
-		for (i = 0; i < vop2->data->nr_vps; i++) {
-			plane_mask = cstate->crtc->vps[i].plane_mask;
-			vop2->vp_plane_mask[i].plane_mask = plane_mask;
-			layer_nr = hweight32(plane_mask); /* use bitmap to store plane mask */
-			vop2->vp_plane_mask[i].attached_layers_nr = layer_nr;
-			primary_plane_id = cstate->crtc->vps[i].primary_plane_id;
-			if (primary_plane_id >= ROCKCHIP_VOP2_LAYER_MAX)
-				primary_plane_id = vop2_get_primary_plane(vop2, plane_mask);
-			vop2->vp_plane_mask[i].primary_plane_id = primary_plane_id;
-			vop2->vp_plane_mask[i].plane_mask = plane_mask;
-
-			/* plane mask[bitmap] convert into layer phy id[enum vop2_layer_phy_id]*/
-			for (j = 0; j < layer_nr; j++) {
-				vop2->vp_plane_mask[i].attached_layers[j] = ffs(plane_mask) - 1;
-				plane_mask &= ~BIT(vop2->vp_plane_mask[i].attached_layers[j]);
-			}
-		}
-	} else {/* need soft assign plane mask */
-		printf("Assign plane mask automatically\n");
-		if (vop2->version == VOP_VERSION_RK3576) {
+	/* The plane mask is assigned in DTS */
+	if (cstate->crtc->assign_plane) {
+		/* check whether plane mask and primary plane are valid */
+		if (vop2_plane_mask_check(state)) {
 			for (i = 0; i < vop2->data->nr_vps; i++) {
-				if (cstate->crtc->vps[i].enable) {
-					vop2->vp_plane_mask[i].attached_layers_nr = 1;
-					vop2->vp_plane_mask[i].primary_plane_id =
-						vop2->data->vp_default_primary_plane[i];
-					vop2->vp_plane_mask[i].attached_layers[0] =
-						vop2->data->vp_default_primary_plane[i];
-					vop2->vp_plane_mask[i].plane_mask |=
-						BIT(vop2->data->vp_default_primary_plane[i]);
-					active_vp_num++;
-				} else {
-					/*
-					 * mark the primary plane id of the VP that is
-					 * not enabled to invalid.
-					 */
-					vop2->vp_plane_mask[i].primary_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID;
+				plane_mask = cstate->crtc->vps[i].plane_mask;
+				nr_planes = hweight32(plane_mask); /* use bitmap to store plane mask */
+				vop2->vp_plane_mask[i].attached_layers_nr = nr_planes;
+				primary_plane_id = cstate->crtc->vps[i].primary_plane_id;
+				/*
+				 * If the primary plane of specific VP is not assigned
+				 * in DTS, find a proper primary plane according to the
+				 * &vop2_win_data.possible_vp_mask.
+				 */
+				if (primary_plane_id == ROCKCHIP_VOP2_PHY_ID_INVALID)
+					primary_plane_id = vop2_vp_find_attachable_win(state, i);
+				vop2->vp_plane_mask[i].primary_plane_id = primary_plane_id;
+				vop2->vp_plane_mask[i].plane_mask = plane_mask;
+
+				/* plane mask[bitmap] convert into layer phy id[enum vop2_layer_phy_id] */
+				for (j = 0; j < nr_planes; j++) {
+					vop2->vp_plane_mask[i].attached_layers[j] = ffs(plane_mask) - 1;
+					plane_mask &= ~BIT(vop2->vp_plane_mask[i].attached_layers[j]);
 				}
 			}
-			printf("VOP have %d active VP\n", active_vp_num);
 		} else {
-			/* find the first unplug devices and set it as main display */
-			int main_vp_index = -1;
-
-			for (i = 0; i < vop2->data->nr_vps; i++) {
-				if (cstate->crtc->vps[i].enable)
-					active_vp_num++;
-			}
-			printf("VOP have %d active VP\n", active_vp_num);
-
-			if (soc_is_rk3566() && active_vp_num > 2)
-				printf("ERROR: rk3566 only support 2 display output!!\n");
-			plane_mask = vop2->data->plane_mask;
-			plane_mask += (active_vp_num - 1) * VOP2_VP_MAX;
-			/*
-			 * For rk3528, one display policy for hdmi store in plane_mask[0], and
-			 * the other for cvbs store in plane_mask[2].
-			 */
-			if (vop2->version == VOP_VERSION_RK3528 && active_vp_num == 1 &&
-			    cstate->crtc->vps[1].output_type == DRM_MODE_CONNECTOR_TV)
-				plane_mask += 2 * VOP2_VP_MAX;
-
-			if (vop2->version == VOP_VERSION_RK3528) {
-				/*
-				 * For rk3528, the plane mask of vp is limited, only esmart2 can
-				 * be selected by both vp0 and vp1.
-				 */
-				j = 0;
-			} else {
-				for (i = 0; i < vop2->data->nr_vps; i++) {
-					if (!is_hot_plug_devices(cstate->crtc->vps[i].output_type)) {
-						/* the first store main display plane mask */
-						vop2->vp_plane_mask[i] = plane_mask[0];
-						main_vp_index = i;
-						break;
-					}
-				}
-
-				/* if no find unplug devices, use vp0 as main display */
-				if (main_vp_index < 0) {
-					main_vp_index = 0;
-					vop2->vp_plane_mask[0] = plane_mask[0];
-				}
-
-				/* plane_mask[0] store main display, so we from plane_mask[1] */
-				j = 1;
-			}
-
-			/* init other display except main display */
-			for (i = 0; i < vop2->data->nr_vps; i++) {
-				/* main display or no connect devices */
-				if (i == main_vp_index || !cstate->crtc->vps[i].enable)
-					continue;
-				vop2->vp_plane_mask[i] = plane_mask[j++];
-				/*
-				 * For rk3588, the main window should attach to the VP0 while
-				 * the splice window should attach to the VP1 when the display
-				 * mode is over 4k.
-				 * If only one VP is enabled and the plane mask is not assigned
-				 * in DTS, all main windows will be assigned to the enabled VPx,
-				 * and all splice windows will be assigned to the VPx+1, in order
-				 * to ensure that the splice mode work well.
-				 */
-				if (vop2->version == VOP_VERSION_RK3588 && active_vp_num == 1)
-					vop2->vp_plane_mask[(i + 1) % vop2->data->nr_vps] = plane_mask[j++];
-			}
+			vop2_plane_mask_assign(state);
 		}
-		/* store plane mask for vop2_fixup_dts */
-		for (i = 0; i < vop2->data->nr_vps; i++) {
-			layer_nr = vop2->vp_plane_mask[i].attached_layers_nr;
-			for (j = 0; j < layer_nr; j++) {
-				layer_phy_id = vop2->vp_plane_mask[i].attached_layers[j];
-				vop2->vp_plane_mask[i].plane_mask |= BIT(layer_phy_id);
-			}
-		}
+	} else {
+		/*
+		 * If no plane mask assignment, plane mask and primary plane will be
+		 * assigned automatically.
+		 */
+		vop2_plane_mask_assign(state);
 	}
 
 	if (vop2->version == VOP_VERSION_RK3588)
@@ -5646,7 +5814,14 @@ static int rockchip_vop2_fixup_dts(struct display_state *state, void *blob)
 	int vp_id = 0;
 	int cursor_plane_id = -1;
 
-	if (vop_fix_dts || vop2->version == VOP_VERSION_RK3528)
+	/*
+	 * For vop3, &vop2_vp_plane_mask.plane_mask will not be fixup in
+	 * &rockchip_crtc_funcs.fixup_dts(), because planes can be switched
+	 * between different CRTCs flexibly and the userspace do not need
+	 * the plane_mask to restrict the binding between the crtc and plane.
+	 * We just find a expected plane for logo display.
+	 */
+	if (vop_fix_dts || is_vop3(vop2))
 		return 0;
 
 	ofnode_for_each_subnode(vp_node, np_to_ofnode(port_parent_node)) {
@@ -6183,13 +6358,6 @@ static struct vop2_dump_regs rk3528_dump_regs[] = {
 	{ RK3528_ACM_CTRL, "ACM", RK3528_ACM_CTRL, 0x1, 0, 1},
 };
 
-static u8 rk3528_vp_primary_plane_order[ROCKCHIP_VOP2_LAYER_MAX] = {
-	ROCKCHIP_VOP2_ESMART0,
-	ROCKCHIP_VOP2_ESMART1,
-	ROCKCHIP_VOP2_ESMART2,
-	ROCKCHIP_VOP2_ESMART3,
-};
-
 static struct vop2_plane_table rk3528_plane_table[ROCKCHIP_VOP2_LAYER_MAX] = {
 	{ROCKCHIP_VOP2_CLUSTER0, CLUSTER_LAYER},
 	{ROCKCHIP_VOP2_ESMART0, ESMART_LAYER},
@@ -6198,62 +6366,17 @@ static struct vop2_plane_table rk3528_plane_table[ROCKCHIP_VOP2_LAYER_MAX] = {
 	{ROCKCHIP_VOP2_ESMART3, ESMART_LAYER},
 };
 
-static struct vop2_vp_plane_mask rk3528_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] = {
-	{ /* one display policy for hdmi */
-		{/* main display */
-			.primary_plane_id = ROCKCHIP_VOP2_ESMART0,
-			.attached_layers_nr = 4,
-			.attached_layers = {
-				  ROCKCHIP_VOP2_CLUSTER0,
-				  ROCKCHIP_VOP2_ESMART0,  ROCKCHIP_VOP2_ESMART1, ROCKCHIP_VOP2_ESMART2
-				},
-		},
-		{/* second display */},
-		{/* third  display */},
-		{/* fourth display */},
-	},
-
-	{ /* two display policy */
-		{/* main display */
-			.primary_plane_id = ROCKCHIP_VOP2_ESMART0,
-			.attached_layers_nr = 3,
-			.attached_layers = {
-				  ROCKCHIP_VOP2_CLUSTER0, ROCKCHIP_VOP2_ESMART0, ROCKCHIP_VOP2_ESMART1
-				},
-		},
-
-		{/* second display */
-			.primary_plane_id = ROCKCHIP_VOP2_ESMART3,
-			.attached_layers_nr = 2,
-			.attached_layers = {
-				  ROCKCHIP_VOP2_ESMART2, ROCKCHIP_VOP2_ESMART3
-				},
-		},
-		{/* third  display */},
-		{/* fourth display */},
-	},
-
-	{ /* one display policy for cvbs */
-		{/* main display */
-			.primary_plane_id = ROCKCHIP_VOP2_ESMART3,
-			.attached_layers_nr = 2,
-			.attached_layers = {
-				  ROCKCHIP_VOP2_ESMART2, ROCKCHIP_VOP2_ESMART3
-				},
-		},
-		{/* second display */},
-		{/* third  display */},
-		{/* fourth display */},
-	},
-
-	{/* reserved */},
-};
+#define RK3528_PLANE_MASK_BASE \
+	(BIT(ROCKCHIP_VOP2_CLUSTER0) | \
+	 BIT(ROCKCHIP_VOP2_ESMART0)  | BIT(ROCKCHIP_VOP2_ESMART1)  | \
+	 BIT(ROCKCHIP_VOP2_ESMART2)  | BIT(ROCKCHIP_VOP2_ESMART3))
 
 static struct vop2_win_data rk3528_win_data[5] = {
 	{
 		.name = "Esmart0",
 		.phys_id = ROCKCHIP_VOP2_ESMART0,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.win_sel_port_offset = 8,
 		.layer_sel_win_id = { 1, 0xff, 0xff, 0xff },
 		.reg_offset = 0,
@@ -6275,6 +6398,7 @@ static struct vop2_win_data rk3528_win_data[5] = {
 		.name = "Esmart1",
 		.phys_id = ROCKCHIP_VOP2_ESMART1,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.win_sel_port_offset = 10,
 		.layer_sel_win_id = { 2, 0xff, 0xff, 0xff },
 		.reg_offset = 0x200,
@@ -6296,6 +6420,7 @@ static struct vop2_win_data rk3528_win_data[5] = {
 		.name = "Esmart2",
 		.phys_id = ROCKCHIP_VOP2_ESMART2,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_CURSOR,
 		.win_sel_port_offset = 12,
 		.layer_sel_win_id = { 3, 0, 0xff, 0xff },
 		.reg_offset = 0x400,
@@ -6317,6 +6442,7 @@ static struct vop2_win_data rk3528_win_data[5] = {
 		.name = "Esmart3",
 		.phys_id = ROCKCHIP_VOP2_ESMART3,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.win_sel_port_offset = 14,
 		.layer_sel_win_id = { 0xff, 1, 0xff, 0xff },
 		.reg_offset = 0x600,
@@ -6338,6 +6464,7 @@ static struct vop2_win_data rk3528_win_data[5] = {
 		.name = "Cluster0",
 		.phys_id = ROCKCHIP_VOP2_CLUSTER0,
 		.type = CLUSTER_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.win_sel_port_offset = 0,
 		.layer_sel_win_id = { 0, 0xff, 0xff, 0xff },
 		.reg_offset = 0,
@@ -6384,9 +6511,8 @@ const struct vop2_data rk3528_vop = {
 	.nr_vps = 2,
 	.vp_data = rk3528_vp_data,
 	.win_data = rk3528_win_data,
-	.plane_mask = rk3528_vp_plane_mask[0],
+	.plane_mask_base = RK3528_PLANE_MASK_BASE,
 	.plane_table = rk3528_plane_table,
-	.vp_primary_plane_order = rk3528_vp_primary_plane_order,
 	.nr_layers = 5,
 	.nr_mixers = 3,
 	.nr_gammas = 2,
@@ -6410,13 +6536,6 @@ static struct vop2_dump_regs rk3562_dump_regs[] = {
 	{ RK3568_SMART1_CTRL0, "Esmart3", RK3568_SMART1_CTRL0, 0x1, 0, 1 },
 };
 
-static u8 rk3562_vp_primary_plane_order[ROCKCHIP_VOP2_LAYER_MAX] = {
-	ROCKCHIP_VOP2_ESMART0,
-	ROCKCHIP_VOP2_ESMART1,
-	ROCKCHIP_VOP2_ESMART2,
-	ROCKCHIP_VOP2_ESMART3,
-};
-
 static struct vop2_plane_table rk3562_plane_table[ROCKCHIP_VOP2_LAYER_MAX] = {
 	{ROCKCHIP_VOP2_ESMART0, ESMART_LAYER},
 	{ROCKCHIP_VOP2_ESMART1, ESMART_LAYER},
@@ -6424,49 +6543,16 @@ static struct vop2_plane_table rk3562_plane_table[ROCKCHIP_VOP2_LAYER_MAX] = {
 	{ROCKCHIP_VOP2_ESMART3, ESMART_LAYER},
 };
 
-static struct vop2_vp_plane_mask rk3562_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] = {
-	{ /* one display policy for hdmi */
-		{/* main display */
-			.primary_plane_id = ROCKCHIP_VOP2_ESMART0,
-			.attached_layers_nr = 4,
-			.attached_layers = {
-				  ROCKCHIP_VOP2_ESMART0,  ROCKCHIP_VOP2_ESMART1,
-				  ROCKCHIP_VOP2_ESMART2,  ROCKCHIP_VOP2_ESMART3
-				},
-		},
-		{/* second display */},
-		{/* third  display */},
-		{/* fourth display */},
-	},
-
-	{ /* two display policy */
-		{/* main display */
-			.primary_plane_id = ROCKCHIP_VOP2_ESMART0,
-			.attached_layers_nr = 2,
-			.attached_layers = {
-				  ROCKCHIP_VOP2_ESMART0, ROCKCHIP_VOP2_ESMART1
-				},
-		},
-
-		{/* second display */
-			.primary_plane_id = ROCKCHIP_VOP2_ESMART2,
-			.attached_layers_nr = 2,
-			.attached_layers = {
-				  ROCKCHIP_VOP2_ESMART2, ROCKCHIP_VOP2_ESMART3
-				},
-		},
-		{/* third  display */},
-		{/* fourth display */},
-	},
-
-	{/* reserved */},
-};
+#define RK3562_PLANE_MASK_BASE \
+	(BIT(ROCKCHIP_VOP2_ESMART0)  | BIT(ROCKCHIP_VOP2_ESMART1)  | \
+	 BIT(ROCKCHIP_VOP2_ESMART2)  | BIT(ROCKCHIP_VOP2_ESMART3))
 
 static struct vop2_win_data rk3562_win_data[4] = {
 	{
 		.name = "Esmart0",
 		.phys_id = ROCKCHIP_VOP2_ESMART0,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.win_sel_port_offset = 8,
 		.layer_sel_win_id = { 0, 0, 0xff, 0xff },
 		.reg_offset = 0,
@@ -6486,6 +6572,7 @@ static struct vop2_win_data rk3562_win_data[4] = {
 		.name = "Esmart1",
 		.phys_id = ROCKCHIP_VOP2_ESMART1,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.win_sel_port_offset = 10,
 		.layer_sel_win_id = { 1, 1, 0xff, 0xff },
 		.reg_offset = 0x200,
@@ -6505,6 +6592,7 @@ static struct vop2_win_data rk3562_win_data[4] = {
 		.name = "Esmart2",
 		.phys_id = ROCKCHIP_VOP2_ESMART2,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.win_sel_port_offset = 12,
 		.layer_sel_win_id = { 2, 2, 0xff, 0xff },
 		.reg_offset = 0x400,
@@ -6524,6 +6612,7 @@ static struct vop2_win_data rk3562_win_data[4] = {
 		.name = "Esmart3",
 		.phys_id = ROCKCHIP_VOP2_ESMART3,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.win_sel_port_offset = 14,
 		.layer_sel_win_id = { 3, 3, 0xff, 0xff },
 		.reg_offset = 0x600,
@@ -6565,9 +6654,8 @@ const struct vop2_data rk3562_vop = {
 	.nr_vps = 2,
 	.vp_data = rk3562_vp_data,
 	.win_data = rk3562_win_data,
-	.plane_mask = rk3562_vp_plane_mask[0],
+	.plane_mask_base = RK3562_PLANE_MASK_BASE,
 	.plane_table = rk3562_plane_table,
-	.vp_primary_plane_order = rk3562_vp_primary_plane_order,
 	.nr_layers = 4,
 	.nr_mixers = 3,
 	.nr_gammas = 2,
@@ -6590,13 +6678,6 @@ static struct vop2_dump_regs rk3568_dump_regs[] = {
 	{ RK3568_SMART0_CTRL0, "Smart0", RK3568_SMART0_REGION0_CTRL, 0x1, 0, 1 },
 	{ RK3568_SMART1_CTRL0, "Smart1", RK3568_SMART1_REGION0_CTRL, 0x1, 0, 1 },
 	{ RK3568_HDR_LUT_CTRL, "HDR", 0, 0, 0, 0 },
-};
-
-static u8 rk3568_vp_primary_plane_order[ROCKCHIP_VOP2_LAYER_MAX] = {
-	ROCKCHIP_VOP2_SMART0,
-	ROCKCHIP_VOP2_SMART1,
-	ROCKCHIP_VOP2_ESMART0,
-	ROCKCHIP_VOP2_ESMART1,
 };
 
 static struct vop2_plane_table rk356x_plane_table[ROCKCHIP_VOP2_LAYER_MAX] = {
@@ -6672,11 +6753,17 @@ static struct vop2_vp_plane_mask rk356x_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 	{/* reserved for four display policy */},
 };
 
+#define RK3568_PLANE_MASK_BASE \
+	(BIT(ROCKCHIP_VOP2_CLUSTER0) | BIT(ROCKCHIP_VOP2_CLUSTER1) | \
+	 BIT(ROCKCHIP_VOP2_ESMART0)  | BIT(ROCKCHIP_VOP2_ESMART1)  | \
+	 BIT(ROCKCHIP_VOP2_SMART0)   | BIT(ROCKCHIP_VOP2_SMART1))
+
 static struct vop2_win_data rk3568_win_data[6] = {
 	{
 		.name = "Cluster0",
 		.phys_id = ROCKCHIP_VOP2_CLUSTER0,
 		.type = CLUSTER_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.win_sel_port_offset = 0,
 		.layer_sel_win_id = { 0, 0, 0, 0xff },
 		.reg_offset = 0,
@@ -6694,6 +6781,7 @@ static struct vop2_win_data rk3568_win_data[6] = {
 		.name = "Cluster1",
 		.phys_id = ROCKCHIP_VOP2_CLUSTER1,
 		.type = CLUSTER_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.win_sel_port_offset = 1,
 		.layer_sel_win_id = { 1, 1, 1, 0xff },
 		.reg_offset = 0x200,
@@ -6713,6 +6801,7 @@ static struct vop2_win_data rk3568_win_data[6] = {
 		.name = "Esmart0",
 		.phys_id = ROCKCHIP_VOP2_ESMART0,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.win_sel_port_offset = 4,
 		.layer_sel_win_id = { 2, 2, 2, 0xff },
 		.reg_offset = 0,
@@ -6730,6 +6819,7 @@ static struct vop2_win_data rk3568_win_data[6] = {
 		.name = "Esmart1",
 		.phys_id = ROCKCHIP_VOP2_ESMART1,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.win_sel_port_offset = 5,
 		.layer_sel_win_id = { 6, 6, 6, 0xff },
 		.reg_offset = 0x200,
@@ -6749,6 +6839,7 @@ static struct vop2_win_data rk3568_win_data[6] = {
 		.name = "Smart0",
 		.phys_id = ROCKCHIP_VOP2_SMART0,
 		.type = SMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.win_sel_port_offset = 6,
 		.layer_sel_win_id = { 3, 3, 3, 0xff },
 		.reg_offset = 0x400,
@@ -6766,6 +6857,7 @@ static struct vop2_win_data rk3568_win_data[6] = {
 		.name = "Smart1",
 		.phys_id = ROCKCHIP_VOP2_SMART1,
 		.type = SMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.win_sel_port_offset = 7,
 		.layer_sel_win_id = { 7, 7, 7, 0xff },
 		.reg_offset = 0x600,
@@ -6811,8 +6903,8 @@ const struct vop2_data rk3568_vop = {
 	.vp_data = rk3568_vp_data,
 	.win_data = rk3568_win_data,
 	.plane_mask = rk356x_vp_plane_mask[0],
+	.plane_mask_base = RK3568_PLANE_MASK_BASE,
 	.plane_table = rk356x_plane_table,
-	.vp_primary_plane_order = rk3568_vp_primary_plane_order,
 	.nr_layers = 6,
 	.nr_mixers = 5,
 	.nr_gammas = 1,
@@ -6821,11 +6913,10 @@ const struct vop2_data rk3568_vop = {
 	.ops = &rk3568_vop_ops,
 };
 
-static u8 rk3576_vp_default_primary_plane[VOP2_VP_MAX] = {
-	ROCKCHIP_VOP2_ESMART0,
-	ROCKCHIP_VOP2_ESMART1,
-	ROCKCHIP_VOP2_ESMART2,
-};
+#define RK3576_PLANE_MASK_BASE \
+	(BIT(ROCKCHIP_VOP2_CLUSTER0) | BIT(ROCKCHIP_VOP2_CLUSTER1) | \
+	 BIT(ROCKCHIP_VOP2_ESMART0)  | BIT(ROCKCHIP_VOP2_ESMART1)  | \
+	 BIT(ROCKCHIP_VOP2_ESMART2)  | BIT(ROCKCHIP_VOP2_ESMART3))
 
 static struct vop2_plane_table rk3576_plane_table[ROCKCHIP_VOP2_LAYER_MAX] = {
 	{ROCKCHIP_VOP2_ESMART0, ESMART_LAYER},
@@ -6902,6 +6993,7 @@ static struct vop2_win_data rk3576_win_data[6] = {
 		.name = "Esmart0",
 		.phys_id = ROCKCHIP_VOP2_ESMART0,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.layer_sel_win_id = { 2, 0xff, 0, 0xff },
 		.reg_offset = 0x0,
 		.supported_rotations = DRM_MODE_REFLECT_Y,
@@ -6924,6 +7016,7 @@ static struct vop2_win_data rk3576_win_data[6] = {
 		.name = "Esmart1",
 		.phys_id = ROCKCHIP_VOP2_ESMART1,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.layer_sel_win_id = { 0xff, 2, 1, 0xff },
 		.reg_offset = 0x200,
 		.supported_rotations = DRM_MODE_REFLECT_Y,
@@ -6947,6 +7040,7 @@ static struct vop2_win_data rk3576_win_data[6] = {
 		.name = "Esmart2",
 		.phys_id = ROCKCHIP_VOP2_ESMART2,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.layer_sel_win_id = { 3, 0xff, 2, 0xff },
 		.reg_offset = 0x400,
 		.supported_rotations = DRM_MODE_REFLECT_Y,
@@ -6970,6 +7064,7 @@ static struct vop2_win_data rk3576_win_data[6] = {
 		.name = "Esmart3",
 		.phys_id = ROCKCHIP_VOP2_ESMART3,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.layer_sel_win_id = { 0xff, 3, 3, 0xff },
 		.reg_offset = 0x600,
 		.supported_rotations = DRM_MODE_REFLECT_Y,
@@ -6993,6 +7088,7 @@ static struct vop2_win_data rk3576_win_data[6] = {
 		.name = "Cluster0",
 		.phys_id = ROCKCHIP_VOP2_CLUSTER0,
 		.type = CLUSTER_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.layer_sel_win_id = { 0, 0, 0xff, 0xff },
 		.reg_offset = 0x0,
 		.supported_rotations = DRM_MODE_REFLECT_X | DRM_MODE_REFLECT_Y,
@@ -7016,6 +7112,7 @@ static struct vop2_win_data rk3576_win_data[6] = {
 		.name = "Cluster1",
 		.phys_id = ROCKCHIP_VOP2_CLUSTER1,
 		.type = CLUSTER_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.layer_sel_win_id = { 1, 1, 0xff, 0xff },
 		.reg_offset = 0x200,
 		.supported_rotations = DRM_MODE_REFLECT_X | DRM_MODE_REFLECT_Y,
@@ -7116,24 +7213,13 @@ const struct vop2_data rk3576_vop = {
 	.esmart_lb_mode_map = rk3576_esmart_lb_mode_map,
 	.vp_data = rk3576_vp_data,
 	.win_data = rk3576_win_data,
+	.plane_mask_base = RK3576_PLANE_MASK_BASE,
 	.plane_table = rk3576_plane_table,
 	.pd = rk3576_vop_pd_data,
-	.vp_default_primary_plane = rk3576_vp_default_primary_plane,
 	.nr_pd = ARRAY_SIZE(rk3576_vop_pd_data),
 	.dump_regs = rk3576_dump_regs,
 	.dump_regs_size = ARRAY_SIZE(rk3576_dump_regs),
 	.ops = &rk3576_vop_ops,
-};
-
-static u8 rk3588_vp_primary_plane_order[ROCKCHIP_VOP2_LAYER_MAX] = {
-	ROCKCHIP_VOP2_ESMART0,
-	ROCKCHIP_VOP2_ESMART1,
-	ROCKCHIP_VOP2_ESMART2,
-	ROCKCHIP_VOP2_ESMART3,
-	ROCKCHIP_VOP2_CLUSTER0,
-	ROCKCHIP_VOP2_CLUSTER1,
-	ROCKCHIP_VOP2_CLUSTER2,
-	ROCKCHIP_VOP2_CLUSTER3,
 };
 
 static struct vop2_plane_table rk3588_plane_table[ROCKCHIP_VOP2_LAYER_MAX] = {
@@ -7266,12 +7352,19 @@ static struct vop2_vp_plane_mask rk3588_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 
 };
 
+#define RK3588_PLANE_MASK_BASE \
+	(BIT(ROCKCHIP_VOP2_CLUSTER0) | BIT(ROCKCHIP_VOP2_CLUSTER1) | \
+	 BIT(ROCKCHIP_VOP2_CLUSTER2) | BIT(ROCKCHIP_VOP2_CLUSTER3) | \
+	 BIT(ROCKCHIP_VOP2_ESMART0)  | BIT(ROCKCHIP_VOP2_ESMART1)  | \
+	 BIT(ROCKCHIP_VOP2_ESMART2)  | BIT(ROCKCHIP_VOP2_ESMART3))
+
 static struct vop2_win_data rk3588_win_data[8] = {
 	{
 		.name = "Cluster0",
 		.phys_id = ROCKCHIP_VOP2_CLUSTER0,
 		.splice_win_id = ROCKCHIP_VOP2_CLUSTER1,
 		.type = CLUSTER_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.win_sel_port_offset = 0,
 		.layer_sel_win_id = { 0, 0, 0, 0 },
 		.reg_offset = 0,
@@ -7293,6 +7386,7 @@ static struct vop2_win_data rk3588_win_data[8] = {
 		.name = "Cluster1",
 		.phys_id = ROCKCHIP_VOP2_CLUSTER1,
 		.type = CLUSTER_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.win_sel_port_offset = 1,
 		.layer_sel_win_id = { 1, 1, 1, 1 },
 		.reg_offset = 0x200,
@@ -7315,6 +7409,7 @@ static struct vop2_win_data rk3588_win_data[8] = {
 		.phys_id = ROCKCHIP_VOP2_CLUSTER2,
 		.splice_win_id = ROCKCHIP_VOP2_CLUSTER3,
 		.type = CLUSTER_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.win_sel_port_offset = 2,
 		.layer_sel_win_id = { 4, 4, 4, 4 },
 		.reg_offset = 0x400,
@@ -7336,6 +7431,7 @@ static struct vop2_win_data rk3588_win_data[8] = {
 		.name = "Cluster3",
 		.phys_id = ROCKCHIP_VOP2_CLUSTER3,
 		.type = CLUSTER_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_OVERLAY,
 		.win_sel_port_offset = 3,
 		.layer_sel_win_id = { 5, 5, 5, 5 },
 		.reg_offset = 0x600,
@@ -7358,6 +7454,7 @@ static struct vop2_win_data rk3588_win_data[8] = {
 		.phys_id = ROCKCHIP_VOP2_ESMART0,
 		.splice_win_id = ROCKCHIP_VOP2_ESMART1,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.win_sel_port_offset = 4,
 		.layer_sel_win_id = { 2, 2, 2, 2 },
 		.reg_offset = 0,
@@ -7378,6 +7475,7 @@ static struct vop2_win_data rk3588_win_data[8] = {
 		.name = "Esmart1",
 		.phys_id = ROCKCHIP_VOP2_ESMART1,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.win_sel_port_offset = 5,
 		.layer_sel_win_id = { 3, 3, 3, 3 },
 		.reg_offset = 0x200,
@@ -7400,6 +7498,7 @@ static struct vop2_win_data rk3588_win_data[8] = {
 		.phys_id = ROCKCHIP_VOP2_ESMART2,
 		.splice_win_id = ROCKCHIP_VOP2_ESMART3,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.win_sel_port_offset = 6,
 		.layer_sel_win_id = { 6, 6, 6, 6 },
 		.reg_offset = 0x400,
@@ -7421,6 +7520,7 @@ static struct vop2_win_data rk3588_win_data[8] = {
 		.name = "Esmart3",
 		.phys_id = ROCKCHIP_VOP2_ESMART3,
 		.type = ESMART_LAYER,
+		.plane_type = VOP2_PLANE_TYPE_PRIMARY,
 		.win_sel_port_offset = 7,
 		.layer_sel_win_id = { 7, 7, 7, 7 },
 		.reg_offset = 0x600,
@@ -7589,12 +7689,12 @@ const struct vop2_data rk3588_vop = {
 	.vp_data = rk3588_vp_data,
 	.win_data = rk3588_win_data,
 	.plane_mask = rk3588_vp_plane_mask[0],
+	.plane_mask_base = RK3588_PLANE_MASK_BASE,
 	.plane_table = rk3588_plane_table,
 	.pd = rk3588_vop_pd_data,
 	.dsc = rk3588_dsc_data,
 	.dsc_error_ecw = dsc_ecw,
 	.dsc_error_buffer_flow = dsc_buffer_flow,
-	.vp_primary_plane_order = rk3588_vp_primary_plane_order,
 	.nr_layers = 8,
 	.nr_mixers = 7,
 	.nr_gammas = 4,

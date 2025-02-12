@@ -310,6 +310,14 @@ config SPL_CRYPTO_SUPPORT
 	  this option to build the drivers in drivers/crypto as part of an
 	  SPL build.
 
+config SPL_KEYLAD_SUPPORT
+	bool "Support keylad drivers"
+	help
+	  Enable keylad drivers in SPL. These drivers can be used to pass
+	  otp keys to other IP addresses. (e.g. CRYPTO module). Enable
+	  this option to build the drivers in drivers/keylad as part of an
+	  SPL build.
+
 config SPL_HASH_SUPPORT
 	bool "Support hashing drivers"
 	select SHA1

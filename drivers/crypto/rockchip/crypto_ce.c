@@ -101,6 +101,20 @@ static const struct rockchip_map rk_ec_map[] = {
 static int rk_crypto_enable_clk(struct udevice *dev);
 static int rk_crypto_disable_clk(struct udevice *dev);
 
+static void rk_crypto_soft_reset(struct udevice *dev, uint32_t reset_sel)
+{
+	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
+
+	if (!priv->hardware)
+		return;
+
+	rk_crypto_enable_clk(dev);
+
+	rkce_soft_reset(priv->hardware, reset_sel);
+
+	rk_crypto_disable_clk(dev);
+}
+
 static void crypto_flush_cacheline(ulong addr, ulong size)
 {
 	ulong alignment = CONFIG_SYS_CACHELINE_SIZE;
@@ -253,7 +267,7 @@ static int rk_sha_init(struct udevice *dev, sha_context *ctx,
 	if (priv->hash_ctx)
 		return -EFAULT;
 
-	rkce_soft_reset(priv->hardware, RKCE_RESET_HASH);
+	rk_crypto_soft_reset(dev, RKCE_RESET_HASH);
 
 	hash_ctx = rkce_sha_ctx_alloc();
 	if (!hash_ctx)
@@ -734,9 +748,13 @@ static int rk_crypto_cipher(struct udevice *dev, cipher_context *ctx,
 	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
 	struct rkce_cipher_contex *hw_ctx = NULL;
 	u32 ce_algo = 0, ce_mode = 0;
+	bool use_otpkey = false;
 	int ret = 0;
 
-	rkce_soft_reset(priv->hardware, RKCE_RESET_SYMM);
+	rk_crypto_soft_reset(dev, RKCE_RESET_SYMM);
+
+	if (!ctx->key && ctx->key_len)
+		use_otpkey = true;
 
 	ret = rk_get_cipher_cemode(ctx->algo, ctx->mode, &ce_algo, &ce_mode);
 	if (ret)
@@ -756,13 +774,16 @@ static int rk_crypto_cipher(struct udevice *dev, cipher_context *ctx,
 	hw_ctx->td->ctrl.first_pkg = 1;
 	hw_ctx->td->ctrl.last_pkg  = 1;
 	hw_ctx->td->ctrl.int_en    = 1;
+	hw_ctx->td->ctrl.key_sel   = use_otpkey ? RKCE_KEY_SEL_KT : RKCE_KEY_SEL_USER;
 
 	memcpy(hw_ctx->td_buf->iv, ctx->iv, ctx->iv_len);
 	hw_ctx->td->ctrl.iv_len    = ctx->iv_len;
 
-	ret = rk_set_symm_td_buf_key(hw_ctx->td_buf, ce_algo, ce_mode, ctx);
-	if (ret)
-		goto exit;
+	if (!use_otpkey) {
+		ret = rk_set_symm_td_buf_key(hw_ctx->td_buf, ce_algo, ce_mode, ctx);
+		if (ret)
+			goto exit;
+	}
 
 	ret = rk_set_symm_td_sg(hw_ctx->td, in, len, out, len);
 	if (ret)
@@ -874,6 +895,36 @@ static int rockchip_crypto_ae(struct udevice *dev, cipher_context *ctx,
 			      u8 *out, u8 *tag)
 {
 	return rk_crypto_cipher(dev, ctx, in, out, len, true, aad, aad_len, tag);
+}
+
+int rockchip_crypto_fw_cipher(struct udevice *dev, cipher_fw_context *ctx,
+			      const u8 *in, u8 *out, u32 len, bool enc)
+{
+	cipher_context cipher_ctx;
+
+	memset(&cipher_ctx, 0x00, sizeof(cipher_ctx));
+
+	cipher_ctx.algo    = ctx->algo;
+	cipher_ctx.mode    = ctx->mode;
+	cipher_ctx.key_len = ctx->key_len;
+	cipher_ctx.iv      = ctx->iv;
+	cipher_ctx.iv_len  = ctx->iv_len;
+
+	return rk_crypto_cipher(dev, &cipher_ctx, in, out, len, enc, NULL, 0, NULL);
+}
+
+static ulong rockchip_get_keytable_addr(struct udevice *dev)
+{
+	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
+	ulong addr;
+
+	rk_crypto_enable_clk(dev);
+
+	addr = rkce_get_keytable_addr(priv->hardware);
+
+	rk_crypto_disable_clk(dev);
+
+	return addr;
 }
 
 #endif
@@ -1005,9 +1056,11 @@ static const struct dm_crypto_ops rockchip_crypto_ops = {
 	.ec_verify    = rockchip_crypto_ec_verify,
 #endif
 #if CONFIG_IS_ENABLED(ROCKCHIP_CIPHER)
-	.cipher_crypt = rockchip_crypto_cipher,
-	.cipher_mac   = rockchip_crypto_mac,
-	.cipher_ae    = rockchip_crypto_ae,
+	.cipher_crypt    = rockchip_crypto_cipher,
+	.cipher_mac      = rockchip_crypto_mac,
+	.cipher_ae       = rockchip_crypto_ae,
+	.cipher_fw_crypt = rockchip_crypto_fw_cipher,
+	.keytable_addr   = rockchip_get_keytable_addr,
 #endif
 
 };

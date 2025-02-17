@@ -90,6 +90,15 @@ enum {
 	RKCE_KEY_AES_256,
 };
 
+enum {
+	RKCE_KEY_SEL_USER  = 0,
+	RKCE_KEY_SEL_KT    = 1,
+	RKCE_KEY_SEL_KL_KA = 4,
+	RKCE_KEY_SEL_KL_K1,
+	RKCE_KEY_SEL_KL_K2,
+	RKCE_KEY_SEL_KL_K3,
+};
+
 enum rkce_algo_hash_type {
 	RKCE_HASH_ALGO_SHA1 = 0,
 	RKCE_HASH_ALGO_MD5,
@@ -335,5 +344,7 @@ int rkce_init_symm_td(struct rkce_symm_td *td, struct rkce_symm_td_buf *buf);
 int rkce_init_hash_td(struct rkce_hash_td *td, struct rkce_hash_td_buf *buf);
 
 bool rkce_hw_algo_valid(void *rkce_hw, uint32_t type, uint32_t algo, uint32_t mode);
+
+uint32_t rkce_get_keytable_addr(void *rkce_hw);
 
 #endif

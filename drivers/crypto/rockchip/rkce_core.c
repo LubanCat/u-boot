@@ -621,3 +621,14 @@ void rkce_irq_thread(void *rkce_hw)
 	if (is_fault)
 		rkce_dump_reginfo(hardware);
 }
+
+uint32_t rkce_get_keytable_addr(void *rkce_hw)
+{
+	struct RKCE_REG *rkce_reg;
+
+	CHECK_RKCE_INITED(rkce_hw);
+
+	rkce_reg = GET_RKCE_REG(rkce_hw);
+
+	return rkce_reg->KL_TO_CE_PADDR + CRYPTO_CH0_KEY_0;
+}

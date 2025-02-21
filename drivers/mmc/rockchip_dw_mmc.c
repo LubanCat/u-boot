@@ -270,7 +270,7 @@ static int rockchip_dwmmc_execute_tuning(struct dwmci_host *host, u32 opcode)
 	int middle_phase, real_middle_phase;
 	ulong ts;
 
-	if (!(priv->sample_clk.dev))
+	if (!(priv->sample_clk.dev) && priv->usrid != USRID_INTER_PHASE)
 		return -EIO;
 	ts = get_timer(0);
 

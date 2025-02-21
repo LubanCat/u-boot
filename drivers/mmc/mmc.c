@@ -2214,11 +2214,17 @@ static int mmc_select_card(struct mmc *mmc, int n)
 
 int mmc_start_init(struct mmc *mmc)
 {
+	int bus_width = 1;
 	/*
 	 * We use the MMC config set by the bootrom.
 	 * So it is no need to reset the eMMC device.
 	 */
-	mmc_set_bus_width(mmc, 8);
+	if (mmc->cfg->host_caps & MMC_MODE_8BIT)
+		bus_width = 8;
+	else if (mmc->cfg->host_caps & MMC_MODE_4BIT)
+		bus_width = 4;
+	mmc_set_bus_width(mmc, bus_width);
+
 	mmc_set_clock(mmc, 1);
 	mmc_set_timing(mmc, MMC_TIMING_LEGACY);
 	/* Send cmd7 to return stand-by state*/

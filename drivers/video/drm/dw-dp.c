@@ -1459,7 +1459,9 @@ static int dw_dp_connector_get_edid(struct rockchip_connector *conn, struct disp
 	struct connector_state *conn_state = &state->conn_state;
 	struct dw_dp *dp = connector_to_dw_dp(conn);
 
-	ret = drm_do_get_edid(&dp->aux.ddc, conn_state->edid);
+	conn_state->edid = drm_do_get_edid(&dp->aux.ddc);
+	if (!conn_state->edid)
+		ret = -EINVAL;
 
 	return ret;
 }
@@ -1626,7 +1628,7 @@ static u32 dw_dp_get_output_bus_fmts(struct dw_dp *dp, struct hdmi_edid_data *ed
 
 static int dw_dp_connector_get_timing(struct rockchip_connector *conn, struct display_state *state)
 {
-	int ret, i;
+	int ret = 0, i;
 	struct connector_state *conn_state = &state->conn_state;
 	struct dw_dp *dp = connector_to_dw_dp(conn);
 	struct drm_display_mode *mode = &conn_state->mode;
@@ -1644,11 +1646,11 @@ static int dw_dp_connector_get_timing(struct rockchip_connector *conn, struct di
 	edid_data.mode_buf = mode_buf;
 
 	if (!dp->force_output) {
-		ret = drm_do_get_edid(&dp->aux.ddc, conn_state->edid);
-		if (!ret)
+		conn_state->edid = drm_do_get_edid(&dp->aux.ddc);
+		if (conn_state->edid)
 			ret = drm_add_edid_modes(&edid_data, conn_state->edid);
 
-		if (ret < 0) {
+		if (ret <= 0) {
 			printf("failed to get edid\n");
 			goto err;
 		}

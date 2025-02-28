@@ -94,9 +94,9 @@ static int rk_pwm_set_invert_v4(struct udevice *dev, uint channel, bool polarity
 
 	debug("%s: polarity=%u\n", __func__, polarity);
 	if (polarity)
-		priv->conf_polarity = PWM_DUTY_NEGATIVE | PWM_INACTIVE_POSTIVE;
+		priv->conf_polarity = DUTY_NEGATIVE | INACTIVE_POSITIVE;
 	else
-		priv->conf_polarity = PWM_DUTY_POSTIVE | PWM_INACTIVE_NEGATIVE;
+		priv->conf_polarity = DUTY_POSITIVE | INACTIVE_NEGATIVE;
 
 	return 0;
 }
@@ -291,8 +291,13 @@ static int rk_pwm_probe(struct udevice *dev)
 	priv->freq = ret;
 	priv->data = (struct rockchip_pwm_data *)dev_get_driver_data(dev);
 
-	if (priv->data->supports_polarity)
-		priv->conf_polarity = PWM_DUTY_POSTIVE | PWM_INACTIVE_POSTIVE;
+	if (priv->data->supports_polarity) {
+		if (priv->data->main_version >= 4) {
+			priv->conf_polarity = DUTY_POSITIVE | INACTIVE_NEGATIVE;
+		} else {
+			priv->conf_polarity = PWM_DUTY_POSTIVE | PWM_INACTIVE_POSTIVE;
+		}
+	}
 
 	return 0;
 }

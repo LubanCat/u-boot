@@ -2502,7 +2502,7 @@ struct mallinfo smp_mALLINFo()
 	info = mALLINFo();
 	u_spin_unlock(&malloc_lock);
 
-	return info
+	return info;
 }
 #endif	/* DEBUG */
 

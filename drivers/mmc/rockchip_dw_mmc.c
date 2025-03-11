@@ -241,7 +241,7 @@ static int rockchip_mmc_set_phase(struct dwmci_host *host, bool sample, int degr
 	if (sample)
 		dwmci_writel(host, SDMMC_TIMING_CON1, HIWORD_UPDATE(raw_value, 0x07ff, 1));
 	else
-		dwmci_writel(host, SDMMC_TIMING_CON1, HIWORD_UPDATE(raw_value, 0x07ff, 1));
+		dwmci_writel(host, SDMMC_TIMING_CON0, HIWORD_UPDATE(raw_value, 0x07ff, 1));
 
 	debug("set %s_phase(%d) delay_nums=%u actual_degrees=%d\n",
 		sample ? "sample" : "drv", degrees, delay_num,

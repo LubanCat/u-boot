@@ -29,6 +29,11 @@ enum RK_ESCK_KEYID {
 	RK_ESCK_KEYMAX
 };
 
+enum RK_FW_KEYID {
+	RK_FW_KEY0 = 0,
+	RK_FW_KEYMAX
+};
+
 /* Crypto mode */
 enum RK_CIPIHER_MODE {
 	RK_CIPHER_MODE_ECB = 0,

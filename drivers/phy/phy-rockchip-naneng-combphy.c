@@ -581,6 +581,19 @@ static int rk3562_combphy_cfg(struct rockchip_combphy_priv *priv)
 		writel(0xf0, priv->mmio + (0xa << 2));
 	}
 
+	if (dev_read_bool(priv->dev, "rockchip,ext-refclk")) {
+		param_write(priv->phy_grf, &cfg->pipe_clk_ext, true);
+		if (priv->mode == PHY_TYPE_PCIE) {
+			val = readl(priv->mmio + (0xc << 2));
+			val |= 0x3 << 4 | 0x1 << 7;
+			writel(val, priv->mmio + (0xc << 2));
+
+			val = readl(priv->mmio + (0xd << 2));
+			val |= 0x1;
+			writel(val, priv->mmio + (0xd << 2));
+		}
+	}
+
 	if (dev_read_bool(priv->dev, "rockchip,enable-ssc")) {
 		val = readl(priv->mmio + (0x7 << 2));
 		val |= BIT(4);

@@ -127,7 +127,7 @@ static struct mm_region rk3576_mem_map[] = {
 	}, {
 		.virt = 0x100000000UL,
 		.phys = 0x100000000UL,
-		.size = 0x300000000UL,
+		.size = 0x400000000UL,
 		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 			 PTE_BLOCK_INNER_SHARE
 	}, {

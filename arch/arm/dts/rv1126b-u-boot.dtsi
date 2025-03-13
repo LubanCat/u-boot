@@ -1,0 +1,173 @@
+/*
+ * (C) Copyright 2025 Rockchip Electronics Co., Ltd
+ *
+ * SPDX-License-Identifier:     GPL-2.0+
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	aliases {
+		mmc0 = &emmc;
+		mmc1 = &sdmmc0;
+	};
+
+	chosen {
+		stdout-path = &uart0;
+		u-boot,spl-boot-order = &sdmmc0, &spi_nand, &spi_nor, &emmc;
+	};
+};
+
+&gpio0 {
+	u-boot,dm-spl;
+	status = "okay";
+};
+
+&gpio1 {
+	u-boot,dm-pre-reloc;
+	status = "okay";
+};
+
+&gpio2 {
+	u-boot,dm-spl;
+	status = "okay";
+};
+
+&gpio3 {
+	u-boot,dm-pre-reloc;
+	status = "okay";
+};
+
+&gpio4 {
+	u-boot,dm-pre-reloc;
+	status = "okay";
+};
+
+&grf {
+	u-boot,dm-spl;
+	status = "okay";
+};
+
+&ioc_grf {
+	u-boot,dm-spl;
+	status = "okay";
+};
+
+&cru {
+	u-boot,dm-spl;
+	status = "okay";
+};
+
+&crypto {
+	u-boot,dm-spl;
+	status = "okay";
+};
+
+&psci {
+	u-boot,dm-pre-reloc;
+	status = "okay";
+};
+
+&uart0 {
+	u-boot,dm-spl;
+	status = "okay";
+};
+
+&hw_decompress {
+	u-boot,dm-spl;
+	status = "okay";
+};
+
+&rng {
+	u-boot,dm-pre-reloc;
+	status = "okay";
+};
+
+&fspi0 {
+	u-boot,dm-spl;
+	status = "okay";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+	spi_nand: flash@0 {
+		u-boot,dm-spl;
+		compatible = "spi-nand";
+		reg = <0>;
+		spi-tx-bus-width = <1>;
+		spi-rx-bus-width = <4>;
+		spi-max-frequency = <80000000>;
+	};
+
+	spi_nor: flash@1 {
+		u-boot,dm-spl;
+		compatible = "jedec,spi-nor";
+		label = "sfc_nor";
+		reg = <0>;
+		spi-tx-bus-width = <1>;
+		spi-rx-bus-width = <4>;
+		spi-max-frequency = <80000000>;
+	};
+};
+
+&saradc0 {
+	u-boot,dm-pre-reloc;
+	status = "okay";
+};
+
+&sdmmc0 {
+	bus-width = <4>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdmmc0_bus4_pins &sdmmc0_cmd_pins &sdmmc0_clk_pins &sdmmc0_detn_pins>;
+	u-boot,dm-spl;
+	status = "okay";
+};
+
+&emmc {
+	bus-width = <8>;
+	mmc-hs200-1_8v;
+	u-boot,dm-spl;
+	status = "okay";
+};
+
+&sdmmc0_pins {
+	u-boot,dm-spl;
+};
+
+&sdmmc0_bus4_pins {
+	u-boot,dm-spl;
+};
+
+&sdmmc0_cmd_pins {
+	u-boot,dm-spl;
+};
+
+&sdmmc0_clk_pins {
+	u-boot,dm-spl;
+};
+
+&sdmmc0_detn_pins {
+	u-boot,dm-spl;
+};
+
+&pinctrl {
+	u-boot,dm-spl;
+	status = "okay";
+};
+
+&pcfg_pull_up {
+	u-boot,dm-spl;
+};
+
+&pcfg_pull_none {
+	u-boot,dm-spl;
+};
+
+&usb2phy {
+	u-boot,dm-pre-reloc;
+	status = "okay";
+};
+
+&usb2phy_otg {
+	u-boot,dm-pre-reloc;
+	status = "okay";
+};

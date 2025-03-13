@@ -12,6 +12,8 @@ rm -f ${srctree}/*.digest ${srctree}/*.bin.gz ${srctree}/bl31_0x*.bin
 # Periph register base
 if grep -q '^CONFIG_ROCKCHIP_RK3576=y' .config ; then
 MAX_ADDR_VAL=$((0x10000000))
+elif grep -q '^CONFIG_ROCKCHIP_RV1126B=y' .config ; then
+MAX_ADDR_VAL=$((0x20000000))
 elif grep -q '^CONFIG_ROCKCHIP_RV1103B=y' .config ; then
 MAX_ADDR_VAL=$((0x20000000))
 else

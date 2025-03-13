@@ -248,6 +248,41 @@ static inline void rk_pcie_writel_apb(struct rk_pcie *rk_pcie, u32 reg,
 	__rk_pcie_write_apb(rk_pcie, rk_pcie->apb_base, reg, 0x4, val);
 }
 
+static int rk_pci_find_ext_capability(struct rk_pcie *rk_pcie, int cap)
+{
+	u32 header;
+	int ttl;
+	int start = 0;
+	int pos = PCI_CFG_SPACE_SIZE;
+
+	/* minimum 8 bytes per capability */
+	ttl = (PCI_CFG_SPACE_EXP_SIZE - PCI_CFG_SPACE_SIZE) / 8;
+
+	header = readl(rk_pcie->dbi_base + pos);
+
+	/*
+	 * If we have no capabilities, this is indicated by cap ID,
+	 * cap version and next pointer all being 0.
+	 */
+	if (header == 0)
+		return 0;
+
+	while (ttl-- > 0) {
+		if (PCI_EXT_CAP_ID(header) == cap && pos != start)
+			return pos;
+
+		pos = PCI_EXT_CAP_NEXT(header);
+		if (pos < PCI_CFG_SPACE_SIZE)
+			break;
+
+		header = readl(rk_pcie->dbi_base + pos);
+		if (!header)
+			break;
+	}
+
+	return 0;
+}
+
 static int rk_pcie_get_link_speed(struct rk_pcie *rk_pcie)
 {
 	return (readl(rk_pcie->dbi_base + PCIE_LINK_STATUS_REG) &
@@ -933,7 +968,7 @@ static int rockchip_pcie_probe(struct udevice *dev)
 					 priv->mem.phys_start,
 					 priv->mem.bus_start, priv->mem.size);
 
-	priv->rasdes_off = dm_pci_find_ext_capability(dev, PCI_EXT_CAP_ID_VNDR);
+	priv->rasdes_off = rk_pci_find_ext_capability(priv, PCI_EXT_CAP_ID_VNDR);
 	if (priv->rasdes_off) {
 		/* Enable RC's err dump */
 		writel(0x1c, priv->dbi_base + priv->rasdes_off + 8);

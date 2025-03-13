@@ -65,6 +65,8 @@ struct rockchip_crypto_priv {
 	u32				length;
 	struct rk_hash_ctx		*hw_ctx;
 	struct rk_crypto_soc_data	*soc_data;
+	u16				enable;
+	u16				secure;
 };
 
 #define LLI_ADDR_ALIGN_SIZE	8
@@ -560,6 +562,9 @@ static u32 rockchip_crypto_capability(struct udevice *dev)
 {
 	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
 	u32 capability, mask = 0;
+
+	if (!priv->enable)
+		return 0;
 
 	capability = priv->soc_data->capability;
 
@@ -1415,7 +1420,6 @@ int rk_crypto_ae(struct udevice *dev, u32 algo, u32 mode,
 int rockchip_crypto_ae(struct udevice *dev, cipher_context *ctx,
 		       const u8 *in, u32 len, const u8 *aad, u32 aad_len,
 		       u8 *out, u8 *tag)
-
 {
 	int ret = 0;
 
@@ -1583,12 +1587,27 @@ static int rockchip_crypto_ofdata_to_platdata(struct udevice *dev)
 {
 	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
 	int len, ret = -EINVAL;
+	bool secure_flag;
 
 	memset(priv, 0x00, sizeof(*priv));
 
 	priv->reg = (fdt_addr_t)dev_read_addr_ptr(dev);
 	if (priv->reg == FDT_ADDR_T_NONE)
 		return -EINVAL;
+
+	secure_flag = dev_read_bool(dev, "security");
+
+	priv->secure = secure_flag;
+
+#if CONFIG_SPL_BUILD
+	if (secure_flag == 1)
+#else
+	if (secure_flag == 0)
+#endif
+		priv->enable = 1;
+
+	if (!priv->enable)
+		return 0;
 
 	crypto_base = priv->reg;
 
@@ -1598,7 +1617,6 @@ static int rockchip_crypto_ofdata_to_platdata(struct udevice *dev)
 		return 0;
 	}
 
-	memset(priv, 0x00, sizeof(*priv));
 	priv->clocks = malloc(len);
 	if (!priv->clocks)
 		return -ENOMEM;
@@ -1673,6 +1691,13 @@ static int rockchip_crypto_probe(struct udevice *dev)
 	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
 	struct rk_crypto_soc_data *sdata;
 	int ret = 0;
+
+	if (!priv->enable) {
+		printf("crypto %s 0x%08x skip probe!!!!!!\n",
+		       priv->secure ? "secure" : "non_secure",
+		       (u32)priv->reg);
+		return 0;
+	}
 
 	sdata = (struct rk_crypto_soc_data *)dev_get_driver_data(dev);
 

@@ -889,6 +889,10 @@ static int hw_cipher_init(u32 chn, const u8 *key, const u8 *twk_key,
 	u32 rk_mode = RK_GET_RK_MODE(mode);
 	u32 key_chn_sel = chn;
 	u32 reg_ctrl = 0;
+	bool use_otpkey = false;
+
+	if (!key && key_len)
+		use_otpkey = true;
 
 	IMSG("%s: key addr is %p, key_len is %d, iv addr is %p",
 	     __func__, key, key_len, iv);
@@ -933,7 +937,12 @@ static int hw_cipher_init(u32 chn, const u8 *key, const u8 *twk_key,
 		reg_ctrl |= CRYPTO_BC_DECRYPT;
 
 	/* write key data to reg */
-	write_key_reg(key_chn_sel, key, key_len);
+	if (!use_otpkey) {
+		write_key_reg(key_chn_sel, key, key_len);
+		crypto_write(CRYPTO_SEL_USER, CRYPTO_KEY_SEL);
+	} else {
+		crypto_write(CRYPTO_SEL_KEYTABLE, CRYPTO_KEY_SEL);
+	}
 
 	/* write twk key for xts mode */
 	if (rk_mode == RK_MODE_XTS)
@@ -1298,6 +1307,36 @@ int rockchip_crypto_cipher(struct udevice *dev, cipher_context *ctx,
 	return ret;
 }
 
+int rockchip_crypto_fw_cipher(struct udevice *dev, cipher_fw_context *ctx,
+			      const u8 *in, u8 *out, u32 len, bool enc)
+{
+	int ret;
+
+	rk_crypto_enable_clk(dev);
+
+	switch (ctx->algo) {
+	case CRYPTO_DES:
+		ret = rk_crypto_des(dev, ctx->mode, NULL, ctx->key_len,
+				    ctx->iv, in, out, len, enc);
+		break;
+	case CRYPTO_AES:
+		ret = rk_crypto_aes(dev, ctx->mode, NULL, NULL, ctx->key_len,
+				    ctx->iv, ctx->iv_len, in, out, len, enc);
+		break;
+	case CRYPTO_SM4:
+		ret = rk_crypto_sm4(dev, ctx->mode, NULL, NULL, ctx->key_len,
+				    ctx->iv, ctx->iv_len, in, out, len, enc);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	rk_crypto_disable_clk(dev);
+
+	return ret;
+}
+
 int rk_crypto_mac(struct udevice *dev, u32 algo, u32 mode,
 		  const u8 *key, u32 key_len,
 		  const u8 *in, u32 len, u8 *tag)
@@ -1389,6 +1428,11 @@ int rockchip_crypto_ae(struct udevice *dev, cipher_context *ctx,
 	rk_crypto_disable_clk(dev);
 
 	return ret;
+}
+
+static ulong rockchip_crypto_keytable_addr(struct udevice *dev)
+{
+	return CRYPTO_S_BY_KEYLAD_BASE + CRYPTO_CH0_KEY_0;
 }
 
 #endif
@@ -1520,9 +1564,11 @@ static const struct dm_crypto_ops rockchip_crypto_ops = {
 	.hmac_final   = rockchip_crypto_hmac_final,
 #endif
 #if CONFIG_IS_ENABLED(ROCKCHIP_CIPHER)
-	.cipher_crypt = rockchip_crypto_cipher,
-	.cipher_mac = rockchip_crypto_mac,
-	.cipher_ae  = rockchip_crypto_ae,
+	.cipher_crypt    = rockchip_crypto_cipher,
+	.cipher_mac      = rockchip_crypto_mac,
+	.cipher_ae       = rockchip_crypto_ae,
+	.cipher_fw_crypt = rockchip_crypto_fw_cipher,
+	.keytable_addr   = rockchip_crypto_keytable_addr,
 #endif
 };
 

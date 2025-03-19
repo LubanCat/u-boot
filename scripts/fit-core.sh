@@ -193,6 +193,11 @@ function fit_process_args()
 				;;
 			--spl-new)      # Use current build u-boot-spl.bin to pack loader
 				ARG_SPL_NEW="y"
+				# Whether aarch32 or not, spl only support 64 bits version.
+				if grep -q '^CONFIG_ARM64_BOOT_AARCH32=y' .config ; then
+					echo "ERROR: SPL doesn't support 32-bit. Please build 64-bit defconfig and update u-boot-spl.bin to rkbin first."
+					exit 1
+				fi
 				shift 1
 				;;
 			--rollback-index-boot)

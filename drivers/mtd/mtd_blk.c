@@ -31,6 +31,8 @@
 #define MTD_BLK_TABLE_BLOCK_UNKNOWN	(-2)
 #define MTD_BLK_TABLE_BLOCK_SHIFT	(-1)
 
+#define FACTORY_UNKNOWN_LBA (0xffffffff - 34)
+
 static int *mtd_map_blk_table;
 
 #if CONFIG_IS_ENABLED(SUPPORT_USBPLUG)
@@ -432,7 +434,8 @@ char *mtd_part_parse(struct blk_desc *dev_desc)
 		strcat(mtd_part_info, ",");
 		if (part_get_info(dev_desc, p + 1, &info)) {
 			/* Partition with grow tag in parameter will be resized */
-			if ((info.size + info.start + 64) >= dev_desc->lba) {
+			if ((info.size + info.start + 64) >= dev_desc->lba ||
+			    (info.size + info.start - 1) == FACTORY_UNKNOWN_LBA) {
 				if (dev_desc->devnum == BLK_MTD_SPI_NOR) {
 					/* Nor is 64KB erase block(kernel) and gpt table just
 					 * resserve 33 sectors for the last partition. This

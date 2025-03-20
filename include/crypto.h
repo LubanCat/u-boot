@@ -88,6 +88,15 @@ typedef struct {
 	u32		iv_len;
 } cipher_context;
 
+typedef struct {
+	u32		algo;
+	u32		mode;
+	u32		key_len;
+	const u8	*iv;
+	u32		iv_len;
+	u32		fw_keyid;
+} cipher_fw_context;
+
 struct dm_crypto_ops {
 	/* Hardware algorithm capability */
 	u32 (*capability)(struct udevice *dev);
@@ -124,6 +133,11 @@ struct dm_crypto_ops {
 			 const u8 *in, u32 len, const u8 *aad, u32 aad_len,
 			 u8 *out, u8 *tag);
 
+	/* cipher firmware encryption and decryption */
+	int (*cipher_fw_crypt)(struct udevice *dev, cipher_fw_context *ctx,
+			       const u8 *in, u8 *out, u32 len, bool enc);
+
+	ulong (*keytable_addr)(struct udevice *dev);
 };
 
 /**
@@ -304,5 +318,27 @@ int crypto_mac(struct udevice *dev, cipher_context *ctx,
 int crypto_ae(struct udevice *dev, cipher_context *ctx,
 	      const u8 *in, u32 len, const u8 *aad, u32 aad_len,
 	      u8 *out, u8 *tag);
+
+/**
+ * crypto_fw_cipher() - Crypto cipher firmware crypt
+ *
+ * @dev: crypto device
+ * @ctx: cipher firmware context
+ * @in: input data buffer
+ * @out: output data buffer
+ * @len: input data length
+ * @enc: true for encrypt, false for decrypt
+ * @return 0 on success, otherwise failed
+ */
+int crypto_fw_cipher(struct udevice *dev, cipher_fw_context *ctx,
+		     const u8 *in, u8 *out, u32 len, bool enc);
+
+/**
+ * crypto_keytable_addr() - Crypto keytable address
+ *
+ * @dev: crypto device
+ * @return crypto keytable address
+ */
+ulong crypto_keytable_addr(struct udevice *dev);
 
 #endif

@@ -4,6 +4,7 @@
  */
 
 #include <crypto.h>
+#include <keylad.h>
 
 static const u8 null_hash_sha1_value[] = {
 	0xda, 0x39, 0xa3, 0xee, 0x5e, 0x6b, 0x4b, 0x0d,
@@ -293,6 +294,9 @@ int crypto_cipher(struct udevice *dev, cipher_context *ctx,
 	if (!ops || !ops->cipher_crypt)
 		return -ENOSYS;
 
+	if (!ctx || !ctx->key || ctx->key_len == 0)
+		return -EINVAL;
+
 	return ops->cipher_crypt(dev, ctx, in, out, len, enc);
 }
 
@@ -303,6 +307,9 @@ int crypto_mac(struct udevice *dev, cipher_context *ctx,
 
 	if (!ops || !ops->cipher_mac)
 		return -ENOSYS;
+
+	if (!ctx || !ctx->key || ctx->key_len == 0)
+		return -EINVAL;
 
 	return ops->cipher_mac(dev, ctx, in, len, tag);
 }
@@ -316,7 +323,44 @@ int crypto_ae(struct udevice *dev, cipher_context *ctx,
 	if (!ops || !ops->cipher_ae)
 		return -ENOSYS;
 
+	if (!ctx || !ctx->key || ctx->key_len == 0)
+		return -EINVAL;
+
 	return ops->cipher_ae(dev, ctx, in, len, aad, aad_len, out, tag);
+}
+
+int crypto_fw_cipher(struct udevice *dev, cipher_fw_context *ctx,
+		     const u8 *in, u8 *out, u32 len, bool enc)
+{
+	const struct dm_crypto_ops *ops = device_get_ops(dev);
+	struct udevice *keylad_dev;
+
+	if (!ops || !ops->cipher_fw_crypt)
+		return -ENOSYS;
+
+	keylad_dev = keylad_get_device();
+	if (!keylad_dev) {
+		printf("No keylad device found.\n");
+		return -ENOSYS;
+	}
+
+	if (keylad_transfer_fwkey(keylad_dev, crypto_keytable_addr(dev),
+				  ctx->fw_keyid, ctx->key_len)) {
+		printf("Failed to transfer key from keylad.\n");
+		return -ENOSYS;
+	}
+
+	return ops->cipher_fw_crypt(dev, ctx, in, out, len, enc);
+}
+
+ulong crypto_keytable_addr(struct udevice *dev)
+{
+	const struct dm_crypto_ops *ops = device_get_ops(dev);
+
+	if (!ops || !ops->keytable_addr)
+		return 0;
+
+	return ops->keytable_addr(dev);
 }
 
 UCLASS_DRIVER(crypto) = {

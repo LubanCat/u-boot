@@ -218,6 +218,7 @@ static struct dm_pmic_ops rk801_ops = {
 
 static const struct udevice_id rk801_ids[] = {
 	{ .compatible = "rockchip,rk801" },
+	{ }
 };
 
 U_BOOT_DRIVER(pmic_rk801) = {

@@ -42,7 +42,7 @@ DRAM_BASE=`sed -n "/CONFIG_SYS_SDRAM_BASE=/s/CONFIG_SYS_SDRAM_BASE=//p" ${srctre
 if [ $# -eq 1 ]; then
 	# default
 	TEE_OFFSET=0x08400000
-	TEE_LOAD_ADDR="0x"$(echo "obase=16;$((DARM_BASE+TEE_OFFSET))"|bc)
+	TEE_LOAD_ADDR="0x"$(echo "obase=16;$((DRAM_BASE+TEE_OFFSET))"|bc)
 else
 	# args
 	while [ $# -gt 0 ]; do
@@ -100,7 +100,11 @@ else
 				shift 2
 				;;
 			-t)
-				TEE_LOAD_ADDR="0x"$(echo "obase=16;$((DARM_BASE+$2))"|bc)
+				TEE_LOAD_ADDR=$2
+				# Compatible leagcy: Offset
+				if ((TEE_LOAD_ADDR < DRAM_BASE));  then
+					TEE_LOAD_ADDR="0x"$(echo "obase=16;$((DRAM_BASE+$2))"|bc)
+				fi
 				shift 2
 				;;
 			*)

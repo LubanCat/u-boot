@@ -63,6 +63,7 @@ struct rockchip_combphy_grfcfg {
 	struct combphy_reg pipe_con1_for_sata;
 	struct combphy_reg pipe_sgmii_mac_sel;
 	struct combphy_reg pipe_xpcs_phy_ready;
+	struct combphy_reg u3otg0_clamp_dis;
 	struct combphy_reg u3otg0_port_en;
 	struct combphy_reg u3otg1_port_en;
 	struct combphy_reg u3otg0_pipe_clk_sel;
@@ -149,6 +150,9 @@ static int rockchip_combphy_usb3_init(struct rockchip_combphy_priv *priv)
 		param_write(priv->phy_grf,  &cfg->usb_mode_set, true);
 #endif
 		return ret;
+	} else {
+		if (cfg->u3otg0_clamp_dis.enable)
+			param_write(priv->pipe_grf, &cfg->u3otg0_clamp_dis, true);
 	}
 
 	if (priv->cfg->combphy_cfg) {
@@ -1136,6 +1140,8 @@ static const struct rockchip_combphy_grfcfg rv1126b_combphy_grfcfgs = {
 	.pipe_phy_status	= { 0x18034, 6, 6, 0x01, 0x00 },
 	/* peri-grf */
 	.u3otg0_port_en		= { 0x1003c, 15, 0, 0x0189, 0x1100 },
+	/* pmu-grf */
+	.u3otg0_clamp_dis	= { 0x30000, 14, 14, 0x00, 0x01 },
 };
 
 static const struct rockchip_combphy_cfg rv1126b_combphy_cfgs = {

@@ -284,18 +284,17 @@
 #define GPIO7_PHYS			0x21b00000
 
 #define GIC_IRQS_NR			287
-#define GPIO_IRQS_NR			(5 * 32)
+#define GPIO_IRQS_NR			(8 * 32)
 
-#define GPIO_BANK_NUM			5
+#define GPIO_BANK_NUM			8
 #define GPIO_BANK_PINS			32
 
-#define IRQ_TIMER1			IRQ_TIMER1_0
-#define IRQ_TIMER1_0			99
-#define IRQ_TIMER1_1			100
-#define IRQ_TIMER1_2			101
-#define IRQ_TIMER1_3			102
-#define IRQ_TIMER1_4			103
-#define IRQ_TIMER1_5			104
+#define IRQ_TIMER0			99
+#define IRQ_TIMER1			100
+#define IRQ_TIMER2			101
+#define IRQ_TIMER3			102
+#define IRQ_TIMER4			103
+#define IRQ_TIMER5			104
 
 #define IRQ_GPIO0			IRQ_GPIO0_0
 #define IRQ_GPIO0_0			32

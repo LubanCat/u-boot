@@ -177,7 +177,7 @@ static struct reg_data rk817_init_reg[] = {
 	{ RK817_PMIC_SYS_CFG3, 0x00, 0x18 },
 	/* GATE pin function: gate function */
 	{ RK817_GPIO_INT_CFG, 0x00, 0x20 },
-#ifdef CONFIG_DM_CHARGE_DISPLAY
+#if CONFIG_IS_ENABLED(IRQ)
 	/* Set pmic_int active low */
 	{ RK817_GPIO_INT_CFG,  0x00, 0x02 },
 #endif

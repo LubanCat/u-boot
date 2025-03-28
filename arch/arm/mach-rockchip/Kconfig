@@ -802,7 +802,7 @@ config ROCKCHIP_BOOT_MODE_REG
 	default 0xff020200 if ROCKCHIP_RV1106
 	default 0x10300580 if ROCKCHIP_RV1108
 	default 0xfe020200 if ROCKCHIP_RV1126
-	default 0x20130200 if ROCKCHIP_RV1126B
+	default 0x20130220 if ROCKCHIP_RV1126B
 	default 0
 	help
 	  The Soc will enter to different boot mode(defined in asm/arch/boot_mode.h)

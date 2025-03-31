@@ -1166,7 +1166,7 @@ static ulong rk3576_dclk_vop_get_clk(struct rk3576_clk_priv *priv, ulong clk_id)
 	return DIV_TO_RATE(parent, div);
 }
 
-#define RK3576_VOP_PLL_LIMIT_FREQ 600000000
+#define RK3576_VOP_PLL_LIMIT_FREQ 594000000
 
 static ulong rk3576_dclk_vop_set_clk(struct rk3576_clk_priv *priv,
 				     ulong clk_id, ulong rate)

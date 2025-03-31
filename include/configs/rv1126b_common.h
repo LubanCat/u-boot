@@ -81,9 +81,11 @@
 #endif
 #endif /* !CONFIG_SPL_BUILD */
 
+#if defined(CONFIG_USB_HOST) || defined(CONFIG_SPL_USB_HOST_SUPPORT)
 /* rockchip ohci host driver */
 #define CONFIG_USB_OHCI_NEW
 #define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS	1
+#endif
 
 #define CONFIG_PREBOOT
 #define CONFIG_LIB_HW_RAND

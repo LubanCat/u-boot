@@ -22,6 +22,9 @@
 
 #define CRYPTO_MAJOR_VER_3		0x03000000
 #define CRYPTO_MAJOR_VER_4		0x04000000
+#ifdef CONFIG_ROCKCHIP_RK3562
+#define CRYPTO_S_BY_KEYLAD_BASE  	0xFF8A8000
+#endif
 
 #ifdef DEBUG
 #define IMSG(format, ...) printf("[%s, %05d]-trace: " format "\n", \

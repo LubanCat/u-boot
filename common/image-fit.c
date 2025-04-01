@@ -31,6 +31,9 @@ DECLARE_GLOBAL_DATA_PTR;
 #include <u-boot/md5.h>
 #include <u-boot/sha1.h>
 #include <u-boot/sha256.h>
+#ifdef CONFIG_OPTEE_CLIENT
+#include <optee_include/OpteeClientInterface.h>
+#endif
 
 #define __round_mask(x, y) ((__typeof__(x))((y)-1))
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
@@ -1116,6 +1119,33 @@ static int fit_image_hash_get_ignore(const void *fit, int noffset, int *ignore)
 	return 0;
 }
 
+/**
+ * fit_image_cipher_get_algo - get cipher algorithm name
+ * @fit: pointer to the FIT format image header
+ * @noffset: cipher node offset
+ * @algo: double pointer to char, will hold pointer to the algorithm name
+ *
+ * fit_image_cipher_get_algo() finds cipher algorithm property in a given
+ * cipher node. If the property is found its data start address is returned
+ * to the caller.
+ *
+ * returns:
+ *     0, on success
+ *     -1, on failure
+ */
+int fit_image_cipher_get_algo(const void *fit, int noffset, char **algo)
+{
+	int len;
+
+	*algo = (char *)fdt_getprop(fit, noffset, FIT_ALGO_PROP, &len);
+	if (!*algo) {
+		fit_get_debug(fit, noffset, FIT_ALGO_PROP, len);
+		return -1;
+	}
+
+	return 0;
+}
+
 ulong fit_get_end(const void *fit)
 {
 	return map_to_sysmem((void *)(fit + fdt_totalsize(fit)));
@@ -1502,6 +1532,69 @@ int fit_all_image_verify(const void *fit)
 	}
 	return 1;
 }
+
+#if !defined(USE_HOSTCC)
+#if CONFIG_IS_ENABLED(FIT_CIPHER)
+/*
+ * [aes-128-ctr] example:
+ *
+ * openssl rand -out aes128.key 16
+ *
+ * openssl rand -out iv.bin 16
+ * openssl enc -aes-128-ctr -in kernel -out kernel.encrypt -K $(xxd -p aes128.key) -iv $(xxd -p iv.bin)
+ * openssl enc -aes-128-ctr -d -in kernel.encrypt -out kernel -K $(xxd -p aes128.key) -iv $(xxd -p iv.bin)
+ */
+static int fit_image_uncipher(const void *fit, int noffset,
+			      ulong cipher_addr, size_t cipher_sz,
+			      ulong uncipher_addr)
+{
+	rk_cipher_config config;
+	int cipher_noffset;
+	const char *node_name;
+	const void *iv;
+	char *algo_name;
+	int key_len = 16;
+	int iv_len;
+
+	node_name = fdt_get_name(fit, noffset, NULL);
+	cipher_noffset = fdt_subnode_offset(fit, noffset, FIT_CIPHER_NODENAME);
+
+	if (fit_image_cipher_get_algo(fit, cipher_noffset, &algo_name)) {
+		printf("Can't get algo name for cipher in image '%s'\n",
+		       node_name);
+		return -1;
+	}
+
+	if (strcmp(algo_name, "aes128")) {
+		printf("Invalid cipher algo '%s'\n", algo_name);
+		return -1;
+	}
+
+	iv = fdt_getprop(fit, cipher_noffset, "iv", &iv_len);
+	if (!iv) {
+		printf("Can't get IV in cipher node '%s'\n", node_name);
+		return -1;
+	}
+
+	if (iv_len != key_len) {
+		printf("Len iv(%d) != key(%d) in cipher node '%s'\n",
+		       iv_len, key_len, node_name);
+		return -1;
+	}
+
+	memset(&config, 0, sizeof(config));
+	config.algo      = RK_ALGO_AES;
+	config.mode      = RK_CIPHER_MODE_CTR;
+	config.operation = RK_MODE_DECRYPT;
+	config.key_len   = key_len;
+	memcpy(config.iv, iv, key_len);
+
+	return trusty_fw_key_cipher(RK_FW_KEY0, &config,
+				    (u32)cipher_addr, (u32)uncipher_addr,
+				    (u32)cipher_sz);
+}
+#endif
+#endif
 
 /**
  * fit_image_check_os - check whether image node is of a given os type
@@ -2202,11 +2295,29 @@ int fit_image_load_index(bootm_headers_t *images, ulong addr,
 		return -ENOENT;
 	}
 
-#if !defined(USE_HOSTCC) && defined(CONFIG_FIT_IMAGE_POST_PROCESS)
 	ret = fit_image_get_load(fit, noffset, &load);
 	if (ret < 0)
 		return ret;
 
+#if !defined(USE_HOSTCC)
+#if CONFIG_IS_ENABLED(FIT_CIPHER)
+	int cipher_noffset =
+		fdt_subnode_offset(fit, noffset, FIT_CIPHER_NODENAME);
+
+	if (cipher_noffset > 0) {
+		printf("   Decrypting Data ... ");
+		ret = fit_image_uncipher(fit, noffset, (ulong)buf, size, load);
+		if (ret) {
+			printf("Error: %d\n", ret);
+			return -EACCES;
+		}
+		buf = (void *)load;
+		printf("OK\n");
+	}
+#endif
+#endif
+
+#if !defined(USE_HOSTCC) && defined(CONFIG_FIT_IMAGE_POST_PROCESS)
 	/* perform any post-processing on the image data */
 	board_fit_image_post_process((void *)fit, noffset,
 				     &load, (ulong **)&buf, &size, NULL);

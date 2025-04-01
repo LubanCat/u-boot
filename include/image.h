@@ -916,6 +916,10 @@ int bootz_setup(ulong image, ulong *start, ulong *end);
 #define FIT_IGNORE_PROP		"uboot-ignore"
 #define FIT_SIG_NODENAME	"signature"
 
+/* cipher node */
+#define FIT_CIPHER_NODENAME	"cipher"
+#define FIT_ALGO_PROP		"algo"
+
 /* image node */
 #define FIT_DATA_PROP		"data"
 #define FIT_DATA_POSITION_PROP	"data-position"
@@ -1108,6 +1112,8 @@ int fit_check_ramdisk(const void *fit, int os_noffset,
 
 int calculate_hash(const void *data, int data_len, const char *algo,
 			uint8_t *value, int *value_len);
+
+int fit_image_cipher_get_algo(const void *fit, int noffset, char **algo);
 
 /*
  * At present we only support signing on the host, and verification on the

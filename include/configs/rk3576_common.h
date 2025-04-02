@@ -55,6 +55,15 @@
 #define SDRAM_MAX_SIZE			(0x100000000 - CONFIG_SYS_SDRAM_BASE)	/* max 4G */
 #define CONFIG_SYS_NONCACHED_MEMORY	(1 << 20)	/* 1M */
 
+#if CONFIG_IS_ENABLED(SMP)
+#define SMP_CPU0			0x0
+#define SMP_CPU1			0x1
+#define SMP_CPU2			0x2
+#define SMP_CORE_ADDR			0x48200000
+#define SMP_CPU1_STACK			0x48200000
+#define SMP_CPU2_STACK			0x48180000
+#endif
+
 /* env used only in U-Boot */
 #ifndef CONFIG_SPL_BUILD
 /* usb mass storage */

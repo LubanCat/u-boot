@@ -1310,36 +1310,6 @@ int rockchip_crypto_cipher(struct udevice *dev, cipher_context *ctx,
 	return ret;
 }
 
-int rockchip_crypto_fw_cipher(struct udevice *dev, cipher_fw_context *ctx,
-			      const u8 *in, u8 *out, u32 len, bool enc)
-{
-	int ret;
-
-	rk_crypto_enable_clk(dev);
-
-	switch (ctx->algo) {
-	case CRYPTO_DES:
-		ret = rk_crypto_des(dev, ctx->mode, NULL, ctx->key_len,
-				    ctx->iv, in, out, len, enc);
-		break;
-	case CRYPTO_AES:
-		ret = rk_crypto_aes(dev, ctx->mode, NULL, NULL, ctx->key_len,
-				    ctx->iv, ctx->iv_len, in, out, len, enc);
-		break;
-	case CRYPTO_SM4:
-		ret = rk_crypto_sm4(dev, ctx->mode, NULL, NULL, ctx->key_len,
-				    ctx->iv, ctx->iv_len, in, out, len, enc);
-		break;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-
-	rk_crypto_disable_clk(dev);
-
-	return ret;
-}
-
 int rk_crypto_mac(struct udevice *dev, u32 algo, u32 mode,
 		  const u8 *key, u32 key_len,
 		  const u8 *in, u32 len, u8 *tag)
@@ -1433,11 +1403,42 @@ int rockchip_crypto_ae(struct udevice *dev, cipher_context *ctx,
 	return ret;
 }
 
+#if CONFIG_IS_ENABLED(DM_KEYLAD)
+int rockchip_crypto_fw_cipher(struct udevice *dev, cipher_fw_context *ctx,
+			      const u8 *in, u8 *out, u32 len, bool enc)
+{
+	int ret;
+
+	rk_crypto_enable_clk(dev);
+
+	switch (ctx->algo) {
+	case CRYPTO_DES:
+		ret = rk_crypto_des(dev, ctx->mode, NULL, ctx->key_len,
+				    ctx->iv, in, out, len, enc);
+		break;
+	case CRYPTO_AES:
+		ret = rk_crypto_aes(dev, ctx->mode, NULL, NULL, ctx->key_len,
+				    ctx->iv, ctx->iv_len, in, out, len, enc);
+		break;
+	case CRYPTO_SM4:
+		ret = rk_crypto_sm4(dev, ctx->mode, NULL, NULL, ctx->key_len,
+				    ctx->iv, ctx->iv_len, in, out, len, enc);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	rk_crypto_disable_clk(dev);
+
+	return ret;
+}
+
 static ulong rockchip_crypto_keytable_addr(struct udevice *dev)
 {
 	return CRYPTO_S_BY_KEYLAD_BASE + CRYPTO_CH0_KEY_0;
 }
-
+#endif
 #endif
 
 #if CONFIG_IS_ENABLED(ROCKCHIP_RSA)
@@ -1570,8 +1571,10 @@ static const struct dm_crypto_ops rockchip_crypto_ops = {
 	.cipher_crypt    = rockchip_crypto_cipher,
 	.cipher_mac      = rockchip_crypto_mac,
 	.cipher_ae       = rockchip_crypto_ae,
+#if CONFIG_IS_ENABLED(DM_KEYLAD)
 	.cipher_fw_crypt = rockchip_crypto_fw_cipher,
 	.keytable_addr   = rockchip_crypto_keytable_addr,
+#endif
 #endif
 };
 

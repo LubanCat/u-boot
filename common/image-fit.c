@@ -1534,15 +1534,28 @@ int fit_all_image_verify(const void *fit)
 }
 
 #if !defined(USE_HOSTCC)
-#if CONFIG_IS_ENABLED(FIT_CIPHER)
+#if defined(CONFIG_FIT_CIPHER)
 /*
  * [aes-128-ctr] example:
  *
  * openssl rand -out aes128.key 16
  *
+ * openssl dgst -sha256 -binary -out kernel.sha256 kernel
  * openssl rand -out iv.bin 16
  * openssl enc -aes-128-ctr -in kernel -out kernel.encrypt -K $(xxd -p aes128.key) -iv $(xxd -p iv.bin)
  * openssl enc -aes-128-ctr -d -in kernel.encrypt -out kernel -K $(xxd -p aes128.key) -iv $(xxd -p iv.bin)
+ *
+ *
+ * Add a "cipher" node under kernel node, the "hash" node is optional.
+ *
+ * 	cipher {
+ *		algo = "aes128";
+ *		iv = /incbin/("./iv.bin");
+ *		hash {
+ *			algo = "sha256";
+ *			value = /incbin/("./kernel.sha256");
+ *		};
+ *	};
  */
 static int fit_image_uncipher(const void *fit, int noffset,
 			      ulong cipher_addr, size_t cipher_sz,
@@ -1553,14 +1566,16 @@ static int fit_image_uncipher(const void *fit, int noffset,
 	const char *node_name;
 	const void *iv;
 	char *algo_name;
+	char *err_msgp;
 	int key_len = 16;
 	int iv_len;
+	int ret;
 
 	node_name = fdt_get_name(fit, noffset, NULL);
 	cipher_noffset = fdt_subnode_offset(fit, noffset, FIT_CIPHER_NODENAME);
 
 	if (fit_image_cipher_get_algo(fit, cipher_noffset, &algo_name)) {
-		printf("Can't get algo name for cipher in image '%s'\n",
+		printf("Can't get cipher algo for image '%s'\n",
 		       node_name);
 		return -1;
 	}
@@ -1572,12 +1587,12 @@ static int fit_image_uncipher(const void *fit, int noffset,
 
 	iv = fdt_getprop(fit, cipher_noffset, "iv", &iv_len);
 	if (!iv) {
-		printf("Can't get IV in cipher node '%s'\n", node_name);
+		printf("Can't get IV for image '%s'\n", node_name);
 		return -1;
 	}
 
 	if (iv_len != key_len) {
-		printf("Len iv(%d) != key(%d) in cipher node '%s'\n",
+		printf("Len iv(%d) != key(%d) for image '%s'\n",
 		       iv_len, key_len, node_name);
 		return -1;
 	}
@@ -1589,9 +1604,32 @@ static int fit_image_uncipher(const void *fit, int noffset,
 	config.key_len   = key_len;
 	memcpy(config.iv, iv, key_len);
 
-	return trusty_fw_key_cipher(RK_FW_KEY0, &config,
-				    (u32)cipher_addr, (u32)uncipher_addr,
-				    (u32)cipher_sz);
+	/* uncipher */
+	ret = trusty_fw_key_cipher(RK_FW_KEY0, &config,
+				   (u32)cipher_addr, (u32)uncipher_addr,
+				   (u32)cipher_sz);
+	if (ret) {
+		printf("Uncipher data failed for image '%s', ret=%d\n",
+		       node_name, ret);
+		return ret;
+	}
+
+	/* verify uncipher data hash  */
+	noffset = fdt_subnode_offset(fit, cipher_noffset, FIT_HASH_NODENAME);
+	if (noffset > 0) {
+		ret = fit_image_check_hash(fit, noffset,
+					   (void *)uncipher_addr,
+					   cipher_sz, &err_msgp);
+		if (ret) {
+			printf("%s, uncipher data hash for image '%s', ret=%d\n",
+			       err_msgp, node_name, ret);
+			return ret;
+		} else {
+			puts("+");
+		}
+	}
+
+	return 0;
 }
 #endif
 #endif
@@ -2308,11 +2346,11 @@ int fit_image_load_index(bootm_headers_t *images, ulong addr,
 		printf("   Decrypting Data ... ");
 		ret = fit_image_uncipher(fit, noffset, (ulong)buf, size, load);
 		if (ret) {
-			printf("Error: %d\n", ret);
+			printf(" Error: %d\n", ret);
 			return -EACCES;
 		}
 		buf = (void *)load;
-		printf("OK\n");
+		printf(" OK\n");
 	}
 #endif
 

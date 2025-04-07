@@ -2295,12 +2295,12 @@ int fit_image_load_index(bootm_headers_t *images, ulong addr,
 		return -ENOENT;
 	}
 
+#if !defined(USE_HOSTCC)
 	ret = fit_image_get_load(fit, noffset, &load);
 	if (ret < 0)
 		return ret;
 
-#if !defined(USE_HOSTCC)
-#if CONFIG_IS_ENABLED(FIT_CIPHER)
+#if defined(CONFIG_FIT_CIPHER)
 	int cipher_noffset =
 		fdt_subnode_offset(fit, noffset, FIT_CIPHER_NODENAME);
 
@@ -2315,12 +2315,12 @@ int fit_image_load_index(bootm_headers_t *images, ulong addr,
 		printf("OK\n");
 	}
 #endif
-#endif
 
-#if !defined(USE_HOSTCC) && defined(CONFIG_FIT_IMAGE_POST_PROCESS)
+#if defined(CONFIG_FIT_IMAGE_POST_PROCESS)
 	/* perform any post-processing on the image data */
 	board_fit_image_post_process((void *)fit, noffset,
 				     &load, (ulong **)&buf, &size, NULL);
+#endif
 #endif
 
 	len = (ulong)size;

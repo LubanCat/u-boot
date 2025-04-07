@@ -8,11 +8,13 @@
 #include <misc.h>
 #include <mmc.h>
 #include <spl.h>
+#include <image.h>
 #include <asm/io.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/grf_rv1126b.h>
 #include <asm/arch/ioc_rv1126b.h>
+#include <asm/arch/rk_atags.h>
 #include <asm/system.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -107,16 +109,22 @@ DECLARE_GLOBAL_DATA_PTR;
 
 static struct mm_region rv1126b_mem_map[] = {
 	{
+		.virt = 0x00010000UL,
+		.phys = 0x00010000UL,
+		.size = 0x0fff0000UL,
+		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
+			 PTE_BLOCK_INNER_SHARE
+	}, {
 		.virt = 0x20000000UL,
 		.phys = 0x20000000UL,
-		.size = 0x2800000UL,
+		.size = 0x02800000UL,
 		.attrs = PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 			 PTE_BLOCK_NON_SHARE |
 			 PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	}, {
 		.virt = 0x3ff1e000UL,
 		.phys = 0x3ff1e000UL,
-		.size = 0xe2000UL,
+		.size = 0x000e2000UL,
 		.attrs = PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 			 PTE_BLOCK_NON_SHARE |
 			 PTE_BLOCK_PXN | PTE_BLOCK_UXN
@@ -371,6 +379,58 @@ int arch_cpu_init(void)
 }
 #endif
 
+#if defined(CONFIG_ROCKCHIP_PRELOADER_ATAGS)
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_KERNEL_BOOT)
+void rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,
+				     ulong **src_addr, size_t *src_len)
+{
+	struct tag *t;
+	int count;
+
+	/* Only current node is kernel needs go further. */
+	if (!fit_image_check_type(fit, node, IH_TYPE_KERNEL))
+		return;
+
+	t = atags_get_tag(ATAG_DDR_MEM);
+	count = t->u.ddr_mem.count;
+	if (!t || !count)
+		return;
+
+	if (t->u.ddr_mem.bank[0] == 0x0) {
+		/*
+		 * Change kernel load address for more ddr usable space.
+		 * For 32 bits kernel Image: 0x00018000
+		 * For 64 bits kernel Image: 0x00200000
+		 * For kernel zImage: still 0x45480000
+		 */
+#ifdef CONFIG_CMD_BOOTZ
+		ulong start, end;
+
+		if (bootz_setup((ulong)*src_addr, &start, &end))
+#endif
+		{
+			uint8_t image_arch;
+
+			if (fit_image_get_arch(fit, node, &image_arch))
+				return;
+
+			if (image_arch == IH_ARCH_ARM) {
+				*load_addr = 0x00018000;
+			} else if (image_arch == IH_ARCH_ARM64) {
+				*load_addr = 0x00200000;
+			} else {
+				printf("Unknown image arch: 0x%x\n", image_arch);
+				return;
+			}
+			printf("Relocate kernel to 0x%lx.\n", *load_addr);
+		}
+	}
+
+	return;
+}
+#endif
+#endif
+
 #if defined(CONFIG_ROCKCHIP_EMMC_IOMUX) && defined(CONFIG_ROCKCHIP_SFC_IOMUX)
-#error FSPI0 M0 and eMMC iomux is incompatible for rv1126b Soc. You should close one of them.
+#error FSPI0 M0 and eMMC iomux is incompatible for rv1126b Soc. You should disable one of them.
 #endif

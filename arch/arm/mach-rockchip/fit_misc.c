@@ -25,6 +25,11 @@ DECLARE_GLOBAL_DATA_PTR;
  */
 #if CONFIG_IS_ENABLED(FIT_IMAGE_POST_PROCESS)
 
+__weak void rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,
+					    ulong **src_addr, size_t *src_len)
+{
+}
+
 #define FIT_UNCOMP_HASH_NODENAME	"digest"
 #if CONFIG_IS_ENABLED(MISC_DECOMPRESS) || CONFIG_IS_ENABLED(GZIP) || CONFIG_IS_ENABLED(LZMA)
 static int fit_image_get_uncomp_digest(const void *fit, int parent_noffset)
@@ -199,6 +204,7 @@ void board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 
 	}
 #endif
+	rk_board_fit_image_post_process(fit, node, load_addr, src_addr, src_len);
 }
 #endif /* FIT_IMAGE_POST_PROCESS */
 /*

@@ -23,6 +23,10 @@ DECLARE_GLOBAL_DATA_PTR;
 
 struct bidram plat_bidram __section(".data") = { .has_init = false, };
 
+__weak void board_bidram_fixup(void)
+{
+}
+
 static int bidram_has_init(void)
 {
 	if (!plat_bidram.has_init) {
@@ -213,6 +217,8 @@ int bidram_fixup(void)
 
 	bidram->fixup = true;
 	bidram_gen_gd_bi_dram();
+
+	board_bidram_fixup();
 
 	return 0;
 }

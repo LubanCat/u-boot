@@ -76,6 +76,11 @@ void bidram_dump(void);
 int bidram_fixup(void);
 
 /**
+ * board_bidram_fixup() - Fixup bi_dram[] based on Soc boards.
+ */
+void board_bidram_fixup(void);
+
+/**
  * bidram_append_size() - Append 4GB+ memory
  *
  * @return 4GB+ size

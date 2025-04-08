@@ -9,12 +9,14 @@
 #include <mmc.h>
 #include <spl.h>
 #include <image.h>
+#include <bidram.h>
 #include <asm/io.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/grf_rv1126b.h>
 #include <asm/arch/ioc_rv1126b.h>
 #include <asm/arch/rk_atags.h>
+#include <asm/arch/rockchip_smccc.h>
 #include <asm/system.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -102,6 +104,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define SGRF_PMU_BASE			0x20230000
 #define SGRF_PMU_SOC_CON0		0x00
+#define SGRF_PMU_SOC_CON1		0x04
 #define SGRF_LPMCU_BOOT_ADDR		0x20
 
 #ifdef CONFIG_ARM64
@@ -427,6 +430,104 @@ void rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 	}
 
 	return;
+}
+
+void board_bidram_fixup(void)
+{
+	struct memblock *mem;
+	struct tag *t;
+	u64 size = 0;
+	int i, count, n, noffset, num = 0;
+
+	t = atags_get_tag(ATAG_DDR_MEM);
+	count = t->u.ddr_mem.count;
+	if (!t || !count)
+		return;
+	if (t->u.ddr_mem.bank[0] != 0x0)
+		return;
+	size = t->u.ddr_mem.bank[count];
+
+	/* Record current bi_dram banks. */
+	mem = calloc(count + MEM_RESV_COUNT, sizeof(*mem));
+	if (!mem) {
+		printf("Calloc ddr memory failed\n");
+		return;
+	}
+	for (i = 0, n = 0; i < MEM_RESV_COUNT; i++) {
+		if (!gd->bd->bi_dram[i].size)
+			continue;
+		mem[n].base = gd->bd->bi_dram[i].start;
+		mem[n].size = gd->bd->bi_dram[i].size;
+		n++;
+
+		assert(n < MEM_RESV_COUNT);
+	}
+
+	/* Handle that always used as DDR. */
+	gd->bd->bi_dram[num].start = 0x00010000;
+	gd->bd->bi_dram[num].size  = 0x0fff0000;
+	num++;
+
+	/* Remap DSMC_MEM to DDR. */
+	noffset = fdt_path_offset(gd->fdt_blob, "/dsmc@21ca0000");
+	if ((noffset >= 0) && fdtdec_get_is_enabled(gd->fdt_blob, noffset)) {
+#ifdef CONFIG_SPL_BUILD
+		writel(0x08000800, SGRF_PMU_BASE + SGRF_PMU_SOC_CON1);
+#elif CONFIG_ROCKCHIP_SMCCC
+		sip_smc_secure_reg_write(SGRF_PMU_BASE + SGRF_PMU_SOC_CON1, 0x08000800);
+#endif
+		gd->bd->bi_dram[num].start = 0x10000000;
+		gd->bd->bi_dram[num].size  = 0x10000000;
+		num++;
+	}
+
+	if (size > SZ_512M) {
+		/* Handle that always used as DDR. */
+		gd->bd->bi_dram[num].start = 0x22800000;
+		gd->bd->bi_dram[num].size  = 0x01800000;
+		num++;
+
+		/* Remap FSPI_PMU_XIP to DDR. */
+#ifdef CONFIG_SPL_BUILD
+		writel(0x20002000, SGRF_PMU_BASE + SGRF_PMU_SOC_CON1);
+#elif CONFIG_ROCKCHIP_SMCCC
+		sip_smc_secure_reg_write(SGRF_PMU_BASE + SGRF_PMU_SOC_CON1, 0x20002000);
+#endif
+		gd->bd->bi_dram[num].start = 0x24000000;
+		gd->bd->bi_dram[num].size  = 0x02000000;
+		num++;
+
+		/* Handle that always used as DDR. */
+		gd->bd->bi_dram[num].start = 0x26000000;
+		gd->bd->bi_dram[num].size  = 0x02000000;
+		num++;
+
+		/* Remap FSPI_XIP to DDR. */
+#ifdef CONFIG_SPL_BUILD
+		writel(0x10001000, SGRF_PMU_BASE + SGRF_PMU_SOC_CON1);
+#elif CONFIG_ROCKCHIP_SMCCC
+		sip_smc_secure_reg_write(SGRF_PMU_BASE + SGRF_PMU_SOC_CON1, 0x10001000);
+#endif
+		gd->bd->bi_dram[num].start = 0x28000000;
+		gd->bd->bi_dram[num].size  = 0x08000000;
+		num++;
+
+		/* Handle that always used as DDR. */
+		gd->bd->bi_dram[num].start = 0x30000000;
+		gd->bd->bi_dram[num].size  = 0x0ff1e000;
+		num++;
+	}
+
+	/* Append recorded bi_dram banks. */
+	for (n = 0; n < MEM_RESV_COUNT; n++) {
+		if (!mem[n].size)
+			continue;
+		gd->bd->bi_dram[num].start = mem[n].base;
+		gd->bd->bi_dram[num].size  = mem[n].size;
+		num++;
+
+		assert(num < MEM_RESV_COUNT);
+	}
 }
 #endif
 #endif

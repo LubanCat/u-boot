@@ -77,6 +77,11 @@ DECLARE_GLOBAL_DATA_PTR;
 #define GPIO3B_IOMUX_SEL_H		0x6c
 #define GPIO3A_PULL			0x330
 
+#define VCCIO6_IOC_BASE			0x201D8000
+#define GPIO6C_PULL			0x368
+#define	GPIO6C_IE			0x468
+#define	GPIO6C_SMT			0x568
+
 /* SGRF/FIREWALL */
 #define SGRF_SYS_BASE			0x20220000
 #define SGRF_HPMCU_BOOT_ADDR		0x0c
@@ -333,6 +338,11 @@ int arch_cpu_init(void)
 	writel(0x00700070, VEPU_GRF_BASE + SARADC0_GRF_CON0);
 	writel(0x00700070, VI_GRF_BASE + SARADC1_GRF_CON0);
 	writel(0x00700070, VI_GRF_BASE + SARADC2_GRF_CON0);
+
+	/* FEPHY: disable gpio's smt and ie, keep high-z to save power consumption */
+	writel(0x00f00000, VCCIO6_IOC_BASE + GPIO6C_PULL);
+	writel(0x00f00000, VCCIO6_IOC_BASE + GPIO6C_IE);
+	writel(0x00f00000, VCCIO6_IOC_BASE + GPIO6C_SMT);
 
 #if defined(CONFIG_ROCKCHIP_EMMC_IOMUX)
 	board_set_iomux(IF_TYPE_MMC, 0, 0);

@@ -16,6 +16,7 @@
 #include <asm/arch/grf_rv1126b.h>
 #include <asm/arch/ioc_rv1126b.h>
 #include <asm/arch/rk_atags.h>
+#include <asm/arch/param.h>
 #include <asm/arch/rockchip_smccc.h>
 #include <asm/system.h>
 
@@ -380,7 +381,6 @@ int arch_cpu_init(void)
 
 	return 0;
 }
-#endif
 
 #if defined(CONFIG_ROCKCHIP_PRELOADER_ATAGS)
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_KERNEL_BOOT)
@@ -529,6 +529,58 @@ void board_bidram_fixup(void)
 		assert(num < MEM_RESV_COUNT);
 	}
 }
+
+void spl_fdt_fixup_memory(struct spl_image_info *spl_image)
+{
+	struct memblock *list;
+	void *blob = spl_image->fdt_addr;
+	u64 start[CONFIG_NR_DRAM_BANKS];
+	u64 size[CONFIG_NR_DRAM_BANKS];
+	int i, count = 0;
+
+	if (fdt_check_header(blob)) {
+		printf("Invalid dtb\n");
+		return;
+	}
+
+	list = param_parse_ddr_mem(&count);
+	if (!list) {
+		printf("Can't get dram banks\n");
+		return;
+	}
+
+	if (count > CONFIG_NR_DRAM_BANKS) {
+		printf("Dram banks num=%d, over %d\n", count, CONFIG_NR_DRAM_BANKS);
+		return;
+	}
+
+	for (i = 0; i < count; i++) {
+		gd->bd->bi_dram[i].start = list[i].base < SZ_1G ? SZ_1G : list[i].base;
+		gd->bd->bi_dram[i].size = ddr_mem_get_usable_size(list[i].base, list[i].size);
+	}
+
+	board_bidram_fixup();
+
+	for (i = 0, count = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
+		start[i] = gd->bd->bi_dram[i].start;
+		size[i] = gd->bd->bi_dram[i].size;
+		if (size[i] == 0)
+			continue;
+		debug("Adding bank: 0x%08llx - 0x%08llx (size: 0x%08llx)\n",
+		      start[i], start[i] + size[i], size[i]);
+		count++;
+	}
+
+	fdt_increase_size(blob, 512);
+
+	if (fdt_fixup_memory_banks(blob, start, size, count)) {
+		printf("Fixup kernel dtb memory node failed.\n");
+		return;
+	}
+
+	return;
+}
+#endif
 #endif
 #endif
 

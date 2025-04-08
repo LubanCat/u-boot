@@ -477,7 +477,7 @@ const char *spl_kernel_partition(struct spl_image_info *spl,
 	return (boot_mode == BOOT_RECOVERY) ? PART_RECOVERY : PART_BOOT;
 }
 
-static void spl_fdt_fixup_memory(struct spl_image_info *spl_image)
+__weak void spl_fdt_fixup_memory(struct spl_image_info *spl_image)
 {
 	void *blob = spl_image->fdt_addr;
 	struct tag *t;

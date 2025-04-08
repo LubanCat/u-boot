@@ -346,6 +346,10 @@ int spl_board_prepare_for_jump(struct spl_image_info *spl_image);
 const char *spl_kernel_partition(struct spl_image_info *spl,
 				 struct spl_load_info *info);
 /**
+ * spl_fdt_fixup_memory() - arch/board-specific fixup kernel dtb memory node.
+ */
+void spl_fdt_fixup_memory(struct spl_image_info *spl_image);
+/**
  * spl_find_hwid_dtb() - Support select kernel dtb based on HW-ID
  */
 int spl_find_hwid_dtb(const char *fdt_name);

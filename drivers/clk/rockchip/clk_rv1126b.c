@@ -1686,6 +1686,9 @@ static int rv1126b_clk_probe(struct udevice *dev)
 	       RV1126B_CRU_BASE + RV1126B_PLL_CON(9));
 	writel(BITS_WITH_WMASK(1, 0x3U, 4),
 	       RV1126B_CRU_BASE + RV1126B_MODE_CON);
+	/* Set clk_pka_rkce to 198M */
+	writel(BITS_WITH_WMASK(1, 0x1U, 12),
+	       RV1126B_CRU_BASE + RV1126B_CLKSEL_CON(50));
 #endif
 
 	rv1126b_clk_init(priv);

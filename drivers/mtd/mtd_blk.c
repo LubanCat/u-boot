@@ -726,7 +726,9 @@ static int mtd_blk_probe(struct udevice *udev)
 #ifdef CONFIG_NAND
 		if (desc->devnum == BLK_MTD_NAND)
 			i = NAND_BBT_SCAN_MAXBLOCKS;
-		else if (desc->devnum == BLK_MTD_SPI_NAND)
+#endif
+#ifdef CONFIG_MTD_SPI_NAND
+		if (desc->devnum == BLK_MTD_SPI_NAND)
 			i = NANDDEV_BBT_SCAN_MAXBLOCKS;
 #endif
 

@@ -68,6 +68,9 @@ struct rockchip_crypto_priv {
 	u32				length;
 	struct rk_hash_ctx		*hw_ctx;
 	struct rk_crypto_soc_data	*soc_data;
+
+	u16				secure;
+	u16				enabled;
 };
 
 #define LLI_ADDR_ALIGN_SIZE	8
@@ -269,11 +272,17 @@ static int rk_crypto_do_enable_clk(struct udevice *dev, int enable)
 
 static int rk_crypto_enable_clk(struct udevice *dev)
 {
+	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
+
+	crypto_base = priv->reg;
+
 	return rk_crypto_do_enable_clk(dev, 1);
 }
 
 static int rk_crypto_disable_clk(struct udevice *dev)
 {
+	crypto_base = 0;
+
 	return rk_crypto_do_enable_clk(dev, 0);
 }
 
@@ -563,6 +572,9 @@ static u32 rockchip_crypto_capability(struct udevice *dev)
 {
 	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
 	u32 capability, mask = 0;
+
+	if (!priv->enabled)
+		return 0;
 
 	capability = priv->soc_data->capability;
 
@@ -1388,7 +1400,6 @@ int rk_crypto_ae(struct udevice *dev, u32 algo, u32 mode,
 int rockchip_crypto_ae(struct udevice *dev, cipher_context *ctx,
 		       const u8 *in, u32 len, const u8 *aad, u32 aad_len,
 		       u8 *out, u8 *tag)
-
 {
 	int ret = 0;
 
@@ -1551,6 +1562,13 @@ exit:
 }
 #endif
 
+static bool rockchip_crypto_is_secure(struct udevice *dev)
+{
+	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
+
+	return priv->secure;
+}
+
 static const struct dm_crypto_ops rockchip_crypto_ops = {
 	.capability   = rockchip_crypto_capability,
 	.sha_init     = rockchip_crypto_sha_init,
@@ -1576,6 +1594,7 @@ static const struct dm_crypto_ops rockchip_crypto_ops = {
 	.keytable_addr   = rockchip_crypto_keytable_addr,
 #endif
 #endif
+	.is_secure       = rockchip_crypto_is_secure,
 };
 
 /*
@@ -1598,13 +1617,22 @@ static int rockchip_crypto_ofdata_to_platdata(struct udevice *dev)
 
 	crypto_base = priv->reg;
 
+	priv->secure = dev_read_bool(dev, "secure");
+	priv->enabled = true;
+
+#if !defined(CONFIG_SPL_BUILD)
+	/* uboot disabled secure crypto */
+	priv->enabled = !priv->secure;
+#endif
+	if (!priv->enabled)
+		return 0;
+
 	/* if there is no clocks in dts, just skip it */
 	if (!dev_read_prop(dev, "clocks", &len)) {
 		printf("Can't find \"clocks\" property\n");
 		return 0;
 	}
 
-	memset(priv, 0x00, sizeof(*priv));
 	priv->clocks = malloc(len);
 	if (!priv->clocks)
 		return -ENOMEM;
@@ -1682,10 +1710,8 @@ static int rockchip_crypto_probe(struct udevice *dev)
 
 	sdata = (struct rk_crypto_soc_data *)dev_get_driver_data(dev);
 
-	if (sdata->dynamic_cap)
-		sdata->capability = sdata->dynamic_cap();
-
-	priv->soc_data = sdata;
+	if (!priv->enabled)
+		return 0;
 
 	priv->hw_ctx = memalign(LLI_ADDR_ALIGN_SIZE,
 				sizeof(struct rk_hash_ctx));
@@ -1699,6 +1725,11 @@ static int rockchip_crypto_probe(struct udevice *dev)
 	rk_crypto_enable_clk(dev);
 
 	hw_crypto_reset();
+
+	if (sdata->dynamic_cap)
+		sdata->capability = sdata->dynamic_cap();
+
+	priv->soc_data = sdata;
 
 	rk_crypto_disable_clk(dev);
 

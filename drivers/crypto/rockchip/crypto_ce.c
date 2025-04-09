@@ -46,6 +46,8 @@ struct rockchip_crypto_priv {
 
 	void				*hardware;
 	struct rkce_sha_contex		*hash_ctx;
+	u16				secure;
+	u16				enabled;
 };
 
 struct rockchip_map {
@@ -182,6 +184,9 @@ static u32 rockchip_crypto_capability(struct udevice *dev)
 {
 	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
 	u32 cap = 0;
+
+	if (!priv->enabled)
+		return 0;
 
 	if (priv->capability)
 		return priv->capability;
@@ -1039,6 +1044,13 @@ exit:
 }
 #endif
 
+static bool rockchip_crypto_is_secure(struct udevice *dev)
+{
+	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
+
+	return priv->secure;
+}
+
 static const struct dm_crypto_ops rockchip_crypto_ops = {
 	.capability   = rockchip_crypto_capability,
 	.sha_init     = rockchip_crypto_sha_init,
@@ -1063,6 +1075,7 @@ static const struct dm_crypto_ops rockchip_crypto_ops = {
 	.keytable_addr   = rockchip_get_keytable_addr,
 #endif
 
+	.is_secure       = rockchip_crypto_is_secure,
 };
 
 /*
@@ -1084,6 +1097,16 @@ static int rockchip_crypto_ofdata_to_platdata(struct udevice *dev)
 		return -EINVAL;
 
 	crypto_base = priv->reg;
+
+	priv->secure = dev_read_bool(dev, "secure");
+	priv->enabled = true;
+
+#if !defined(CONFIG_SPL_BUILD)
+	/* uboot disabled secure crypto */
+	priv->enabled = !priv->secure;
+#endif
+	if (!priv->enabled)
+		return 0;
 
 	/* if there is no clocks in dts, just skip it */
 	if (!dev_read_prop(dev, "clocks", &len)) {
@@ -1158,11 +1181,17 @@ static int rk_crypto_do_enable_clk(struct udevice *dev, int enable)
 
 static int rk_crypto_enable_clk(struct udevice *dev)
 {
+	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
+
+	crypto_base = priv->reg;
+
 	return rk_crypto_do_enable_clk(dev, 1);
 }
 
 static int rk_crypto_disable_clk(struct udevice *dev)
 {
+	crypto_base = 0;
+
 	return rk_crypto_do_enable_clk(dev, 0);
 }
 
@@ -1201,6 +1230,9 @@ static int rockchip_crypto_probe(struct udevice *dev)
 {
 	struct rockchip_crypto_priv *priv = dev_get_priv(dev);
 	int ret = 0;
+
+	if (!priv->enabled)
+		return 0;
 
 	ret = rk_crypto_set_clk(dev);
 	if (ret)

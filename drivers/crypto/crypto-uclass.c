@@ -87,11 +87,20 @@ u32 crypto_algo_nbits(u32 algo)
 
 struct udevice *crypto_get_device(u32 capability)
 {
+	bool preferred_secure = false;
+	bool cur_secure = false;
 	const struct dm_crypto_ops *ops;
+	struct udevice *best_fit_dev = NULL;
 	struct udevice *dev;
 	struct uclass *uc;
 	int ret;
 	u32 cap;
+
+#if defined(CONFIG_SPL_BUILD)
+	preferred_secure = true;
+#else
+	preferred_secure = false;
+#endif
 
 	ret = uclass_get(UCLASS_CRYPTO, &uc);
 	if (ret)
@@ -104,12 +113,21 @@ struct udevice *crypto_get_device(u32 capability)
 		if (!ops || !ops->capability)
 			continue;
 
+		cur_secure = ops->is_secure ? ops->is_secure(dev) : false;
+
 		cap = ops->capability(dev);
-		if ((cap & capability) == capability)
-			return dev;
+		if ((cap & capability) == capability) {
+			if (!best_fit_dev) {
+				best_fit_dev = dev;
+				continue;
+			}
+
+			if (preferred_secure == cur_secure)
+				best_fit_dev = dev;
+		}
 	}
 
-	return NULL;
+	return best_fit_dev;
 }
 
 int crypto_sha_init(struct udevice *dev, sha_context *ctx)
@@ -338,6 +356,11 @@ int crypto_fw_cipher(struct udevice *dev, cipher_fw_context *ctx,
 	if (!ops || !ops->cipher_fw_crypt)
 		return -ENOSYS;
 
+	if (!ops->is_secure || !ops->is_secure(dev)) {
+		printf("Only secure crypto support fwkey cipher.\n");
+		return -ENOSYS;
+	}
+
 	keylad_dev = keylad_get_device();
 	if (!keylad_dev) {
 		printf("No keylad device found.\n");
@@ -361,6 +384,16 @@ ulong crypto_keytable_addr(struct udevice *dev)
 		return 0;
 
 	return ops->keytable_addr(dev);
+}
+
+bool crypto_is_secure(struct udevice *dev)
+{
+	const struct dm_crypto_ops *ops = device_get_ops(dev);
+
+	if (!ops || !ops->is_secure)
+		return false;
+
+	return ops->is_secure(dev);
 }
 
 UCLASS_DRIVER(crypto) = {

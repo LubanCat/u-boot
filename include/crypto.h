@@ -138,6 +138,8 @@ struct dm_crypto_ops {
 			       const u8 *in, u8 *out, u32 len, bool enc);
 
 	ulong (*keytable_addr)(struct udevice *dev);
+
+	bool (*is_secure)(struct udevice *dev);
 };
 
 /**
@@ -340,5 +342,13 @@ int crypto_fw_cipher(struct udevice *dev, cipher_fw_context *ctx,
  * @return crypto keytable address
  */
 ulong crypto_keytable_addr(struct udevice *dev);
+
+/**
+ * crypto_is_secure() - Crypto keytable address
+ *
+ * @dev: crypto device
+ * @return true: secure device, false: non-secure device
+ */
+bool crypto_is_secure(struct udevice *dev);
 
 #endif

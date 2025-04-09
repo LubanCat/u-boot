@@ -580,6 +580,24 @@ void spl_fdt_fixup_memory(struct spl_image_info *spl_image)
 
 	return;
 }
+
+u64 board_bidram_append_size(void)
+{
+	struct tag *t;
+	int count;
+
+	t = atags_get_tag(ATAG_DDR_MEM);
+	count = t->u.ddr_mem.count;
+	if (!t || !count)
+		return 0;
+
+	if (t->u.ddr_mem.bank[0] == 0x0)
+		return t->u.ddr_mem.bank[count] > SZ_1G ?
+		       SZ_1G : t->u.ddr_mem.bank[count];
+
+	return 0;
+}
+
 #endif
 #endif
 #endif

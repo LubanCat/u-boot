@@ -742,6 +742,7 @@ static int mtd_blk_probe(struct udevice *udev)
 			if (!ret) {
 				desc->lba = (mtd->size >> 9) -
 					(mtd->erasesize >> 9) * i;
+				desc->rawlba = desc->lba;
 				break;
 			}
 		}

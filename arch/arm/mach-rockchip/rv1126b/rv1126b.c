@@ -300,7 +300,7 @@ int arch_cpu_init(void)
 	/* Set sdmmc1 master secure */
 	writel(0x80000, SGRF_SYS_BASE + SGRF_SYS_AHB_SECURE_SGRF_CON);
 	/* Set rkce master secure */
-	writel(0x80030000, SGRF_SYS_BASE + SGRF_SYS_AXI_SECURE_SGRF_CON0);
+	writel(0x80038000, SGRF_SYS_BASE + SGRF_SYS_AXI_SECURE_SGRF_CON0);
 	/* Set decom master secure */
 	writel(0xC00000, SGRF_SYS_BASE + SGRF_SYS_AXI_SECURE_SGRF_CON0);
 

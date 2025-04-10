@@ -437,9 +437,6 @@ function fit_gen_boot_itb()
 		sed -i "s/${FDT_ADDR_PLACEHOLDER}/${FDT_ADDR_R}/g"         ${ITS_BOOT}
 		sed -i "s/${KERNEL_ADDR_PLACEHOLDER}/${KERNEL_ADDR_R}/g"   ${ITS_BOOT}
 		sed -i "s/${RAMDISK_ADDR_PLACEHOLDER}/${RMADISK_ADDR_R}/g" ${ITS_BOOT}
-		if grep -q '^CONFIG_ARM64=y' .config ; then
-			sed -i 's/arch = "arm";/arch = "arm64";/g' ${ITS_BOOT}
-		fi
 
 		if [ "${ARG_ROLLBACK_PROTECT}" == "y" ]; then
 			VERSION=`grep 'rollback-index' ${ITS_BOOT} | awk -F '=' '{ printf $2 }' | tr -d ' '`
@@ -524,9 +521,6 @@ function fit_gen_recovery_itb()
 		sed -i "s/${FDT_ADDR_PLACEHOLDER}/${FDT_ADDR_R}/g"         ${ITS_RECOVERY}
 		sed -i "s/${KERNEL_ADDR_PLACEHOLDER}/${KERNEL_ADDR_R}/g"   ${ITS_RECOVERY}
 		sed -i "s/${RAMDISK_ADDR_PLACEHOLDER}/${RMADISK_ADDR_R}/g" ${ITS_RECOVERY}
-		if grep -q '^CONFIG_ARM64=y' .config ; then
-			sed -i 's/arch = "arm";/arch = "arm64";/g' ${ITS_RECOVERY}
-		fi
 
 		if [ "${ARG_ROLLBACK_PROTECT}" == "y" ]; then
 			VERSION=`grep 'rollback-index' ${ITS_RECOVERY} | awk -F '=' '{ printf $2 }' | tr -d ' '`

@@ -16,6 +16,16 @@
 		stdout-path = &uart0;
 		u-boot,spl-boot-order = &sdmmc0, &spi_nand, &spi_nor, &emmc;
 	};
+
+	secure-otp@20b10000 {
+		compatible = "rockchip,rv1126b-secure-otp";
+		reg = <0x20b10000 0x10000>;
+		secure_conf = <0x2022001c>;
+		cru_rst_addr = <0x20200a00>;
+		mask_addr = <0x20ba0000>;
+		u-boot,dm-spl;
+		status = "okay";
+	};
 };
 
 &gpio0 {

@@ -38,6 +38,17 @@
 #define GICD_BASE			0x21201000
 #define GICC_BASE			0x21202000
 
+/* secure otp */
+#define OTP_UBOOT_ROLLBACK_OFFSET	0x310
+#define OTP_UBOOT_ROLLBACK_WORDS	2	/* 64 bits, 2 words */
+#define OTP_ALL_ONES_NUM_BITS		32
+#define OTP_SECURE_BOOT_ENABLE_ADDR	0x20
+#define OTP_SECURE_BOOT_ENABLE_SIZE	1
+#define OTP_RSA4096_ENABLE_ADDR		0x21
+#define OTP_RSA4096_ENABLE_SIZE		1
+#define OTP_RSA_HASH_ADDR		0x180
+#define OTP_RSA_HASH_SIZE		32
+
 #define CONFIG_BOUNCE_BUFFER
 /* For most, U-Boot no need to use 0-1G space. */
 #define CONFIG_SYS_SDRAM_BASE		0x40000000

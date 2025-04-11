@@ -7,6 +7,7 @@
 #include <clk.h>
 #include <keylad.h>
 #include <dm.h>
+#include <misc.h>
 #include <asm/io.h>
 #include <clk-uclass.h>
 #include <asm/arch/hardware.h>
@@ -151,6 +152,32 @@ static int rk_keylad_send_key(u32 key_reg, u32 n_words, ulong dst_addr)
 	return ret;
 }
 
+static int rk_otp_keylad_read_init(void)
+{
+	struct udevice *dev;
+
+	dev = misc_otp_get_device(OTP_S);
+	if (!dev)
+		return -ENODEV;
+
+	misc_otp_ioctl(dev, IOCTL_REQ_KEYLAD_INIT, NULL);
+
+	return 0;
+}
+
+static int rk_otp_keylad_read_deinit(void)
+{
+	struct udevice *dev;
+
+	dev = misc_otp_get_device(OTP_S);
+	if (!dev)
+		return -ENODEV;
+
+	misc_otp_ioctl(dev, IOCTL_REQ_KEYLAD_DEINIT, NULL);
+
+	return 0;
+}
+
 static int rk_keylad_read_otp_key(u32 otp_offset, u32 keylad_area, u32 keylen)
 {
 	int ret = 0;
@@ -161,7 +188,11 @@ static int rk_keylad_read_otp_key(u32 otp_offset, u32 keylad_area, u32 keylen)
 	if (keylad_area >= KEYLAD_AREA_NUM)
 		return -EINVAL;
 
-//	rk_otp_keylad_read_init();
+	ret = rk_otp_keylad_read_init();
+	if (ret) {
+		printf("Keyladder read otp key init err: 0x%x.", ret);
+		return ret;
+	}
 
 	/* src use byte address, dst use keytable block address */
 	val = KL_OTP_KEY_REQ_SRC_ADDR(otp_offset / 2) |
@@ -184,7 +215,7 @@ static int rk_keylad_read_otp_key(u32 otp_offset, u32 keylad_area, u32 keylen)
 		ret = -EIO;
 	}
 
-//	rk_otp_keylad_read_deinit();
+	rk_otp_keylad_read_deinit();
 
 	return ret;
 }
@@ -210,13 +241,13 @@ static int rockchip_keylad_transfer_fwkey(struct udevice *dev, ulong dst,
 		return -EINVAL;
 	}
 
+	rk_keylad_enable_clk(dev);
+
 	res = rk_keylad_read_otp_key(fw_key_offset, 0, keylen);
 	if (res) {
 		printf("Keyladder read otp key err: 0x%x.", res);
 		return res;
 	}
-
-	rk_keylad_enable_clk(dev);
 
 	res = rk_keylad_send_key(0, keylen / 4, dst);
 

@@ -17,6 +17,8 @@
 #define IOCTL_REQ_POLL		_IO('m', 0x03)
 #define IOCTL_REQ_CAPABILITY	_IO('m', 0x04)
 #define IOCTL_REQ_DATA_SIZE	_IO('m', 0x05)
+#define IOCTL_REQ_KEYLAD_INIT	_IO('m', 0x06)
+#define IOCTL_REQ_KEYLAD_DEINIT	_IO('m', 0x07)
 
 enum misc_mode {
 	DECOM_LZ4	= BIT(0),

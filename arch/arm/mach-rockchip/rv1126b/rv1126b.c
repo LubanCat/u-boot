@@ -80,6 +80,12 @@ DECLARE_GLOBAL_DATA_PTR;
 #define GPIO1A_IOMUX_SEL_H		0x24
 #define GPIO1B_IOMUX_SEL_L		0x28
 #define GPIO1B_IOMUX_SEL_H		0x2c
+#define GPIO1_IOC_IO1_VSEL		0x908
+#define VCCIO1_VD_3V3			BIT(15)
+#define GPIO1_IOC_GPIO1B_DS_0		0x150
+#define GPIO1_IOC_GPIO1B_DS_1		0x154
+#define GPIO1_IOC_GPIO1B_DS_2		0x158
+#define GPIO1_IOC_GPIO1B_DS_3		0x15c
 
 #define VCCIO2_IOC_BASE			0x201b8000
 #define GPIO2A_IOMUX_SEL_L		0x40
@@ -417,6 +423,21 @@ int arch_cpu_init(void)
 	/* Set the sdmmc iomux and power cycle */
 	board_set_iomux(IF_TYPE_MMC, 1, 0);
 #endif
+
+	/*
+	 * Fix fspi io ds level:
+	 *
+	 * level 3 for 1V8(default)
+	 * level 4 for 3V3
+	 */
+	if (readl(VCCIO1_IOC_BASE + GPIO1B_IOMUX_SEL_H) == 0x1111) {
+		if (readl(VCCIO1_IOC_BASE + GPIO1_IOC_IO1_VSEL) & VCCIO1_VD_3V3) {
+			writel(0x003f001f, VCCIO1_IOC_BASE + GPIO1_IOC_GPIO1B_DS_0);
+			writel(0x003f001f, VCCIO1_IOC_BASE + GPIO1_IOC_GPIO1B_DS_1);
+			writel(0x3f3f1f1f, VCCIO1_IOC_BASE + GPIO1_IOC_GPIO1B_DS_2);
+			writel(0x3f3f1f1f, VCCIO1_IOC_BASE + GPIO1_IOC_GPIO1B_DS_3);
+		}
+	}
 #endif
 
 	return 0;

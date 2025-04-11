@@ -1628,12 +1628,88 @@ static int rv1126b_clk_set_parent(struct clk *clk, struct clk *parent)
 	return 0;
 }
 
+static int rv1126b_clk_enable(struct clk *clk)
+{
+	ulong ret = 0;
+
+	switch (clk->id) {
+#ifdef CONFIG_SPL_BUILD
+	case PCLK_KEY_READER_S:
+		ret = writel(BITS_WITH_WMASK(0, 0x1U, 13),
+			     RV1126B_CRU_BASE + RV1126B_SBUSCLKGATE_CON(0));
+		break;
+	case HCLK_KL_RKCE_S:
+		ret = writel(BITS_WITH_WMASK(0, 0x1U, 9),
+			     RV1126B_CRU_BASE + RV1126B_SBUSCLKGATE_CON(0));
+		break;
+	case HCLK_RKCE_S:
+		ret = writel(BITS_WITH_WMASK(0, 0x1U, 8),
+			     RV1126B_CRU_BASE + RV1126B_SBUSCLKGATE_CON(0));
+		break;
+	case HCLK_RKRNG_S:
+		ret = writel(BITS_WITH_WMASK(0, 0x1U, 14),
+			     RV1126B_CRU_BASE + RV1126B_SBUSCLKGATE_CON(2));
+		break;
+	case CLK_PKA_RKCE_S:
+		ret = writel(BITS_WITH_WMASK(0, 0x1U, 13),
+			     RV1126B_CRU_BASE + RV1126B_SBUSCLKGATE_CON(2));
+		break;
+	case ACLK_RKCE_S:
+		ret = writel(BITS_WITH_WMASK(0, 0x1U, 12),
+			     RV1126B_CRU_BASE + RV1126B_SBUSCLKGATE_CON(2));
+		break;
+#endif
+	default:
+		return -ENOENT;
+	}
+	return ret;
+}
+
+static int rv1126b_clk_disable(struct clk *clk)
+{
+	ulong ret = 0;
+
+	switch (clk->id) {
+#ifdef CONFIG_SPL_BUILD
+	case PCLK_KEY_READER_S:
+		ret = writel(BITS_WITH_WMASK(1, 0x1U, 13),
+			     RV1126B_CRU_BASE + RV1126B_SBUSCLKGATE_CON(0));
+		break;
+	case HCLK_KL_RKCE_S:
+		ret = writel(BITS_WITH_WMASK(1, 0x1U, 9),
+			     RV1126B_CRU_BASE + RV1126B_SBUSCLKGATE_CON(0));
+		break;
+	case HCLK_RKCE_S:
+		ret = writel(BITS_WITH_WMASK(1, 0x1U, 8),
+			     RV1126B_CRU_BASE + RV1126B_SBUSCLKGATE_CON(0));
+		break;
+	case HCLK_RKRNG_S:
+		ret = writel(BITS_WITH_WMASK(1, 0x1U, 14),
+			     RV1126B_CRU_BASE + RV1126B_SBUSCLKGATE_CON(2));
+		break;
+	case CLK_PKA_RKCE_S:
+		ret = writel(BITS_WITH_WMASK(1, 0x1U, 13),
+			     RV1126B_CRU_BASE + RV1126B_SBUSCLKGATE_CON(2));
+		break;
+	case ACLK_RKCE_S:
+		ret = writel(BITS_WITH_WMASK(1, 0x1U, 12),
+			     RV1126B_CRU_BASE + RV1126B_SBUSCLKGATE_CON(2));
+		break;
+#endif
+	default:
+		return -ENOENT;
+	}
+	return ret;
+}
+
 static struct clk_ops rv1126b_clk_ops = {
 	.get_rate = rv1126b_clk_get_rate,
 	.set_rate = rv1126b_clk_set_rate,
 #if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
 	.set_parent = rv1126b_clk_set_parent,
 #endif
+	.enable = rv1126b_clk_enable,
+	.disable = rv1126b_clk_disable,
 };
 
 static void rv1126b_clk_init(struct rv1126b_clk_priv *priv)

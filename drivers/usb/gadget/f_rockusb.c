@@ -610,6 +610,27 @@ static int rkusb_do_vs_write(struct fsg_common *common)
 						curlun->sense_data = SS_WRITE_ERROR;
 						return -EIO;
 					}
+				} else if (memcmp(data, "FWEK", 4) == 0) {
+					uint32_t key_len = vhead->size - 9;
+					uint8_t key_id = *((uint8_t *)data + 8);
+					if (key_len == 4 && memcmp(data + 9, "lock", 4) == 0) {
+						if (trusty_set_fw_encrypt_key_mask(key_id) != 0) {
+							printf("trusty_set_fw_encrypt_key_mask error!");
+							curlun->sense_data = SS_WRITE_ERROR;
+							return -EIO;
+						}
+					} else {
+						if (key_len != 16 && key_len != 32) {
+							printf("check FW encrypt key size fail!\n");
+							curlun->sense_data = SS_WRITE_ERROR;
+							return -EIO;
+						}
+						if (trusty_write_fw_encrypt_key(key_id, (uint8_t *)(data + 9), key_len) != 0) {
+							printf("trusty_write_fw_encrypt_key error!");
+							curlun->sense_data = SS_WRITE_ERROR;
+							return -EIO;
+						}
+					}
 				} else {
 					printf("Unknown tag\n");
 					curlun->sense_data = SS_WRITE_ERROR;

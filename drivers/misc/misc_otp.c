@@ -22,3 +22,8 @@ int misc_otp_write(struct udevice *dev, int offset, const void *buf, int size)
 {
 	return misc_write(dev, offset, (void *)buf, size);
 }
+
+int misc_otp_ioctl(struct udevice *dev, unsigned long request, void *buf)
+{
+	return misc_ioctl(dev, request, buf);
+}

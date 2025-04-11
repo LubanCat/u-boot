@@ -145,6 +145,7 @@ struct misc_ops {
 struct udevice *misc_otp_get_device(u32 capability);
 int misc_otp_read(struct udevice *dev, int offset, void *buf, int size);
 int misc_otp_write(struct udevice *dev, int offset, const void *buf, int size);
+int misc_otp_ioctl(struct udevice *dev, unsigned long request, void *buf);
 
 /* generic layer for decompress */
 struct decom_param {

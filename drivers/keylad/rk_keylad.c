@@ -60,9 +60,49 @@
 
 struct rockchip_keylad_priv {
 	fdt_addr_t			reg;
+	char				*clocks;
+	u32				nclocks;
 };
 
 fdt_addr_t keylad_base;
+
+static int rk_keylad_do_enable_clk(struct udevice *dev, int enable)
+{
+	struct rockchip_keylad_priv *priv = dev_get_priv(dev);
+	struct clk clk;
+	int i, ret;
+
+	for (i = 0; i < priv->nclocks; i++) {
+		ret = clk_get_by_index(dev, i, &clk);
+		if (ret < 0) {
+			printf("Keylad failed to get clk index %d, ret=%d\n", i, ret);
+			return ret;
+		}
+
+		if (enable)
+			ret = clk_enable(&clk);
+		else
+			ret = clk_disable(&clk);
+
+		if (ret < 0 && ret != -ENOSYS) {
+			printf("Keylad failed to enable(%d) clk(%ld): ret=%d\n",
+			       enable, clk.id, ret);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+static int rk_keylad_enable_clk(struct udevice *dev)
+{
+	return rk_keylad_do_enable_clk(dev, 1);
+}
+
+static int rk_keylad_disable_clk(struct udevice *dev)
+{
+	return rk_keylad_do_enable_clk(dev, 0);
+}
 
 static inline u32 keylad_read(u32 offset)
 {
@@ -176,13 +216,18 @@ static int rockchip_keylad_transfer_fwkey(struct udevice *dev, ulong dst,
 		return res;
 	}
 
-	/// TODO: enable clock
+	rk_keylad_enable_clk(dev);
+
 	res = rk_keylad_send_key(0, keylen / 4, dst);
+
+	rk_keylad_disable_clk(dev);
+
 	if (res) {
 		printf("Keyladder transfer key err: 0x%x.", res);
-		return res;
+		goto exit;
 	}
 
+exit:
 	return res;
 }
 
@@ -193,6 +238,8 @@ static const struct dm_keylad_ops rockchip_keylad_ops = {
 static int rockchip_keylad_ofdata_to_platdata(struct udevice *dev)
 {
 	struct rockchip_keylad_priv *priv = dev_get_priv(dev);
+	int len = 0;
+	int ret = 0;
 
 	memset(priv, 0x00, sizeof(*priv));
 
@@ -201,6 +248,36 @@ static int rockchip_keylad_ofdata_to_platdata(struct udevice *dev)
 		return -EINVAL;
 
 	keylad_base = priv->reg;
+
+	/* if there is no clocks in dts, just skip it */
+	if (!dev_read_prop(dev, "clocks", &len)) {
+		printf("Keylad \"clocks\" property not set.\n");
+		return 0;
+	}
+
+	priv->clocks = malloc(len);
+	if (!priv->clocks)
+		return -ENOMEM;
+
+	priv->nclocks = len / (2 * sizeof(u32));
+	if (dev_read_u32_array(dev, "clocks", (u32 *)priv->clocks,
+			       priv->nclocks)) {
+		printf("Keylad can't read \"clocks\" property.\n");
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	return 0;
+exit:
+	if (priv->clocks)
+		free(priv->clocks);
+
+	return ret;
+}
+
+static int rockchip_keylad_probe(struct udevice *dev)
+{
+	rk_keylad_disable_clk(dev);
 
 	return 0;
 }
@@ -216,6 +293,7 @@ U_BOOT_DRIVER(rockchip_keylad) = {
 	.id		= UCLASS_KEYLAD,
 	.of_match	= rockchip_keylad_ids,
 	.ops		= &rockchip_keylad_ops,
+	.probe		= rockchip_keylad_probe,
 	.ofdata_to_platdata = rockchip_keylad_ofdata_to_platdata,
 	.priv_auto_alloc_size = sizeof(struct rockchip_keylad_priv),
 };

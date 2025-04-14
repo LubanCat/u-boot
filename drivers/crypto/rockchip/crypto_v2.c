@@ -261,7 +261,7 @@ static int rk_crypto_do_enable_clk(struct udevice *dev, int enable)
 		else
 			ret = clk_disable(&clk);
 		if (ret < 0 && ret != -ENOSYS) {
-			printf("Failed to enable(%d) clk(%ld): ret=%d\n",
+			debug("Failed to enable(%d) clk(%ld): ret=%d\n",
 			       enable, clk.id, ret);
 			return ret;
 		}

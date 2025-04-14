@@ -23,6 +23,7 @@
 		secure_conf = <0x2022001c>;
 		cru_rst_addr = <0x20200a00>;
 		mask_addr = <0x20ba0000>;
+		key_reader_addr = <0x20b20000>;
 		u-boot,dm-spl;
 		status = "okay";
 	};

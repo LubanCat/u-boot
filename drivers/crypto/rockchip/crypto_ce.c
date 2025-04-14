@@ -902,6 +902,7 @@ static int rockchip_crypto_ae(struct udevice *dev, cipher_context *ctx,
 	return rk_crypto_cipher(dev, ctx, in, out, len, true, aad, aad_len, tag);
 }
 
+#if CONFIG_IS_ENABLED(DM_KEYLAD)
 int rockchip_crypto_fw_cipher(struct udevice *dev, cipher_fw_context *ctx,
 			      const u8 *in, u8 *out, u32 len, bool enc)
 {
@@ -931,6 +932,7 @@ static ulong rockchip_get_keytable_addr(struct udevice *dev)
 
 	return addr;
 }
+#endif
 
 #endif
 
@@ -1071,8 +1073,12 @@ static const struct dm_crypto_ops rockchip_crypto_ops = {
 	.cipher_crypt    = rockchip_crypto_cipher,
 	.cipher_mac      = rockchip_crypto_mac,
 	.cipher_ae       = rockchip_crypto_ae,
+
+#if CONFIG_IS_ENABLED(DM_KEYLAD)
 	.cipher_fw_crypt = rockchip_crypto_fw_cipher,
 	.keytable_addr   = rockchip_get_keytable_addr,
+#endif
+
 #endif
 
 	.is_secure       = rockchip_crypto_is_secure,

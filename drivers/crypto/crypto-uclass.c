@@ -350,6 +350,7 @@ int crypto_ae(struct udevice *dev, cipher_context *ctx,
 int crypto_fw_cipher(struct udevice *dev, cipher_fw_context *ctx,
 		     const u8 *in, u8 *out, u32 len, bool enc)
 {
+#if CONFIG_IS_ENABLED(DM_KEYLAD)
 	const struct dm_crypto_ops *ops = device_get_ops(dev);
 	struct udevice *keylad_dev;
 
@@ -374,6 +375,9 @@ int crypto_fw_cipher(struct udevice *dev, cipher_fw_context *ctx,
 	}
 
 	return ops->cipher_fw_crypt(dev, ctx, in, out, len, enc);
+#else
+	return -ENOSYS;
+#endif
 }
 
 ulong crypto_keytable_addr(struct udevice *dev)

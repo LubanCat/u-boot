@@ -50,6 +50,13 @@
 #define OTP_RSA_HASH_ADDR		0x180
 #define OTP_RSA_HASH_SIZE		32
 
+/* firmware key */
+#define OTP_FW_ENC_KEY_ADDR		(0x24 * 4)
+#define OTP_FW_ENC_KEY_SIZE		(0x04 * 4)
+
+#define OTP_BACK_FW_ENC_KEY_ADDR	(0x28 * 4)
+#define OTP_BACK_FW_ENC_KEY_SIZE	(0x04 * 4)
+
 #define CONFIG_BOUNCE_BUFFER
 /* For most, U-Boot no need to use 0-1G space. */
 #define CONFIG_SYS_SDRAM_BASE		0x40000000

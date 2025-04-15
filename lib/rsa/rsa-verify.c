@@ -742,5 +742,54 @@ error:
 
 	return ret;
 }
+
+#if defined(CONFIG_SPL_OTP_DISABLE_SD) || defined(CONFIG_SPL_OTP_DISABLE_USB) || \
+    defined(CONFIG_SPL_OTP_DISABLE_UART) || defined(CONFIG_SPL_OTP_DISABLE_SPI2APB)
+typedef struct {
+	unsigned long addr;
+	uint8_t value;
+	char *name;
+} OtpUpgrade;
+
+int rsa_burn_disable_upgrade(void)
+{
+	OtpUpgrade upgrade[] = {
+#if defined(CONFIG_SPL_OTP_DISABLE_USB)
+		{OTP_DISABLE_UPGRADE_ADDR, OTP_DISABLE_USB_VAL, "usb"},
+#endif
+#if defined(CONFIG_SPL_OTP_DISABLE_SD)
+		{OTP_DISABLE_UPGRADE_ADDR, OTP_DISABLE_SD_VAL, "sd"},
+#endif
+#if defined(CONFIG_SPL_OTP_DISABLE_UART)
+		{OTP_DISABLE_UPGRADE_ADDR, OTP_DISABLE_UART_VAL, "uart"},
+#endif
+#if defined(CONFIG_SPL_OTP_DISABLE_SPI2APB)
+		{OTP_DISABLE_UPGRADE_ADDR, OTP_DISABLE_SPI2APB_VAL, "spi2apb"},
+#endif
+	};
+	struct udevice *dev;
+	uint8_t otp_write;
+	int ret = 0, i;
+
+	dev = misc_otp_get_device(OTP_S);
+	if (!dev) {
+		printf("OTP: No available device\n");
+		ret = -ENODEV;
+		goto fail;
+	}
+
+	for (i = 0; i < sizeof(upgrade)/sizeof(upgrade[0]); i++) {
+		otp_write = upgrade[i].value;
+		if (misc_otp_write_verify(dev, upgrade[i].addr, &otp_write, 1)) {
+			printf("Write OTP to disable %s upgrade failed.\n", upgrade[i].name);
+			goto fail;
+		}
+		printf("Write OTP to disable %s upgrade successfully.\n", upgrade[i].name);
+	}
+
+fail:
+	return ret;
+}
+#endif
 #endif
 #endif

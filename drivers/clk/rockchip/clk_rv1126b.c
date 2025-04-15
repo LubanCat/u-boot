@@ -1605,10 +1605,10 @@ static ulong rv1126b_clk_set_rate(struct clk *clk, ulong rate)
 	case TCLK_WDT_S:
 	case TCLK_WDT_HPMCU:
 	case TCLK_WDT_LPMCU:
-		rate = rv1126b_wdt_set_rate(priv, clk->id, rate);
+		ret = rv1126b_wdt_set_rate(priv, clk->id, rate);
 		break;
 	case DCLK_VOP:
-		rate = rv1126b_vop_set_rate(priv, clk->id, rate);
+		ret = rv1126b_vop_set_rate(priv, clk->id, rate);
 		break;
 
 	default:

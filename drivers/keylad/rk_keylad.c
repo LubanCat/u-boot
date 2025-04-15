@@ -119,8 +119,8 @@ static int rk_get_fwkey_param(u32 keyid, u32 *offset, u32 *max_len)
 {
 	switch (keyid) {
 	case RK_FW_KEY0:
-		*offset  = OEM_CIPHER_KEY_FW_ADDR;
-		*max_len = OEM_CIPHER_KEY_FW_LEN;
+		*offset  = OTP_FW_ENC_KEY_ADDR;
+		*max_len = OTP_FW_ENC_KEY_SIZE;
 		break;
 	default:
 		return -EINVAL;

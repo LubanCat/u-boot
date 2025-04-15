@@ -36,6 +36,9 @@ KEY_DIR="keys/"
 RSA_PRI_KEY="keys/dev.key"
 RSA_PUB_KEY="keys/dev.pubkey"
 RSA_CRT_KEY="keys/dev.crt"
+LEGACY_RSA_PRI_KEY="legacy_keys/dev.key"
+LEGACY_RSA_PUB_KEY="legacy_keys/dev.pubkey"
+LEGACY_RSA_CRT_KEY="legacy_keys/dev.crt"
 SIGNATURE_KEY_NODE="/signature/key-dev"
 SPL_DTB="spl/u-boot-spl.dtb"
 UBOOT_DTB="u-boot.dtb"
@@ -620,7 +623,12 @@ function fit_gen_loader()
 {
 	if [ "${ARG_SIGN}" == "y" ]; then
 		${RK_SIGN_TOOL} cc --chip ${ARG_CHIP: 2: 6}
-		${RK_SIGN_TOOL} lk --key ${RSA_PRI_KEY} --pubkey ${RSA_PUB_KEY}
+		if grep -q '^CONFIG_SPL_REVOKE_PUB_KEY=y' .config ; then
+			${RK_SIGN_TOOL} lk --key ${LEGACY_RSA_PRI_KEY} --pubkey ${LEGACY_RSA_PUB_KEY}
+			${RK_SIGN_TOOL} ss --flag=0x80
+		else
+			${RK_SIGN_TOOL} lk --key ${RSA_PRI_KEY} --pubkey ${RSA_PUB_KEY}
+		fi
 		if ls *loader*.bin >/dev/null 2>&1 ; then
 			${RK_SIGN_TOOL} sl --loader *loader*.bin
 		fi

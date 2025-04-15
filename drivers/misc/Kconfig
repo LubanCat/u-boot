@@ -138,6 +138,13 @@ config SPL_OTP_DISABLE_SPI2APB
 	help
 	  Support write otp to disable spi2apb upgrade.
 
+config SPL_REVOKE_PUB_KEY
+	bool "Rockchip revoke current public key Support"
+	depends on SPL_ROCKCHIP_SECURE_OTP
+	default n
+	help
+	  Support write otp to revoke current public key.
+
 config CMD_CROS_EC
 	bool "Enable crosec command"
 	depends on CROS_EC

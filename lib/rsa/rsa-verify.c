@@ -616,7 +616,6 @@ int rsa_burn_key_hash(struct image_sign_info *info)
 	struct key_prop prop;
 	char name[100] = {0};
 	uint8_t otp_write;
-	u16 secure_flags_read;
 	const void *blob = info->fdt_blob;
 	uint8_t digest_write[FIT_MAX_HASH_LEN];
 	int sig_node, node, digest_len;
@@ -643,6 +642,9 @@ int rsa_burn_key_hash(struct image_sign_info *info)
 	if (!dev)
 		return -ENODEV;
 
+#if !defined(CONFIG_SPL_REVOKE_PUB_KEY)
+	u16 secure_flags_read;
+
 	ret = misc_otp_read(dev, OTP_SECURE_BOOT_ENABLE_ADDR,
 			    &secure_flags_read, OTP_SECURE_BOOT_ENABLE_SIZE);
 	if (ret)
@@ -650,6 +652,7 @@ int rsa_burn_key_hash(struct image_sign_info *info)
 
 	if ((secure_flags_read & 0xff) == 0xff)
 		return 0;
+#endif
 
 	if (!prop.hash || !prop.modulus || !prop.public_exponent_BN)
 		return -ENOENT;
@@ -700,6 +703,17 @@ int rsa_burn_key_hash(struct image_sign_info *info)
 	printf("Waiting for power supply steady for OTP write. Please don't turn off the device\n");
 	mdelay(3000);
 
+#if defined(CONFIG_SPL_REVOKE_PUB_KEY)
+	/* Burn next key hash here */
+	if (misc_otp_write_verify(dev, OTP_NEXT_RSA_HASH_ADDR, digest_write,
+				  OTP_NEXT_RSA_HASH_SIZE)) {
+		printf("RSA: Write next public key hash fail.\n");
+		ret = -EIO;
+		goto error;
+	} else {
+		printf("RSA: Write next RSA key hash successfully.\n");
+	}
+#else
 	/* Burn key hash here */
 	if (misc_otp_write_verify(dev, OTP_RSA_HASH_ADDR, digest_write, OTP_RSA_HASH_SIZE)) {
 		printf("RSA: Write public key hash fail.\n");
@@ -708,6 +722,7 @@ int rsa_burn_key_hash(struct image_sign_info *info)
 	} else {
 		printf("RSA: Write RSA key hash successfully.\n");
 	}
+#endif
 /*
  * For some chips, rsa4096 flag and secureboot flag should be burned together
  * because of ecc enable. OTP_RSA4096_ENABLE_ADDR won't defined for burning
@@ -726,6 +741,18 @@ int rsa_burn_key_hash(struct image_sign_info *info)
 	}
 #endif
 
+#if defined(CONFIG_SPL_REVOKE_PUB_KEY)
+	/* Burn revoke key config here */
+	otp_write = OTP_RSA_HASH_REVOKE_VAL;
+	if (misc_otp_write_verify(dev, OTP_RSA_HASH_REVOKE_ADDR, &otp_write,
+				  OTP_RSA_HASH_REVOKE_SIZE)) {
+		printf("RSA: Write revoke key config fail.\n");
+		ret = -EIO;
+		goto error;
+	} else {
+		printf("RSA: Write revoke key config successfully.\n");
+	}
+#else
 	/* Burn secure flag here */
 	otp_write = OTP_SECURE_BOOT_ENABLE_VALUE;
 	if (misc_otp_write_verify(dev, OTP_SECURE_BOOT_ENABLE_ADDR, &otp_write,
@@ -736,6 +763,7 @@ int rsa_burn_key_hash(struct image_sign_info *info)
 	} else {
 		printf("RSA: Write secure flag successfully.\n");
 	}
+#endif
 
 error:
 	free(rsa_key);

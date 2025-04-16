@@ -88,6 +88,13 @@ void board_bidram_fixup(void);
 u64 bidram_append_size(void);
 
 /**
+ * board_bidram_append_size() - Append board specific memory
+ *
+ * @return board specific size
+ */
+u64 board_bidram_append_size(void);
+
+/**
  * bidram_reserved_is_overlap() - Check outside memory is overlap with reserved
  *
  * @base: region base address

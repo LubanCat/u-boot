@@ -27,6 +27,11 @@ __weak void board_bidram_fixup(void)
 {
 }
 
+__weak u64 board_bidram_append_size(void)
+{
+	return 0;
+}
+
 static int bidram_has_init(void)
 {
 	if (!plat_bidram.has_init) {
@@ -235,6 +240,8 @@ u64 bidram_append_size(void)
 
 	if (gd->ram_top_ext_size)
 		size += gd->ram_top_ext_size;
+
+	size += board_bidram_append_size();
 
 	return size;
 }

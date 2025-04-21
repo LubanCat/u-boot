@@ -12,8 +12,6 @@
 #include <dm/lists.h>
 #include <dm/uclass-internal.h>
 
-static uspinlock_t blk_lock;
-
 static const char *if_typename_str[IF_TYPE_COUNT] = {
 	[IF_TYPE_IDE]		= "ide",
 	[IF_TYPE_SCSI]		= "scsi",
@@ -474,9 +472,9 @@ unsigned long blk_dread(struct blk_desc *block_dev, lbaint_t start,
 			  start, blkcnt, block_dev->blksz, buffer))
 		return blkcnt;
 
-	u_spin_lock(&blk_lock);
+	u_spin_lock(&block_dev->blk_lock);
 	blks_read = ops->read(dev, start, blkcnt, buffer);
-	u_spin_unlock(&blk_lock);
+	u_spin_unlock(&block_dev->blk_lock);
 
 	if (blks_read == blkcnt)
 		blkcache_fill(block_dev->if_type, block_dev->devnum,
@@ -497,9 +495,9 @@ unsigned long blk_dwrite(struct blk_desc *block_dev, lbaint_t start,
 
 	blkcache_invalidate(block_dev->if_type, block_dev->devnum);
 
-	u_spin_lock(&blk_lock);
+	u_spin_lock(&block_dev->blk_lock);
 	ret = ops->write(dev, start, blkcnt, buffer);
-	u_spin_unlock(&blk_lock);
+	u_spin_unlock(&block_dev->blk_lock);
 
 	return ret;
 }
@@ -516,9 +514,9 @@ unsigned long blk_dwrite_zeroes(struct blk_desc *block_dev, lbaint_t start,
 
 	blkcache_invalidate(block_dev->if_type, block_dev->devnum);
 
-	u_spin_lock(&blk_lock);
+	u_spin_lock(&block_dev->blk_lock);
 	ret = ops->write_zeroes(dev, start, blkcnt);
-	u_spin_unlock(&blk_lock);
+	u_spin_unlock(&block_dev->blk_lock);
 
 	return ret;
 }
@@ -535,9 +533,9 @@ unsigned long blk_derase(struct blk_desc *block_dev, lbaint_t start,
 
 	blkcache_invalidate(block_dev->if_type, block_dev->devnum);
 
-	u_spin_lock(&blk_lock);
+	u_spin_lock(&block_dev->blk_lock);
 	ret = ops->erase(dev, start, blkcnt);
-	u_spin_unlock(&blk_lock);
+	u_spin_unlock(&block_dev->blk_lock);
 
 	return ret;
 }

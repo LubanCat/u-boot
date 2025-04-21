@@ -9,6 +9,7 @@
 #define BLK_H
 
 #include <efi.h>
+#include <asm/uspinlock.h>
 
 #ifdef CONFIG_SYS_64BIT_LBA
 typedef uint64_t lbaint_t;
@@ -123,6 +124,8 @@ struct blk_desc {
 				       lbaint_t blkcnt);
 	void		*priv;		/* driver private struct pointer */
 #endif
+
+	uspinlock_t	blk_lock;
 };
 
 #define BLOCK_CNT(size, blk_desc) (PAD_COUNT(size, blk_desc->blksz))

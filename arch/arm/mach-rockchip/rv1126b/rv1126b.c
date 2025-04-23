@@ -82,6 +82,9 @@ DECLARE_GLOBAL_DATA_PTR;
 #define	GPIO6C_IE			0x468
 #define	GPIO6C_SMT			0x568
 
+#define VCCIO7_IOC_BASE			0x201E0000
+#define GRF_DSM_IOC_CON0		0x0ca0
+
 /* SGRF/FIREWALL */
 #define SGRF_SYS_BASE			0x20220000
 #define SGRF_HPMCU_BOOT_ADDR		0x0c
@@ -343,6 +346,9 @@ int arch_cpu_init(void)
 	writel(0x00f00000, VCCIO6_IOC_BASE + GPIO6C_PULL);
 	writel(0x00f00000, VCCIO6_IOC_BASE + GPIO6C_IE);
 	writel(0x00f00000, VCCIO6_IOC_BASE + GPIO6C_SMT);
+
+	/* Solve dsm pop pulse */
+	writel(0xfffff990, VCCIO7_IOC_BASE + GRF_DSM_IOC_CON0);
 
 #if defined(CONFIG_ROCKCHIP_EMMC_IOMUX)
 	board_set_iomux(IF_TYPE_MMC, 0, 0);

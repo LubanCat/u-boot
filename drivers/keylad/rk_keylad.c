@@ -160,6 +160,7 @@ static int rk_otp_keylad_read_init(void)
 	if (!dev)
 		return -ENODEV;
 
+	misc_otp_ioctl(dev, IOCTL_REQ_START, NULL);
 	misc_otp_ioctl(dev, IOCTL_REQ_KEYLAD_INIT, NULL);
 
 	return 0;
@@ -174,6 +175,7 @@ static int rk_otp_keylad_read_deinit(void)
 		return -ENODEV;
 
 	misc_otp_ioctl(dev, IOCTL_REQ_KEYLAD_DEINIT, NULL);
+	misc_otp_ioctl(dev, IOCTL_REQ_STOP, NULL);
 
 	return 0;
 }

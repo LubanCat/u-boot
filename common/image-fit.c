@@ -824,6 +824,24 @@ int fit_image_get_comp_addr(const void *fit, int noffset, ulong *comp)
 }
 
 /**
+ * fit_image_get_cipher_addr() - get cipher addr property for given component image node
+ * @fit: pointer to the FIT format image header
+ * @noffset: component image node offset
+ * @cipher: pointer to the uint32_t, will hold load address
+ *
+ * fit_image_get_cipher_addr() finds cipher address property in a given component
+ * image node. If the property is found, its value is returned to the caller.
+ *
+ * returns:
+ *     0, on success
+ *     -1, on failure
+ */
+int fit_image_get_cipher_addr(const void *fit, int noffset, ulong *cipher)
+{
+	return fit_image_get_address(fit, noffset, FIT_CIPHER_ADDR_PROP, cipher);
+}
+
+/**
  * fit_image_set_load() - set load addr property for given component image node
  * @fit: pointer to the FIT format image header
  * @noffset: component image node offset

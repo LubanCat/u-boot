@@ -934,6 +934,7 @@ int bootz_setup(ulong image, ulong *start, ulong *end);
 #define FIT_OS_PROP		"os"
 #define FIT_COMP_PROP		"compression"
 #define FIT_COMP_ADDR_PROP	"comp"
+#define FIT_CIPHER_ADDR_PROP	"cipher"
 #define FIT_ENTRY_PROP		"entry"
 #define FIT_LOAD_PROP		"load"
 #define FIT_PRE_LOAD_PROP	"preload"
@@ -1023,6 +1024,7 @@ bool fit_image_is_preload(const void *fit, int noffset);
 int fit_image_get_load(const void *fit, int noffset, ulong *load);
 int fit_image_get_entry(const void *fit, int noffset, ulong *entry);
 int fit_image_get_comp_addr(const void *fit, int noffset, ulong *comp);
+int fit_image_get_cipher_addr(const void *fit, int noffset, ulong *cipher);
 int fit_image_set_load(const void *fit, int noffset, ulong load);
 int fit_image_set_entry(const void *fit, int noffset, ulong entry);
 int fit_image_get_data(const void *fit, int noffset,

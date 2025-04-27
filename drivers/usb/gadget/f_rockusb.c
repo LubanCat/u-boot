@@ -857,6 +857,10 @@ static int rkusb_do_switch_storage(struct fsg_common *common)
 		scsi_scan(true);
 		break;
 #endif
+	case BOOT_TYPE_PCIE:
+		type = IF_TYPE_NVME;
+		devnum = 0;
+		break;
 	default:
 		printf("Bootdev 0x%x is not support\n", media);
 		return -ENODEV;

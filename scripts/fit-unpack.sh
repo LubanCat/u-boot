@@ -138,7 +138,13 @@ function gen_its()
 		fi
 	done
 
-	dtc -I dtb -O dts ${TMP_ITB} -o ${ITS}
+	DTC=$(find . -type f -name "dtc")
+	if [ -z ${DTC} ]; then
+		echo "ERROR: No DTC tool"
+		exit 1
+	fi
+	${DTC} -I dtb -O dts ${TMP_ITB} -o ${ITS}
+
 	rm -f ${TMP_ITB}
 
 	# fixup placeholder: data = "/INCBIN/(...)"; -> data = /incbin/("...");

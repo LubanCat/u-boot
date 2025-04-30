@@ -406,14 +406,6 @@ int arch_cpu_init(void)
 	 * Module: GMAC0/1, MMU0/1(PCIe, SATA, USB3)
 	 */
 	writel(0xffffff00, SYS_SGRF_BASE + SYS_SGRF_SOC_CON20);
-#else
-	/*
-	 * Set SATA FBSCP and PORTS_IMPL for kernel drivers
-	 */
-	writel(SATA_FBS_ENABLE, SATA0_BASE_ADDR + SATA_PORT_CMD);
-	writel(1, SATA0_BASE_ADDR + SATA_PI);
-	writel(SATA_FBS_ENABLE, SATA1_BASE_ADDR + SATA_PORT_CMD);
-	writel(1, SATA1_BASE_ADDR + SATA_PI);
 #endif
 
 #if defined(CONFIG_ROCKCHIP_EMMC_IOMUX)
@@ -461,6 +453,17 @@ int rk_board_dm_fdt_fixup(const void *blob)
 				}
 			}
 		}
+	}
+
+	node = fdt_path_offset(blob, "/sata@2a240000");
+	if (node >= 0) {
+		/*
+		* Set SATA FBSCP and PORTS_IMPL for kernel drivers
+		*/
+		writel(SATA_FBS_ENABLE, SATA0_BASE_ADDR + SATA_PORT_CMD);
+		writel(1, SATA0_BASE_ADDR + SATA_PI);
+		writel(SATA_FBS_ENABLE, SATA1_BASE_ADDR + SATA_PORT_CMD);
+		writel(1, SATA1_BASE_ADDR + SATA_PI);
 	}
 
 	return 0;

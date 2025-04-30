@@ -36,6 +36,16 @@ DECLARE_GLOBAL_DATA_PTR;
 #define TSADC_GRF_CON0			0x50
 #define TSADC_GRF_CON1			0x54
 #define TSADC_GRF_CON6			0x68
+#define TSADC_GRF_ST1			0x114
+#define TSADC_DEF_WIDTH			0x00010001
+#define TSADC_TARGET_WIDTH		24000
+#define TSADC_DEF_BIAS			32
+#define TSADC_MIN_BIAS			0x1
+#define TSADC_MAX_BIAS			0x7f
+#define TSADC_UNLOCK_VALUE		0xa5
+#define TSADC_UNLOCK_VALUE_MASK		(0xff << 16)
+#define TSADC_UNLOCK_TRIGGER		BIT(8)
+#define TSADC_UNLOCK_TRIGGER_MASK	(BIT(8) << 16)
 #define GRF_JTAG_CON0			0x904
 
 #define PERI_GRF_BASE			0x20110000
@@ -280,6 +290,36 @@ void spl_board_storages_fixup(struct spl_image_loader *loader)
 	if (loader->boot_device == BOOT_DEVICE_MMC2)
 		/* Unset the sdmmc0 iomux */
 		board_unset_iomux(IF_TYPE_MMC, 1, 0);
+}
+
+static void tsadc_adjust_bias_current(void)
+{
+	u32 bias, value = 0, width = 0;
+
+	value = readl(SYS_GRF_BASE + TSADC_GRF_ST1);
+	if (!value || value == TSADC_DEF_WIDTH) {
+		printf("Invalid tsadc width\n");
+	} else {
+		width = (value & 0x0000ffff) + ((value & 0xffff0000) >> 16);
+		bias = width * TSADC_DEF_BIAS / TSADC_TARGET_WIDTH;
+		if (bias > TSADC_MAX_BIAS)
+			bias = TSADC_MAX_BIAS;
+		if (bias < TSADC_MAX_BIAS)
+			bias = TSADC_MIN_BIAS;
+		printf("tsadc width=0x%x, bias=0x%x\n", value, bias);
+		writel((TSADC_MAX_BIAS << 16) | bias,
+		       SYS_GRF_BASE + TSADC_GRF_CON6);
+		writel(TSADC_UNLOCK_VALUE | TSADC_UNLOCK_VALUE_MASK,
+		       SYS_GRF_BASE + TSADC_GRF_CON1);
+		writel(TSADC_UNLOCK_TRIGGER | TSADC_UNLOCK_TRIGGER_MASK,
+		       SYS_GRF_BASE + TSADC_GRF_CON1);
+		writel(TSADC_UNLOCK_TRIGGER_MASK, SYS_GRF_BASE + TSADC_GRF_CON1);
+	}
+}
+
+void spl_rk_board_prepare_for_jump(struct spl_image_info *spl_image)
+{
+	tsadc_adjust_bias_current();
 }
 
 int spl_fit_standalone_release(char *id, uintptr_t entry_point)

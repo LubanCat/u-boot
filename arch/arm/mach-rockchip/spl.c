@@ -38,6 +38,10 @@ void board_return_to_bootrom(void)
 __weak const char * const boot_devices[BROM_LAST_BOOTSOURCE + 1] = {
 };
 
+__weak void spl_rk_board_prepare_for_jump(struct spl_image_info *spl_image)
+{
+}
+
 const char *board_spl_was_booted_from(void)
 {
 	u32  bootdevice_brom_id = readl(BROM_BOOTSOURCE_ID_ADDR);
@@ -651,5 +655,7 @@ int spl_board_prepare_for_jump(struct spl_image_info *spl_image)
 #ifdef CONFIG_SPL_ROCKCHIP_HW_DECOMPRESS
 	misc_decompress_cleanup();
 #endif
+	spl_rk_board_prepare_for_jump(spl_image);
+
 	return 0;
 }

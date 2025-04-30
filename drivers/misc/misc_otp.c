@@ -44,7 +44,13 @@ int misc_otp_write_verify(struct udevice *dev, int offset, const uint8_t *write_
 	}
 
 	for (i = 0; i < size; i++) {
-		if (read_buf[i] == write_buf[i])
+		/* Already 1 value in otp can't be written to 0. */
+		if (read_buf[i] & ~write_buf[i]) {
+			printf("OTP: The zone is partly written.\n");
+			ret = -EACCES;
+			goto out;
+		}
+		if ((read_buf[i] == write_buf[i]) && write_buf[i])
 			written_size++;
 		else
 			break;

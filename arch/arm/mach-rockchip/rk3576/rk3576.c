@@ -19,6 +19,8 @@
 #include <asm/arch/ioc_rk3576.h>
 #include <asm/arch/rockchip_smccc.h>
 #include <asm/system.h>
+#include <asm/arch/vendor.h>
+#include <optee_include/OpteeClientInterface.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -470,3 +472,37 @@ int rk_board_dm_fdt_fixup(const void *blob)
 }
 #endif
 
+/* @brief: Fix up the device tree of gmac0
+ *
+ * This function enables GMAC0 after verifying the license.
+ *
+ * @param blob Pointer to the device tree blob
+ * @return 0 on success
+ **/
+#if defined(CONFIG_ROCKCHIP_VENDOR_PARTITION)
+int rk_board_fdt_fixup(const void *blob)
+{
+	char licence_str[1024] = {0};
+	int ret, size, node;
+
+	size = vendor_storage_read(MULTI_MODULE_KEY_ID, licence_str, 1024);
+	if (size > 0) {
+		ret = trusty_verify_config_ip(licence_str);
+		if (!ret)
+			printf("gmac0 can be enabled safely\n");
+		else
+			return 0;
+
+		node = fdt_path_offset(blob, "/ethernet@2a220000");
+		if (node < 0) {
+			printf("Error: /ethernet@2a220000 cannot find node\n");
+		} else {
+			ret = fdt_setprop_string((void *)blob, node, "status", "okay");
+			if (ret < 0)
+				printf("Error: /ethernet@2a220000 cannot set status property\n");
+		}
+	}
+
+	return 0;
+}
+#endif

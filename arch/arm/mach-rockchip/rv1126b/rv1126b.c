@@ -304,7 +304,7 @@ static void tsadc_adjust_bias_current(void)
 		bias = width * TSADC_DEF_BIAS / TSADC_TARGET_WIDTH;
 		if (bias > TSADC_MAX_BIAS)
 			bias = TSADC_MAX_BIAS;
-		if (bias < TSADC_MAX_BIAS)
+		if (bias < TSADC_MIN_BIAS)
 			bias = TSADC_MIN_BIAS;
 		printf("tsadc width=0x%x, bias=0x%x\n", value, bias);
 		writel((TSADC_MAX_BIAS << 16) | bias,

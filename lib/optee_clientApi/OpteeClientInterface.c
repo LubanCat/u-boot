@@ -44,6 +44,7 @@
 
 #define CRYPTO_SERVICE_CMD_OEM_OTP_KEY_PHYS_CIPHER	0x00000002
 #define CRYPTO_SERVICE_CMD_FW_KEY_PHYS_CIPHER		0x00000007
+#define CRYPTO_SERVICE_CMD_VERIFY_CONFIG_IP		0x00000009
 
 #define RK_CRYPTO_SERVICE_UUID	{ 0x0cacdb5d, 0x4fea, 0x466c, \
 		{ 0x97, 0x16, 0x3d, 0x54, 0x16, 0x52, 0x83, 0x0f } }
@@ -2325,3 +2326,65 @@ exit:
 	return TeecResult;
 }
 
+uint32_t trusty_verify_config_ip(char *licence_str)
+{
+	TEEC_Result TeecResult;
+	TEEC_Context TeecContext;
+	TEEC_Session TeecSession;
+	uint32_t ErrorOrigin;
+
+	TEEC_UUID tempuuid = RK_CRYPTO_SERVICE_UUID;
+	TEEC_UUID *TeecUuid = &tempuuid;
+	TEEC_Operation TeecOperation = {0};
+
+	TeecResult = OpteeClientApiLibInitialize();
+	if (TeecResult != TEEC_SUCCESS)
+		return TeecResult;
+
+	TeecResult = TEEC_InitializeContext(NULL, &TeecContext);
+	if (TeecResult != TEEC_SUCCESS)
+		return TeecResult;
+
+	TeecResult = TEEC_OpenSession(&TeecContext,
+				      &TeecSession,
+				      TeecUuid,
+				      TEEC_LOGIN_PUBLIC,
+				      NULL,
+				      NULL,
+				      &ErrorOrigin);
+	if (TeecResult != TEEC_SUCCESS) {
+		TEEC_FinalizeContext(&TeecContext);
+		return TeecResult;
+	}
+
+	TEEC_SharedMemory SharedMem = {0};
+
+	SharedMem.size = strlen(licence_str);
+	SharedMem.flags = 0;
+
+	TeecResult = TEEC_AllocateSharedMemory(&TeecContext, &SharedMem);
+	if (TeecResult != TEEC_SUCCESS)
+		goto exit;
+
+	memcpy(SharedMem.buffer, licence_str, SharedMem.size);
+	TeecOperation.params[0].tmpref.buffer = SharedMem.buffer;
+	TeecOperation.params[0].tmpref.size = SharedMem.size;
+	TeecOperation.paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_TEMP_INPUT,
+						    TEEC_NONE,
+						    TEEC_NONE,
+						    TEEC_NONE);
+
+	TeecResult = TEEC_InvokeCommand(&TeecSession,
+					CRYPTO_SERVICE_CMD_VERIFY_CONFIG_IP,
+					&TeecOperation,
+					&ErrorOrigin);
+	if (TeecResult != TEEC_SUCCESS)
+		goto exit;
+
+exit:
+	TEEC_ReleaseSharedMemory(&SharedMem);
+	TEEC_CloseSession(&TeecSession);
+	TEEC_FinalizeContext(&TeecContext);
+
+	return TeecResult;
+}

@@ -158,6 +158,8 @@ static void __do_reset(struct usb_ep *ep, struct usb_request *req)
 
 	if (rkusb_rst_code == 0x03)
 		boot_flag = BOOT_BROM_DOWNLOAD;
+	else if (rkusb_rst_code == 0x06)
+		boot_flag = BOOT_LOADER;
 
 	rkusb_rst_code = 0; /* restore to default */
 	writel(boot_flag, (void *)CONFIG_ROCKCHIP_BOOT_MODE_REG);

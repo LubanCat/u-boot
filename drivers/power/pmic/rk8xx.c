@@ -25,6 +25,10 @@ static const struct virq_reg rk805_irqs[] = {
 		.mask = RK805_IRQ_PWRON_RISE_MSK,
 		.reg_offset = 0,
 	},
+	[RK8XX_IRQ_RTC_ALARM] = {
+		.mask = RK805_IRQ_RTC_ALARM_MSK,
+		.reg_offset = 0,
+	},
 };
 
 static struct virq_chip rk805_irq_chip = {
@@ -66,6 +70,10 @@ static const struct virq_reg rk808_irqs[] = {
 		.mask = RK808_IRQ_PLUG_OUT_MSK,
 		.reg_offset = 1,
 	},
+	[RK8XX_IRQ_RTC_ALARM] = {
+		.mask = RK808_IRQ_RTC_ALARM_MSK,
+		.reg_offset = 0,
+	},
 };
 
 static struct virq_chip rk808_irq_chip = {
@@ -97,6 +105,10 @@ static const struct virq_reg rk816_irqs[] = {
 		.mask = RK816_IRQ_CHR_OK_MSK,
 		.reg_offset = 2,
 	},
+	[RK8XX_IRQ_RTC_ALARM] = {
+		.mask = RK816_IRQ_RTC_ALARM_MSK,
+		.reg_offset = 1,
+	},
 };
 
 static struct virq_chip rk816_irq_chip = {
@@ -121,6 +133,10 @@ static const struct virq_reg rk818_irqs[] = {
 	[RK8XX_IRQ_CHG_OK] = {
 		.mask = RK818_IRQ_CHR_OK_MSK,
 		.reg_offset = 1,
+	},
+	[RK8XX_IRQ_RTC_ALARM] = {
+		.mask = RK818_IRQ_RTC_ALARM_MSK,
+		.reg_offset = 0,
 	},
 };
 
@@ -152,6 +168,10 @@ static const struct virq_reg rk817_irqs[] = {
 	[RK8XX_IRQ_PLUG_IN] = {
 		.mask = RK817_IRQ_PLUG_IN_MSK,
 		.reg_offset = 1,
+	},
+	[RK8XX_IRQ_RTC_ALARM] = {
+		.mask = RK817_IRQ_RTC_ALARM_MSK,
+		.reg_offset = 0,
 	},
 };
 

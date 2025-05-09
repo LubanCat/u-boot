@@ -38,7 +38,6 @@ static struct virq_chip rk801_irq_chip = {
 
 static struct reg_data rk801_init_reg[] = {
 	{ RK801_SLEEP_CFG_REG, RK801_NONE_FUN, RK801_SLEEP_FUN_MSK },
-	{ RK801_SYS_CFG2_REG, RK801_SLEEP_ACT_H, RK801_SLEEP_POL_MSK },
 	{ RK801_SYS_CFG2_REG, RK801_RST_RESTART_REG, RK801_RST_MSK },
 	{ RK801_INT_CONFIG_REG, RK801_INT_ACT_L, RK801_INT_POL_MSK },
 	{ RK801_POWER_FPWM_EN_REG, RK801_PLDO_HRDEC_EN, RK801_PLDO_HRDEC_EN },
@@ -178,6 +177,7 @@ static int rk801_probe(struct udevice *dev)
 	       priv->variant, on, off, priv->req_pwrctrl_dvs);
 
 	if (priv->req_pwrctrl_dvs) {
+		/* GPIOD_IS_OUT: output inactive */
 		ret = gpio_request_by_name(dev, "pwrctrl-gpios", 0,
 					   &priv->pwrctrl_gpio, GPIOD_IS_OUT);
 		if (ret) {

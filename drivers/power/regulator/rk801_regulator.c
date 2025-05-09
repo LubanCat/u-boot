@@ -382,7 +382,7 @@ static int rk801_regulator_set_value(struct udevice *dev, int uV, bool runtime)
 		else
 			ret = pmic_clrsetbits(pmic, reg0, desc->vsel_mask, sel);
 
-		/* if sleep mode: set pwrctrl pin low-level anyway */
+		/* if sleep mode: set pwrctrl pin inactive anyway */
 		if (!runtime) {
 			dm_gpio_set_value(gpio, 0);
 			udelay(40); /* hw sync */
@@ -585,6 +585,7 @@ static int switch_get_suspend_value(struct udevice *dev)
 
 static int rk801_buck_probe(struct udevice *dev)
 {
+	struct rk801_priv *priv = dev_get_priv(dev->parent);
 	struct dm_regulator_uclass_platdata *uc_pdata;
 	struct udevice *pmic = dev->parent;
 	struct runtime_device rdev[] = {
@@ -605,9 +606,11 @@ static int rk801_buck_probe(struct udevice *dev)
 	if (dev->driver_data != 1)
 		return 0;
 
-	/* pwrctrl gpio active high and use sleep function */
+	/* set pwrctrl active pol and use sleep function */
+	val = (priv->pwrctrl_gpio.flags & GPIOD_ACTIVE_LOW) ?
+			      RK801_SLEEP_ACT_L : RK801_SLEEP_ACT_H;
 	ret = pmic_clrsetbits(pmic, RK801_SYS_CFG2_REG,
-			      RK801_SLEEP_POL_MSK, RK801_SLEEP_ACT_H);
+			      RK801_SLEEP_POL_MSK, val);
 	if (ret < 0)
 		return ret;
 

@@ -136,6 +136,9 @@ static int dbg_enable;
 #define BAT_DISCHRG		0x00ec
 #define BAT_CON			BIT(4)
 
+#define USB_VOL_ADC_EN		BIT(4)
+#define SYS_VOL_ADC_EN		BIT(6)
+
 #define PMIC_CHRG_OUT		0x00E4
 #define USB_CTRL_REG		0x00E5
 #define PMIC_CHRG_TERM		0x00E6
@@ -1062,6 +1065,15 @@ static bool is_rk817_bat_last_halt(struct rk817_battery_device *battery)
 	}
 }
 
+static void rk817_bat_adc_init(struct rk817_battery_device *battery)
+{
+	int value;
+
+	value = rk817_bat_read(battery, ADC_CONFIG0);
+	value |= USB_VOL_ADC_EN | SYS_VOL_ADC_EN;
+	rk817_bat_write(battery, ADC_CONFIG0, value);
+}
+
 static u8 rk817_bat_get_halt_cnt(struct rk817_battery_device *battery)
 {
 	return rk817_bat_read(battery, HALT_CNT_REG);
@@ -1723,6 +1735,7 @@ static int rk817_fg_init(struct rk817_battery_device *battery)
 	rk817_bat_gas_gaugle_enable(battery);
 	rk817_bat_init_voltage_kb(battery);
 	rk817_bat_calibration(battery);
+	rk817_bat_adc_init(battery);
 	rk817_bat_rsoc_init(battery);
 	rk817_bat_init_coulomb_cap(battery, battery->nac);
 	rk817_bat_init_ts_detect(battery);

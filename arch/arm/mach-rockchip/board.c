@@ -79,6 +79,11 @@ __weak int rk_board_dm_fdt_fixup(void *blob)
 	return 0;
 }
 
+__weak int soc_id_init(void)
+{
+	return 0;
+}
+
 __weak int soc_clk_dump(void)
 {
 	return 0;
@@ -587,6 +592,8 @@ int board_init(void)
 	if (ab_decrease_tries())
 		printf("Decrease ab tries count fail!\n");
 #endif
+	soc_id_init();
+
 	return rk_board_init();
 }
 

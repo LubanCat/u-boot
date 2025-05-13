@@ -6,6 +6,7 @@
 #include <common.h>
 #include <clk.h>
 #include <dm.h>
+#include <misc.h>
 #include <asm/io.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/hardware.h>
@@ -67,6 +68,10 @@ DECLARE_GLOBAL_DATA_PTR;
 #define SATA_PI				0xC
 #define SATA_PORT_CMD			0x118
 #define SATA_FBS_ENABLE			BIT(22)
+
+#define OTP_SPEC_NUM_OFFSET		0x07
+#define OTP_SPEC_NUM_MASK		0x1f
+#define REMARK_OTP_SPEC_NUM_OFFSET	0x56
 
 enum {
 	/* PMU_GRF_GPIO0C_IOMUX_L */
@@ -1223,6 +1228,45 @@ int rk_board_fdt_fixup(const void *blob)
 
 	return 0;
 }
+
+#ifdef CONFIG_ROCKCHIP_OTP
+int soc_id_init(void)
+{
+	struct udevice *dev;
+	u8 val, spec;
+	int ret;
+
+	ret = uclass_get_device_by_driver(UCLASS_MISC,
+					  DM_GET_DRIVER(rockchip_otp),
+					  &dev);
+	if (ret) {
+		printf("No OTP device, ret=%d\n", ret);
+		return ret;
+	}
+
+	ret = misc_read(dev, REMARK_OTP_SPEC_NUM_OFFSET, &val, 1);
+	if (ret) {
+		printf("Fail to read otp remark-spec, ret=%d\n", ret);
+		return ret;
+	}
+	if (!val) {
+		ret = misc_read(dev, OTP_SPEC_NUM_OFFSET, &val, 1);
+		if (ret) {
+			printf("Fail to read otp spec, ret=%d\n", ret);
+			return ret;
+		}
+	}
+
+	spec = val & OTP_SPEC_NUM_MASK;
+	printf("otp spec: %x\n", spec);
+	if (spec == 0x1b) {
+		printf("SoC: rk3566pro\n");
+		board_soc_id_init(ROCKCHIP_SOC_RK3566PRO);
+	}
+
+	return 0;
+}
+#endif
 
 #if !defined(CONFIG_SPL_BUILD) && defined(CONFIG_ROCKCHIP_DMC_FSP)
 int rk_board_init(void)

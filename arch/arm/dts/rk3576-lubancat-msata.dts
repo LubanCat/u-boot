@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2023 Rockchip Electronics Co., Ltd.
+ */
+
+/dts-v1/;
+#include "rk3576.dtsi"
+#include "rk3576-u-boot.dtsi"
+#include <dt-bindings/input/input.h>
+
+/ {
+	model = "Rockchip RK3576 Evaluation board";
+	compatible = "rockchip,rk3576-evb", "rockchip,rk3576";
+
+	adc-keys {
+		compatible = "adc-keys";
+		io-channels = <&saradc 1>;
+		io-channel-names = "buttons";
+		keyup-threshold-microvolt = <1800000>;
+		u-boot,dm-pre-reloc;
+		status = "okay";
+
+		volumeup-key {
+			u-boot,dm-pre-reloc;
+			linux,code = <KEY_VOLUMEUP>;
+			label = "volume up";
+			press-threshold-microvolt = <1750>;
+		};
+	};
+
+	vcc5v_dcin: vcc5v-dcin {
+		u-boot,dm-pre-reloc;
+		compatible = "regulator-fixed";
+		regulator-name = "vcc5v_dcin";
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+	};
+
+	vcc_sys: vcc5v0-sys {
+		u-boot,dm-pre-reloc;
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_sys";
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		vin-supply = <&vcc5v_dcin>;
+	};
+
+	vcc3v3_pcie0: vcc3v3-pcie0 {
+		u-boot,dm-pre-reloc;
+		compatible = "regulator-fixed";
+		regulator-name = "vcc3v3_pcie0";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		enable-active-high;
+		regulator-always-on;
+		gpios = <&gpio0 RK_PD3 GPIO_ACTIVE_HIGH>;
+		startup-delay-us = <5000>;
+		vin-supply = <&vcc_sys>;
+	};
+
+	mipi_bl_down: mipi-bl-down {
+		compatible = "regulator-fixed";
+		regulator-name = "mipi_bl_down";
+		gpio = <&gpio1 RK_PC2 GPIO_ACTIVE_LOW>;
+		regulator-always-on;
+		regulator-boot-on;
+		enable-active-high;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pwm1m1_ch2_down>;
+		u-boot,dm-pre-reloc;
+	};
+};
+
+&combphy0_ps {
+	u-boot,dm-pre-reloc;
+	status = "okay";
+};
+
+&pcie0 {
+	u-boot,dm-pre-reloc;
+	status = "disabled";
+};
+
+&sata0 {
+	u-boot,dm-pre-reloc;
+	vpcie3v3-supply = <&vcc3v3_pcie0>;
+	status = "okay";
+};
+
+&pinctrl {
+	pwm-down{
+		pwm1m1_ch2_down: pwm1m1-ch2-down {
+			rockchip,pins =
+				/* pwm1_ch2_m1 */
+				<1 RK_PC2 RK_FUNC_GPIO &pcfg_pull_down>;
+		};
+	};
+};

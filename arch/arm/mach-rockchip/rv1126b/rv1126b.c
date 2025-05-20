@@ -124,6 +124,12 @@ DECLARE_GLOBAL_DATA_PTR;
 #define SGRF_PMU_SOC_CON1		0x04
 #define SGRF_LPMCU_BOOT_ADDR		0x20
 
+#define PVTPLL_ISP_BASE			0x21C60000
+#define PVTPLL_ENC_BASE			0x21F00000
+#define PVTPLL_AIISP_BASE		0x21FC0000
+#define PVTPLL_GCK_CFG			0x20
+#define PVTPLL_GCK_LEN			0x24
+
 #ifdef CONFIG_ARM64
 #include <asm/armv8/mmu.h>
 
@@ -407,6 +413,14 @@ int arch_cpu_init(void)
 
 	/* Solve dsm pop pulse */
 	writel(0xfffff990, VCCIO7_IOC_BASE + GRF_DSM_IOC_CON0);
+
+	/* Enable pvtpll for isp/enc/aiisp */
+	writel(0x01ff0064, PVTPLL_ISP_BASE + PVTPLL_GCK_LEN);
+	writel(0x00230023, PVTPLL_ISP_BASE + PVTPLL_GCK_CFG);
+	writel(0x01ff0058, PVTPLL_ENC_BASE + PVTPLL_GCK_LEN);
+	writel(0x00230023, PVTPLL_ENC_BASE + PVTPLL_GCK_CFG);
+	writel(0x01ff0008, PVTPLL_AIISP_BASE + PVTPLL_GCK_LEN);
+	writel(0x00230023, PVTPLL_AIISP_BASE + PVTPLL_GCK_CFG);
 
 #if defined(CONFIG_ROCKCHIP_EMMC_IOMUX)
 	board_set_iomux(IF_TYPE_MMC, 0, 0);

@@ -28,4 +28,26 @@
 			press-threshold-microvolt = <1750>;
 		};
 	};
+
+	mipi_bl_down: mipi-bl-down {
+		compatible = "regulator-fixed";
+		regulator-name = "mipi_bl_down";
+		gpio = <&gpio0 RK_PC6 GPIO_ACTIVE_LOW>;
+		regulator-always-on;
+		regulator-boot-on;
+		enable-active-low;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pwm5m1_pins_pull_down>;
+		u-boot,dm-pre-reloc;
+	};
+};
+
+&pinctrl {
+	pwm-down{
+		pwm5m1_pins_pull_down: pwm5m1-pins-pull-down {
+			rockchip,pins =
+				/* pwm5_m1 */
+				<0 RK_PC6 RK_FUNC_GPIO &pcfg_pull_down>;
+		};
+	};
 };

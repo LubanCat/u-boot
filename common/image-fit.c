@@ -2379,8 +2379,9 @@ int fit_image_load_index(bootm_headers_t *images, ulong addr,
 
 #if defined(CONFIG_FIT_IMAGE_POST_PROCESS)
 	/* perform any post-processing on the image data */
-	board_fit_image_post_process((void *)fit, noffset,
-				     &load, (ulong **)&buf, &size, NULL);
+	if (board_fit_image_post_process((void *)fit, noffset,
+					 &load, (ulong **)&buf, &size, NULL))
+		return -EINVAL;
 #endif
 #endif
 

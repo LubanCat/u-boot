@@ -160,11 +160,15 @@ static int fit_decomp_image(void *fit, int node, ulong *load_addr,
 }
 #endif
 
-void board_fit_image_post_process(void *fit, int node, ulong *load_addr,
+int board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 				  ulong **src_addr, size_t *src_len, void *spec)
 {
 #if CONFIG_IS_ENABLED(MISC_DECOMPRESS) || CONFIG_IS_ENABLED(GZIP) || CONFIG_IS_ENABLED(LZMA)
-	fit_decomp_image(fit, node, load_addr, src_addr, src_len, spec);
+	int ret = 0;
+
+	ret = fit_decomp_image(fit, node, load_addr, src_addr, src_len, spec);
+	if (ret)
+		return ret;
 #endif
 
 #if CONFIG_IS_ENABLED(USING_KERNEL_DTB)
@@ -187,11 +191,11 @@ void board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 
 		uname = fdt_get_name(fit, node, NULL);
 		if (strcmp("bootargs", uname))
-			return;
+			return -EINVAL;
 
 		old = env_get("bootargs");
 		if (!old)
-			return;
+			return -EIO;
 
 		len = strlen(old) + (*src_len) + 2;
 		new = calloc(1, len);
@@ -205,7 +209,8 @@ void board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 
 	}
 #endif
-	rk_board_fit_image_post_process(fit, node, load_addr, src_addr, src_len);
+
+	return rk_board_fit_image_post_process(fit, node, load_addr, src_addr, src_len);
 }
 #endif /* FIT_IMAGE_POST_PROCESS */
 /*

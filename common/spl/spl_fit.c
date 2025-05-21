@@ -366,8 +366,9 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 #endif
 
 #ifdef CONFIG_SPL_FIT_IMAGE_POST_PROCESS
-	board_fit_image_post_process(fit, node, (ulong *)&load_addr,
-				     (ulong **)&src, &length, info);
+	if (board_fit_image_post_process(fit, node, (ulong *)&load_addr,
+					 (ulong **)&src, &length, info))
+		return -EINVAL;
 #endif
 	puts("OK\n");
 

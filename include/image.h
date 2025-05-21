@@ -1447,9 +1447,9 @@ int board_fit_config_name_match(const char *name);
  * @size: pointer to the image size
  * @spec: special data. SPL: struct spl_load_info info, U-Boot: NULL.
  *
- * @return no return value (failure should be handled internally)
+ * @return 0 if ok, <0 on failure
  */
-void board_fit_image_post_process(void *fit, int node, ulong *load_addr,
+int board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 				  ulong **src_addr, size_t *size, void *spec);
 
 int rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,

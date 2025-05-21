@@ -512,6 +512,10 @@ int board_late_init(void)
 #ifdef CONFIG_AMP
 	amp_cpus_on();
 #endif
+#ifdef CONFIG_DM_RNG
+	struct udevice *dev;
+    uclass_get_device(UCLASS_RNG, 0, &dev);
+#endif
 	return rk_board_late_init();
 }
 

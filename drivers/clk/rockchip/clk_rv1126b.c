@@ -1660,7 +1660,7 @@ static int rv1126b_clk_enable(struct clk *clk)
 		break;
 #endif
 	default:
-		return -ENOENT;
+		return ret;
 	}
 	return ret;
 }
@@ -1697,7 +1697,7 @@ static int rv1126b_clk_disable(struct clk *clk)
 		break;
 #endif
 	default:
-		return -ENOENT;
+		return ret;
 	}
 	return ret;
 }

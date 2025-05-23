@@ -2863,11 +2863,6 @@ static void vop2_plane_mask_assign(struct display_state *state)
 	 */
 	if (is_vop3(vop2)) {
 		for (i = 0; i < vop2->data->nr_vps; i++) {
-			/*
-			 * mark the primary plane id of the VP that is
-			 * not enabled to invalid.
-			 */
-			vop2->vp_plane_mask[i].primary_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID;
 			if (!cstate->crtc->vps[i].enable)
 				continue;
 
@@ -2904,11 +2899,6 @@ static void vop2_plane_mask_assign(struct display_state *state)
 		printf("VOP have %d active VP\n", active_vp_num);
 	} else {
 		for (i = 0; i < vop2->data->nr_vps; i++) {
-			/*
-			 * mark the primary plane id of the VP that is
-			 * not enabled to invalid.
-			 */
-			vop2->vp_plane_mask[i].primary_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID;
 			if (cstate->crtc->vps[i].enable) {
 				rockchip_cursor_plane_assign(state, i);
 				active_vp_num++;
@@ -2988,6 +2978,7 @@ static void vop2_global_initial(struct vop2 *vop2, struct display_state *state)
 	struct crtc_state *cstate = &state->crtc_state;
 	const struct vop2_data *vop2_data = vop2->data;
 	const struct vop2_ops *vop2_ops = vop2_data->ops;
+	struct vop2_vp_plane_mask *vp_plane_mask;
 	u32 nr_planes = 0;
 	u32 plane_mask;
 	u8 primary_plane_id;
@@ -2996,6 +2987,20 @@ static void vop2_global_initial(struct vop2 *vop2, struct display_state *state)
 
 	if (vop2->global_init)
 		return;
+
+	/*
+	 * Initialize struct vop2_vp_plane_mask, whose main function is to
+	 * fixup the DTS.
+	 */
+	for (i = 0; i < vop2->data->nr_vps; i++) {
+		vp_plane_mask = &vop2->vp_plane_mask[i];
+		/*
+		 * Set default value of the primary plane id and cursor plane
+		 * id to invalid.
+		 */
+		vp_plane_mask->primary_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID;
+		vp_plane_mask->cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID;
+	}
 
 	/* OTP must enable at the first time, otherwise mirror layer register is error */
 	if (soc_is_rk3566())
@@ -6828,6 +6833,7 @@ static struct vop2_vp_plane_mask rk356x_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 				  ROCKCHIP_VOP2_CLUSTER0, ROCKCHIP_VOP2_ESMART0, ROCKCHIP_VOP2_SMART0,
 				  ROCKCHIP_VOP2_CLUSTER1, ROCKCHIP_VOP2_ESMART1, ROCKCHIP_VOP2_SMART1
 				},
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 		{/* second display */},
 		{/* third  display */},
@@ -6841,6 +6847,7 @@ static struct vop2_vp_plane_mask rk356x_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 			.attached_layers = {
 				  ROCKCHIP_VOP2_CLUSTER0, ROCKCHIP_VOP2_ESMART0, ROCKCHIP_VOP2_SMART0
 				},
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 
 		{/* second display */
@@ -6849,6 +6856,7 @@ static struct vop2_vp_plane_mask rk356x_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 			.attached_layers = {
 				  ROCKCHIP_VOP2_CLUSTER1, ROCKCHIP_VOP2_ESMART1, ROCKCHIP_VOP2_SMART1
 				},
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 		{/* third  display */},
 		{/* fourth display */},
@@ -6861,6 +6869,7 @@ static struct vop2_vp_plane_mask rk356x_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 			.attached_layers = {
 				  ROCKCHIP_VOP2_CLUSTER0, ROCKCHIP_VOP2_ESMART0, ROCKCHIP_VOP2_SMART0
 				},
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 
 		{/* second display */
@@ -6869,12 +6878,14 @@ static struct vop2_vp_plane_mask rk356x_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 			.attached_layers = {
 				  ROCKCHIP_VOP2_CLUSTER1, ROCKCHIP_VOP2_SMART1
 				},
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 
 		{/* third  display */
 			.primary_plane_id = ROCKCHIP_VOP2_ESMART1,
 			.attached_layers_nr = 1,
 			.attached_layers = { ROCKCHIP_VOP2_ESMART1 },
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 
 		{/* fourth display */},
@@ -7368,6 +7379,7 @@ static struct vop2_vp_plane_mask rk3588_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 				  ROCKCHIP_VOP2_CLUSTER0, ROCKCHIP_VOP2_ESMART0,
 				  ROCKCHIP_VOP2_CLUSTER2, ROCKCHIP_VOP2_ESMART2
 			},
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 
 		{/* planes for the splice mode */
@@ -7377,6 +7389,7 @@ static struct vop2_vp_plane_mask rk3588_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 				  ROCKCHIP_VOP2_CLUSTER1, ROCKCHIP_VOP2_ESMART1,
 				  ROCKCHIP_VOP2_CLUSTER3, ROCKCHIP_VOP2_ESMART3
 			},
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 		{/* third  display */},
 		{/* fourth display */},
@@ -7390,6 +7403,7 @@ static struct vop2_vp_plane_mask rk3588_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 				  ROCKCHIP_VOP2_CLUSTER0, ROCKCHIP_VOP2_ESMART0,
 				  ROCKCHIP_VOP2_CLUSTER2, ROCKCHIP_VOP2_ESMART2
 			},
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 
 		{/* second display */
@@ -7399,6 +7413,7 @@ static struct vop2_vp_plane_mask rk3588_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 				  ROCKCHIP_VOP2_CLUSTER1, ROCKCHIP_VOP2_ESMART1,
 				  ROCKCHIP_VOP2_CLUSTER3, ROCKCHIP_VOP2_ESMART3
 			},
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 		{/* third  display */},
 		{/* fourth display */},
@@ -7412,6 +7427,7 @@ static struct vop2_vp_plane_mask rk3588_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 				  ROCKCHIP_VOP2_CLUSTER0, ROCKCHIP_VOP2_CLUSTER2,
 				  ROCKCHIP_VOP2_ESMART0
 			},
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 
 		{/* second display */
@@ -7421,12 +7437,14 @@ static struct vop2_vp_plane_mask rk3588_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 				  ROCKCHIP_VOP2_CLUSTER1, ROCKCHIP_VOP2_CLUSTER3,
 				  ROCKCHIP_VOP2_ESMART1
 			},
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 
 		{/* third  display */
 			.primary_plane_id = ROCKCHIP_VOP2_ESMART2,
 			.attached_layers_nr = 2,
 			.attached_layers = { ROCKCHIP_VOP2_ESMART2, ROCKCHIP_VOP2_ESMART3 },
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 
 		{/* fourth display */},
@@ -7437,24 +7455,28 @@ static struct vop2_vp_plane_mask rk3588_vp_plane_mask[VOP2_VP_MAX][VOP2_VP_MAX] 
 			.primary_plane_id = ROCKCHIP_VOP2_ESMART0,
 			.attached_layers_nr = 2,
 			.attached_layers = { ROCKCHIP_VOP2_CLUSTER0, ROCKCHIP_VOP2_ESMART0 },
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 
 		{/* second display */
 			.primary_plane_id = ROCKCHIP_VOP2_ESMART1,
 			.attached_layers_nr = 2,
 			.attached_layers = { ROCKCHIP_VOP2_CLUSTER1, ROCKCHIP_VOP2_ESMART1 },
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 
 		{/* third  display */
 			.primary_plane_id = ROCKCHIP_VOP2_ESMART2,
 			.attached_layers_nr = 2,
 			.attached_layers = { ROCKCHIP_VOP2_CLUSTER2, ROCKCHIP_VOP2_ESMART2 },
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 
 		{/* fourth display */
 			.primary_plane_id = ROCKCHIP_VOP2_ESMART3,
 			.attached_layers_nr = 2,
 			.attached_layers = { ROCKCHIP_VOP2_CLUSTER3, ROCKCHIP_VOP2_ESMART3 },
+			.cursor_plane_id = ROCKCHIP_VOP2_PHY_ID_INVALID,
 		},
 	},
 

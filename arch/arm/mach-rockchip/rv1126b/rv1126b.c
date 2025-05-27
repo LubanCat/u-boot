@@ -396,7 +396,6 @@ int arch_cpu_init(void)
 	/* Enable tsadc phy */
 	writel(0x01000000, CRU_BUS_BASE + CRU_BUS_GATE_CON06);
 	writel(0x80788028, SYS_GRF_BASE + TSADC_GRF_CON0);
-	writel(0xff000300, SYS_GRF_BASE + TSADC_GRF_CON6);
 	writel(0x00ff00a5, SYS_GRF_BASE + TSADC_GRF_CON1);
 	writel(0x01000100, SYS_GRF_BASE + TSADC_GRF_CON1);
 	writel(0x01000000, SYS_GRF_BASE + TSADC_GRF_CON1);

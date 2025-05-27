@@ -1369,6 +1369,100 @@ static ulong rv1126b_vop_set_rate(struct rv1126b_clk_priv *priv,
 	return rv1126b_vop_get_rate(priv, clk_id);
 }
 
+static ulong rv1126b_mac_get_rate(struct rv1126b_clk_priv *priv, ulong clk_id)
+{
+	struct rv1126b_cru *cru = priv->cru;
+	u32 sel, div, con, p_rate;
+
+	switch (clk_id) {
+	case CLK_GMAC_PTP_REF_SRC:
+	case CLK_GMAC_PTP_REF:
+		con = readl(&cru->clksel_con[45]);
+		sel = (con & CLK_GMAC_PTP_REF_SRC_SEL_MASK) >>
+		      CLK_GMAC_PTP_REF_SRC_SEL_SHIFT;
+		div = (con & CLK_GMAC_PTP_REF_SRC_DIV_MASK) >>
+		      CLK_GMAC_PTP_REF_SRC_DIV_SHIFT;
+		if (sel == CLK_GMAC_PTP_REF_SRC_SEL_CPLL)
+			p_rate = priv->cpll_hz;
+		else
+			p_rate = OSC_HZ;
+		break;
+	case CLK_MAC_OUT2IO:
+		con = readl(&cru->clksel_con[69]);
+		sel = (con & CLK_MAC_OUT2IO_SEL_MASK) >>
+		      CLK_MAC_OUT2IO_SEL_SHIFT;
+		div = (con & CLK_MAC_OUT2IO_DIV_MASK) >>
+		      CLK_MAC_OUT2IO_DIV_SHIFT;
+		if (sel == CLK_MAC_OUT2IO_SEL_CPLL)
+			p_rate = priv->cpll_hz;
+		else if (sel == CLK_MAC_OUT2IO_SEL_GPLL)
+			p_rate = priv->gpll_hz;
+		else
+			p_rate = OSC_HZ;
+		break;
+	case CLK_GMAC_125M:
+		return priv->cpll_hz / 8;
+	case CLK_50M_GMAC_IOBUF_VI:
+		return priv->cpll_hz / 20;
+	default:
+		return -ENOENT;
+	}
+
+	return DIV_TO_RATE(p_rate, div);
+}
+
+static ulong rv1126b_mac_set_rate(struct rv1126b_clk_priv *priv,
+				  ulong clk_id, ulong rate)
+{
+	struct rv1126b_cru *cru = priv->cru;
+	int src_clk, div, p_rate;
+
+	switch (clk_id) {
+	case CLK_GMAC_PTP_REF_SRC:
+	case CLK_GMAC_PTP_REF:
+		if (!(priv->cpll_hz % rate)) {
+			src_clk = CLK_GMAC_PTP_REF_SRC_SEL_CPLL;
+			p_rate = priv->cpll_hz;
+		} else {
+			src_clk = CLK_GMAC_PTP_REF_SRC_SEL_24M;
+			p_rate = OSC_HZ;
+		}
+		div = DIV_ROUND_UP(p_rate, rate);
+		rk_clrsetreg(&cru->clksel_con[45],
+			     CLK_GMAC_PTP_REF_SRC_DIV_MASK |
+			     CLK_GMAC_PTP_REF_SRC_SEL_MASK,
+			     (src_clk << CLK_GMAC_PTP_REF_SRC_SEL_SHIFT) |
+			     ((div - 1) << CLK_GMAC_PTP_REF_SRC_DIV_SHIFT));
+		break;
+	case CLK_MAC_OUT2IO:
+		if (!(priv->cpll_hz % rate)) {
+			src_clk = CLK_MAC_OUT2IO_SEL_CPLL;
+			p_rate = priv->cpll_hz;
+		} else if (!(priv->gpll_hz % rate)) {
+			src_clk = CLK_MAC_OUT2IO_SEL_GPLL;
+			p_rate = priv->gpll_hz;
+		} else {
+			src_clk = CLK_MAC_OUT2IO_SEL_24M;
+			p_rate = OSC_HZ;
+		}
+		div = DIV_ROUND_UP(p_rate, rate);
+		rk_clrsetreg(&cru->clksel_con[69],
+			     CLK_MAC_OUT2IO_DIV_MASK | CLK_MAC_OUT2IO_SEL_MASK,
+			     (src_clk << CLK_MAC_OUT2IO_SEL_SHIFT) |
+			     ((div - 1) << CLK_MAC_OUT2IO_DIV_SHIFT));
+		writel(0x01000000, &cru->clkgate_con[15]);
+		break;
+	case CLK_GMAC_125M:
+		return rv1126b_mac_get_rate(priv, clk_id);;
+	case CLK_50M_GMAC_IOBUF_VI:
+		return rv1126b_mac_get_rate(priv, clk_id);;
+	default:
+		return -ENOENT;
+	}
+
+	return rv1126b_mac_get_rate(priv, clk_id);
+}
+
 static ulong rv1126b_clk_get_rate(struct clk *clk)
 {
 	struct rv1126b_clk_priv *priv = dev_get_priv(clk->dev);
@@ -1485,6 +1579,13 @@ static ulong rv1126b_clk_get_rate(struct clk *clk)
 		break;
 	case DCLK_VOP:
 		rate = rv1126b_vop_get_rate(priv, clk->id);
+		break;
+	case CLK_GMAC_125M:
+	case CLK_GMAC_PTP_REF_SRC:
+	case CLK_50M_GMAC_IOBUF_VI:
+	case CLK_MAC_OUT2IO:
+	case CLK_GMAC_PTP_REF:
+		rate = rv1126b_mac_get_rate(priv, clk->id);
 		break;
 
 	default:
@@ -1609,6 +1710,13 @@ static ulong rv1126b_clk_set_rate(struct clk *clk, ulong rate)
 		break;
 	case DCLK_VOP:
 		ret = rv1126b_vop_set_rate(priv, clk->id, rate);
+		break;
+	case CLK_GMAC_125M:
+	case CLK_GMAC_PTP_REF_SRC:
+	case CLK_50M_GMAC_IOBUF_VI:
+	case CLK_MAC_OUT2IO:
+	case CLK_GMAC_PTP_REF:
+		ret = rv1126b_mac_set_rate(priv, clk->id, rate);
 		break;
 
 	default:

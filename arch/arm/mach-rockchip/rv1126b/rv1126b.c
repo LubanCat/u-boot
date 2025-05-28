@@ -459,7 +459,7 @@ int arch_cpu_init(void)
 
 #if defined(CONFIG_ROCKCHIP_PRELOADER_ATAGS)
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_KERNEL_BOOT)
-void rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,
+int rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 				     ulong **src_addr, size_t *src_len)
 {
 	struct tag *t;
@@ -467,12 +467,12 @@ void rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 
 	/* Only current node is kernel needs go further. */
 	if (!fit_image_check_type(fit, node, IH_TYPE_KERNEL))
-		return;
+		return 0;
 
 	t = atags_get_tag(ATAG_DDR_MEM);
 	count = t->u.ddr_mem.count;
 	if (!t || !count)
-		return;
+		return -EINVAL;
 
 	if (t->u.ddr_mem.bank[0] == 0x0) {
 		/*
@@ -490,7 +490,7 @@ void rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 			uint8_t image_arch;
 
 			if (fit_image_get_arch(fit, node, &image_arch))
-				return;
+				return -EINVAL;
 
 			if (image_arch == IH_ARCH_ARM) {
 				*load_addr = 0x00018000;
@@ -498,13 +498,13 @@ void rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 				*load_addr = 0x00200000;
 			} else {
 				printf("Unknown image arch: 0x%x\n", image_arch);
-				return;
+				return -EINVAL;
 			}
 			printf("Relocate kernel to 0x%lx.\n", *load_addr);
 		}
 	}
 
-	return;
+	return 0;
 }
 
 void board_bidram_fixup(void)

@@ -1452,7 +1452,7 @@ int board_fit_config_name_match(const char *name);
 void board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 				  ulong **src_addr, size_t *size, void *spec);
 
-void rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,
+int rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 				     ulong **src_addr, size_t *src_len);
 #endif /* CONFIG_SPL_FIT_IMAGE_POST_PROCESS */
 

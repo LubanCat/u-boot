@@ -25,9 +25,10 @@ DECLARE_GLOBAL_DATA_PTR;
  */
 #if CONFIG_IS_ENABLED(FIT_IMAGE_POST_PROCESS)
 
-__weak void rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,
+__weak int rk_board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 					    ulong **src_addr, size_t *src_len)
 {
+	return 0;
 }
 
 #define FIT_UNCOMP_HASH_NODENAME	"digest"

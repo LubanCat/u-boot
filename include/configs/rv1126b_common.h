@@ -71,6 +71,11 @@
 #define SDRAM_MAX_SIZE			0xc0000000ULL	/* max 3G */
 #define CONFIG_SYS_NONCACHED_MEMORY	(1 << 20)	/* 1M */
 
+#ifdef CONFIG_SPL_KERNEL_BOOT
+/* spl thunderboot */
+#define SPL_RESV_MEM_SIZE		(2 << 20)	/* 2M */
+#endif
+
 /* env used only in U-Boot */
 #ifndef CONFIG_SPL_BUILD
 /* usb mass storage */

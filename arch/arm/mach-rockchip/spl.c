@@ -502,6 +502,11 @@ __weak void spl_fdt_fixup_memory(struct spl_image_info *spl_image)
 		for (i = 0; i < count; i++) {
 			start[i] = t->u.ddr_mem.bank[i];
 			size[i] = t->u.ddr_mem.bank[i + count];
+#ifdef SPL_RESV_MEM_SIZE
+			if ((start[i] == CONFIG_SYS_SDRAM_BASE) &&
+			    (start[i] + size[i] > CONFIG_SYS_SDRAM_BASE + SPL_RESV_MEM_SIZE))
+				start[i] += SPL_RESV_MEM_SIZE;
+#endif
 			if (size[i] == 0)
 				continue;
 			debug("Adding bank: 0x%08llx - 0x%08llx (size: 0x%08llx)\n",

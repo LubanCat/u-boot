@@ -191,7 +191,7 @@ int board_fit_image_post_process(void *fit, int node, ulong *load_addr,
 
 		uname = fdt_get_name(fit, node, NULL);
 		if (strcmp("bootargs", uname))
-			return -EINVAL;
+			return 0;
 
 		old = env_get("bootargs");
 		if (!old)

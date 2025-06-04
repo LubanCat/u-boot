@@ -478,6 +478,10 @@ char *mtd_part_parse(struct blk_desc *dev_desc)
 		memset(mtd_part_info_temp, 0, MTD_SINGLE_PART_INFO_MAX_SIZE);
 	}
 
+	length = strlen(mtd_part_info);
+	if (length > 0 && mtd_part_info[length - 1] == ',')
+		mtd_part_info[length - 1] = '\0';
+
 	return mtd_part_info;
 }
 

@@ -511,13 +511,19 @@ static int dwmci_send_cmd_prepare(struct mmc *mmc, struct mmc_cmd *cmd,
 	unsigned int timeout = 500;
 	u32 mask;
 	ulong start = get_timer(0);
+	ulong mmc_idmac;
 	struct bounce_buffer bbstate;
 
-	cur_idmac = malloc(ROUND(DIV_ROUND_UP(data->blocks, 8) *
-			   sizeof(struct dwmci_idmac),
-			   ARCH_DMA_MINALIGN) + ARCH_DMA_MINALIGN - 1);
-	if (!cur_idmac)
-		return -ENODATA;
+	mmc_idmac = dev_read_u32_default(mmc->dev, "mmc-idmac", 0);
+	if (mmc_idmac) {
+		cur_idmac = (struct dwmci_idmac *)mmc_idmac;
+	} else {
+		cur_idmac = malloc(ROUND(DIV_ROUND_UP(data->blocks, 8) *
+			sizeof(struct dwmci_idmac),
+			ARCH_DMA_MINALIGN) + ARCH_DMA_MINALIGN - 1);
+		if (!cur_idmac)
+			return -ENODATA;
+	}
 
 	while (dwmci_readl(host, DWMCI_STATUS) & DWMCI_BUSY) {
 		if (get_timer(start) > timeout) {

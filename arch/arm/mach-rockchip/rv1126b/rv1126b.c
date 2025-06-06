@@ -676,6 +676,19 @@ u64 board_bidram_append_size(void)
 #endif
 #endif
 
+int fit_standalone_release(char *id, uintptr_t entry_point)
+{
+	if (!strcmp(id, "hpmcu")) {
+		writel(0x1e001e0, CRU_BUS_BASE + CRU_BUS_SOFTRST_CON01);
+		sip_smc_mcu_config(ROCKCHIP_SIP_CONFIG_BUSMCU_0_ID,
+			ROCKCHIP_SIP_CONFIG_MCU_CODE_START_ADDR,
+			entry_point);
+		writel(0x1e00000, CRU_BUS_BASE + CRU_BUS_SOFTRST_CON01);
+	}
+
+	return 0;
+}
+
 #if defined(CONFIG_ROCKCHIP_EMMC_IOMUX) && defined(CONFIG_ROCKCHIP_SFC_IOMUX)
 #error FSPI0 M0 and eMMC iomux is incompatible for rv1126b Soc. You should disable one of them.
 #endif

@@ -667,20 +667,10 @@ static int spl_load_kernel_fit(struct spl_image_info *spl_image,
 
 		/* initial addr or entry point */
 		if (!strcmp(images[i], FIT_FDT_PROP)) {
-			spl_image->fdt_addr = (void *)image_info.load_addr;
-#ifdef CONFIG_SPL_AB
-			char slot_suffix[3] = {0};
-
-			if (!spl_get_current_slot(info->dev, "misc", slot_suffix))
-				spl_ab_bootargs_append_slot((void *)image_info.load_addr, slot_suffix);
-#endif
-
-#ifdef CONFIG_SPL_MTD_SUPPORT
-			struct blk_desc *desc = info->dev;
-
-			if (desc->devnum == BLK_MTD_SPI_NAND)
-				fdt_bootargs_append((void *)image_info.load_addr, mtd_part_parse(desc));
-#endif
+			if (spl_fdt_chosen_bootargs(info, (void *)image_info.load_addr)) {
+				printf("ERROR: Append bootargs failed\n");
+				return -EINVAL;
+			}
 		} else if (!strcmp(images[i], FIT_KERNEL_PROP)) {
 #if CONFIG_IS_ENABLED(OPTEE)
 			spl_image->entry_point_os = image_info.load_addr;

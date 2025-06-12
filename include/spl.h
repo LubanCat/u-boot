@@ -353,6 +353,10 @@ void spl_fdt_fixup_memory(struct spl_image_info *spl_image);
  * spl_find_hwid_dtb() - Support select kernel dtb based on HW-ID
  */
 int spl_find_hwid_dtb(const char *fdt_name);
+/**
+ * spl_fdt_chosen_bootargs() - Support append bootargs into kernel fdt chosen node
+ */
+int spl_fdt_chosen_bootargs(struct spl_load_info *info, void *fdt);
 #endif
 
 #endif

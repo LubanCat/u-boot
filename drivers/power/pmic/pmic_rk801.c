@@ -169,7 +169,7 @@ static int rk801_probe(struct udevice *dev)
 		return ret;
 
 	priv->variant = ((msb << 8) | lsb) & RK8XX_ID_MSK;
-	priv->req_pwrctrl_dvs = (lsb & 0x0f) < 4;
+	priv->req_pwrctrl_dvs = (lsb & 0x0f) < 3;
 
 	rk801_read(dev, RK801_ON_SOURCE_REG, &on, 1);
 	rk801_read(dev, RK801_OFF_SOURCE_REG, &off, 1);

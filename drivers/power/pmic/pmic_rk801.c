@@ -157,6 +157,7 @@ static int rk801_probe(struct udevice *dev)
 {
 	struct rk801_priv *priv = dev_get_priv(dev);
 	uint8_t msb, lsb, on, off;
+	u32 pmic_id;
 	int i, ret;
 
 	ret = rk801_read(dev, RK801_ID_MSB, &msb, 1);
@@ -167,24 +168,25 @@ static int rk801_probe(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	priv->variant = ((msb << 8) | lsb) & RK8XX_ID_MSK;
+	pmic_id = (msb << 8) | lsb;
+	priv->variant = pmic_id & RK8XX_ID_MSK;
 	priv->req_pwrctrl_dvs = (lsb & 0x0f) < 3;
-
-	rk801_read(dev, RK801_ON_SOURCE_REG, &on, 1);
-	rk801_read(dev, RK801_OFF_SOURCE_REG, &off, 1);
-
-	printf("PMIC:  RK%x (on=0x%02x, off=0x%02x, req_dvs=%d)\n",
-	       priv->variant, on, off, priv->req_pwrctrl_dvs);
-
 	if (priv->req_pwrctrl_dvs) {
 		/* GPIOD_IS_OUT: output inactive */
 		ret = gpio_request_by_name(dev, "pwrctrl-gpios", 0,
 					   &priv->pwrctrl_gpio, GPIOD_IS_OUT);
 		if (ret) {
-			printf("failed to get pwrctrl gpio! ret=%d\n", ret);
+			printf("rk801: failed to get pwrctrl-gpio, ret=%d\n", ret);
 			return ret;
 		}
 	}
+
+	rk801_read(dev, RK801_ON_SOURCE_REG, &on, 1);
+	rk801_read(dev, RK801_OFF_SOURCE_REG, &off, 1);
+
+	printf("PMIC:  RK%x (on=0x%02x, off=0x%02x, req_dvs: %d, act: %s)\n",
+	       pmic_id, on, off, priv->req_pwrctrl_dvs,
+	       priv->pwrctrl_gpio.flags & GPIOD_ACTIVE_LOW ? "low" : "high");
 
 	for (i = 0; i < ARRAY_SIZE(rk801_init_reg); i++) {
 		ret = pmic_clrsetbits(dev,

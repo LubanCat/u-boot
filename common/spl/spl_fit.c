@@ -667,6 +667,7 @@ static int spl_load_kernel_fit(struct spl_image_info *spl_image,
 
 		/* initial addr or entry point */
 		if (!strcmp(images[i], FIT_FDT_PROP)) {
+			spl_image->fdt_addr = (void *)image_info.load_addr;
 			if (spl_fdt_chosen_bootargs(info, (void *)image_info.load_addr)) {
 				printf("ERROR: Append bootargs failed\n");
 				return -EINVAL;

@@ -1858,7 +1858,7 @@ static int rv1126b_clk_probe(struct udevice *dev)
 
 #ifdef CONFIG_SPL_BUILD
 	/* fix gpll and some clks modify by maskrom */
-	writel(BITS_WITH_WMASK(9, 0x1fU, 5),
+	writel(BITS_WITH_WMASK(11, 0x1fU, 5),
 	       RV1126B_CRU_BASE + RV1126B_CLKSEL_CON(1));
 	writel(BITS_WITH_WMASK(1, 0x1U, 15),
 	       RV1126B_CRU_BASE + RV1126B_CLKSEL_CON(1));

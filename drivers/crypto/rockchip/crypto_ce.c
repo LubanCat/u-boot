@@ -131,6 +131,20 @@ static void crypto_flush_cacheline(ulong addr, ulong size)
 	flush_cache(aligned_input, aligned_len);
 }
 
+static void crypto_invalidate_cacheline(uint32_t addr, uint32_t size)
+{
+	ulong alignment = CONFIG_SYS_CACHELINE_SIZE;
+	ulong aligned_input, aligned_len;
+
+	if (!addr || !size)
+		return;
+
+	/* Must invalidate dcache after crypto DMA write data region */
+	aligned_input = round_down(addr, alignment);
+	aligned_len = round_up(size + (addr - aligned_input), alignment);
+	invalidate_dcache_range(aligned_input, aligned_input + aligned_len);
+}
+
 static u32 rk_get_cemode(const struct rockchip_map *map, u32 num, u32 algo)
 {
 	u32 i, j;
@@ -356,6 +370,8 @@ static int rk_sha_update(struct udevice *dev, u32 *input, u32 len, bool is_last)
 		rkce_sha_ctx_free(hash_ctx);
 		priv->hash_ctx = NULL;
 	}
+
+	crypto_invalidate_cacheline((ulong)hash_ctx->td_buf, sizeof(*hash_ctx->td_buf));
 
 	rk_crypto_disable_clk(dev);
 
@@ -628,20 +644,6 @@ static void rkce_cipher_ctx_free(struct rkce_cipher_contex *hw_ctx)
 	free(hw_ctx);
 }
 
-static void crypto_invalidate_cacheline(u32 addr, u32 size)
-{
-	ulong alignment = CONFIG_SYS_CACHELINE_SIZE;
-	ulong aligned_input, aligned_len;
-
-	if (!addr || !size)
-		return;
-
-	/* Must invalidate dcache after crypto DMA write data region */
-	aligned_input = round_down(addr, alignment);
-	aligned_len = round_up(size + (addr - aligned_input), alignment);
-	invalidate_dcache_range(aligned_input, aligned_input + aligned_len);
-}
-
 static const struct rockchip_map rk_cipher_algo_map[] = {
 	{RK_MODE_ECB,     RKCE_SYMM_MODE_ECB},
 	{RK_MODE_CBC,     RKCE_SYMM_MODE_CBC},
@@ -826,6 +828,8 @@ static int rk_crypto_cipher(struct udevice *dev, cipher_context *ctx,
 
 		ret = rkce_push_td_sync(priv->hardware, hw_ctx->td_aad, RKCE_SYMM_TIMEOUT_MS);
 
+		crypto_invalidate_cacheline((ulong)hw_ctx->td_buf, sizeof(*hw_ctx->td_buf));
+
 		rk_crypto_disable_clk(dev);
 
 		rkce_destroy_ccm_aad(new_aad);
@@ -855,6 +859,8 @@ static int rk_crypto_cipher(struct udevice *dev, cipher_context *ctx,
 
 		ret = rkce_push_td_sync(priv->hardware, hw_ctx->td_aad, RKCE_SYMM_TIMEOUT_MS);
 
+		crypto_invalidate_cacheline((ulong)hw_ctx->td_buf, sizeof(*hw_ctx->td_buf));
+
 		rk_crypto_disable_clk(dev);
 		if (ret) {
 			printf("GCM calc aad data failed.\n");
@@ -865,13 +871,15 @@ static int rk_crypto_cipher(struct udevice *dev, cipher_context *ctx,
 	crypto_flush_cacheline((ulong)hw_ctx->td, sizeof(*hw_ctx->td));
 	crypto_flush_cacheline((ulong)hw_ctx->td_buf, sizeof(*hw_ctx->td_buf));
 	crypto_flush_cacheline((ulong)in, len);
-	crypto_invalidate_cacheline((ulong)out, len);
+	if (in != out)
+		crypto_flush_cacheline((ulong)out, len);
 
 	rk_crypto_enable_clk(dev);
 
 	ret = rkce_push_td_sync(priv->hardware, hw_ctx->td, RKCE_SYMM_TIMEOUT_MS);
 
 	crypto_invalidate_cacheline((ulong)out, len);
+	crypto_invalidate_cacheline((ulong)hw_ctx->td_buf, sizeof(*hw_ctx->td_buf));
 
 	rk_crypto_disable_clk(dev);
 

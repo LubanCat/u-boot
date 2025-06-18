@@ -100,6 +100,9 @@ static int rockchip_decom_start(struct udevice *dev, void *buf)
 	unsigned int limit_hi = param->size_dst >> 32;
 	u32 irq_status;
 
+	/* Increase limit_size by 16 to avoid premature decompression termination by decom */
+	limit_lo += 16;
+
 #if CONFIG_IS_ENABLED(DM_RESET)
 	reset_assert(&priv->rst);
 	udelay(10);

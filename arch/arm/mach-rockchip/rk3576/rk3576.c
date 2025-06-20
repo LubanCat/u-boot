@@ -410,6 +410,10 @@ int arch_cpu_init(void)
 	writel(0xffffff00, SYS_SGRF_BASE + SYS_SGRF_SOC_CON20);
 #endif
 
+	/* Enabled SDMMC iomux in default except FSPI1_M0 boot */
+	if (readl(TOP_IOC_BASE + GPIO2A_IOMUX_SEL_L) != 0x2222)
+		board_set_iomux(IF_TYPE_MMC, 1, 0);
+
 #if defined(CONFIG_ROCKCHIP_EMMC_IOMUX)
 	board_set_iomux(IF_TYPE_MMC, 0, 0);
 #elif defined(CONFIG_ROCKCHIP_SFC_IOMUX)

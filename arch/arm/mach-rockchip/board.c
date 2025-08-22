@@ -1437,6 +1437,7 @@ char *board_fdt_chosen_bootargs(void *fdt)
 {
 	int verbose = is_hotkey(HK_CMDLINE);
 	const char *bootargs;
+	const char *bootargs_ext;
 
 	/* debug */
 	hotkey_run(HK_INITCALL);
@@ -1444,6 +1445,15 @@ char *board_fdt_chosen_bootargs(void *fdt)
 		printf("## bootargs(u-boot): %s\n\n", env_get("bootargs"));
 
 	bootargs_add_dtb_dtbo(fdt, verbose);
+
+	bootargs_ext = env_get("bootargs_ext");
+	if (bootargs_ext && strlen(bootargs_ext)) {
+		env_update("bootargs", bootargs_ext);
+
+		if (verbose)
+			printf("## bootargs(ext): %s\n", env_get("bootargs"));
+	}
+
 	bootargs_add_partition(verbose);
 	bootargs_add_fwver(verbose);
 	bootargs_add_android(verbose);

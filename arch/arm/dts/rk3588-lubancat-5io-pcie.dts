@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
-* Copyright (c) 2021 Rockchip Electronics Co., Ltd
-*
-*/
+ * Copyright (c) 2021 Rockchip Electronics Co., Ltd
+ *
+ */
 
 /dts-v1/;
 #include "rk3588.dtsi"
@@ -10,23 +10,34 @@
 #include <dt-bindings/input/input.h>
 
 / {
-	model = "Embedfire LubanCat-5";
-	compatible = "rockchip,rk3588-lubancat-5", "rockchip,rk3588";
+	model = "Embedfire LubanCat-5IO";
+	compatible = "rockchip,rk3588s-lubancat-5io", "rockchip,rk3588";
 
 	vcc12v_dcin: vcc12v-dcin {
 		u-boot,dm-pre-reloc;
 		compatible = "regulator-fixed";
-		regulator-name = "vcc12v_dcin";
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-min-microvolt = <12000000>;
 		regulator-max-microvolt = <12000000>;
+		regulator-name = "vcc12v_dcin";
 	};
 
-	vcc5v0_sys: vcc5v0-sys {
+	vcc4v0_sys: vcc4v0-sys {
 		u-boot,dm-pre-reloc;
 		compatible = "regulator-fixed";
-		regulator-name = "vcc5v0_sys";
+		regulator-name = "vcc4v0_sys";
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-min-microvolt = <4000000>;
+		regulator-max-microvolt = <4000000>;
+		vin-supply = <&vcc12v_dcin>;
+	};
+
+	vcc_5v0_s0: vcc-5v0-s0 {
+		u-boot,dm-pre-reloc;
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_5v0_s0";
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-min-microvolt = <5000000>;
@@ -34,38 +45,42 @@
 		vin-supply = <&vcc12v_dcin>;
 	};
 
-	vcc_5v0: vcc-5v0 {
+	vcc5v0_usb_s0: vcc5v0-usb-s0 {
 		u-boot,dm-pre-reloc;
 		compatible = "regulator-fixed";
-		regulator-name = "vcc_5v0";
+		regulator-name = "vcc5v0_usb_s0";
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
-		vin-supply = <&vcc5v0_sys>;
+		vin-supply = <&vcc12v_dcin>;
 	};
 
-	vcc3v3_sys: vcc3v3-sys {
+	vcc3v3_m2_pcie: vcc3v3-m2-pcie {
 		u-boot,dm-pre-reloc;
 		compatible = "regulator-fixed";
-		regulator-name = "vcc3v3_sys";
-		regulator-always-on;
-		regulator-boot-on;
+		regulator-name = "vcc3v3_m2_pcie";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+		enable-active-high;
+		regulator-boot-on;
+		gpio = <&gpio2 RK_PC5 GPIO_ACTIVE_HIGH>;
 		vin-supply = <&vcc12v_dcin>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&vcc3v3_m2_pcie_en>;
 	};
-};
-
-&pcie3x4 {
-	u-boot,dm-pre-reloc;
-	reset-gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
-	vpcie3v3-supply = <&vcc3v3_sys>;
-	status = "okay";
 };
 
 &pcie30phy {
 	u-boot,dm-pre-reloc;
+	status = "okay";
+};
+
+&pcie3x4 {
+	u-boot,dm-pre-reloc;
+	vpcie3v3-supply = <&vcc3v3_m2_pcie>;
+	reset-gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 };
 
@@ -149,6 +164,14 @@
 				<2 RK_PD2 2 &pcfg_pull_none>,
 				/* fspi_d3_m0 */
 				<2 RK_PD3 2 &pcfg_pull_none>;
+		};
+	};
+
+	pcie {
+		u-boot,dm-spl;
+		vcc3v3_m2_pcie_en: vcc3v3-m2-pcie-en {
+			u-boot,dm-spl;
+			rockchip,pins = <2 RK_PC5 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 };

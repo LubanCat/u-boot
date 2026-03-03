@@ -1193,7 +1193,6 @@ source "arch/arm/mach-rockchip/Kconfig"
 
 source "arch/arm/cpu/armv8/Kconfig"
 
-source "board/phytec/pcm051/Kconfig"
 
 source "arch/arm/Kconfig.debug"
 

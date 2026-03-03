@@ -41,6 +41,5 @@ config SPL_STACK_R_ADDR
 	default 0x04000000
 
 source "board/rockchip/evb_rk3399/Kconfig"
-source "board/theobroma-systems/puma_rk3399/Kconfig"
 
 endif

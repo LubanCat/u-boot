@@ -6,9 +6,26 @@ cmd    disk       dts            include   Licenses  net          scripts       
 best test way is 
 ./make.sh CROSS_COMPILE=/home/mzhang/home_work/minix/lubancat2/sdk/gen_sdk/prebuilts/gcc/linux-x86/aarch64/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu- rk3568
 
+make CROSS_COMPILE=/home/mzhang/home_work/minix/lubancat2/sdk/gen_sdk/prebuilts/gcc/linux-x86/aarch64/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu- rk3568_defconfig
+
 put board into maskrom mode 
 sudo ./rkdeveloptool db ../../bootloader/u-boot/rk356x_spl_loader_v1.23.114.bin 
 sudo ./rkdeveloptool cs 1
 sudo ./rkdeveloptool ul ../../bootloader/u-boot/rk356x_spl_loader_v1.23.114.bin 
 sudo ./rkdeveloptool gpt ../../bootloader/parameter.txt
 sudo ./rkdeveloptool wlx uboot ../../bootloader/u-boot/uboot.img
+
+uboot packing process will split bin/rk35/rk3568_bl31_v1.45.elf
+into many parts:
+bl31_0x00040000.bin
+bl31_0x00040000.bin.digest (sha256)
+bl31_0x00040000.bin.gz     (gzip -kf9 bl31_0x00040000.bin)
+bl31_0x0005a000.bin
+bl31_0x0005c000.bin
+bl31_0xfdcc1000.bin
+bl31_0xfdcce000.bin
+bl31_0xfdcd0000.bin
+
+
+bin/rk35/rk3568_bl32_v2.15.bin will be copied to tee.bin in uboot packing process
+

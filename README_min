@@ -1,0 +1,14 @@
+api    common     doc            env       Kbuild    MAINTAINERS  post           snapshot.commit
+arch   config.mk  Documentation  examples  Kconfig   Makefile     PREUPLOAD.cfg  test
+board  configs    drivers        fs        lib       make.sh      README         tools
+cmd    disk       dts            include   Licenses  net          scripts        usb_update.txt
+
+best test way is 
+./make.sh CROSS_COMPILE=/home/mzhang/home_work/minix/lubancat2/sdk/gen_sdk/prebuilts/gcc/linux-x86/aarch64/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu- rk3568
+
+put board into maskrom mode 
+sudo ./rkdeveloptool db ../../bootloader/u-boot/rk356x_spl_loader_v1.23.114.bin 
+sudo ./rkdeveloptool cs 1
+sudo ./rkdeveloptool ul ../../bootloader/u-boot/rk356x_spl_loader_v1.23.114.bin 
+sudo ./rkdeveloptool gpt ../../bootloader/parameter.txt
+sudo ./rkdeveloptool wlx uboot ../../bootloader/u-boot/uboot.img

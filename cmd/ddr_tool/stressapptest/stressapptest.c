@@ -430,6 +430,10 @@ ulong __sp;		/* set sp of secondary cpu */
 
 u32 print_mutex;	/* 0: unlock, 1: lock */
 
+static ulong sat_safe_end;
+#define SAT_STACK_GUARD_BYTES       (2UL * 1024 * 1024) 
+#define SAT_LOW_RESERVE_OFFSET      (176UL * 1024 * 1024)
+
 static u64 get_time_us(void)
 {
 	return lldiv(get_ticks(), CONFIG_SYS_HZ_CLOCK / (CONFIG_SYS_HZ * 1000));
@@ -507,21 +511,48 @@ static void pattern_list_init(struct pattern *pattern_list,
 	sat->weight_count = weight_count;
 }
 
-static u32 get_max_page_num(ulong page_size_byte)
+static void clamp_available_to_safe_end(ulong start_adr[], ulong length[])
+{
+	for (int i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
+		if (start_adr[i] == 0 && length[i] == 0)
+			break;
+
+		if (start_adr[i] < sat_safe_end &&
+		    start_adr[i] + length[i] > sat_safe_end) {
+			length[i] = sat_safe_end - start_adr[i];
+		}
+	}
+}
+
+static u32 get_max_page_num(ulong page_size_byte, ulong start_addr)
 {
 	ulong start_adr[CONFIG_NR_DRAM_BANKS], length[CONFIG_NR_DRAM_BANKS];
-	u32 page_num = 0;
+	u64 total_bytes = 0;
 
 	get_print_available_addr(start_adr, length, 0);
 
-	page_num = 0;
-	for (int i = 0; i < ARRAY_SIZE(start_adr) || i < ARRAY_SIZE(length); i++) {
+	clamp_available_to_safe_end(start_adr, length);
+
+	for (int i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
+		ulong end;
+
 		if ((start_adr[i] == 0 && length[i] == 0))
 			break;
-		page_num += (u32)(length[i] / page_size_byte);
+
+		end = start_adr[i] + length[i];
+
+		if (end <= start_addr)
+			continue;
+
+		if (start_adr[i] < start_addr) {
+			length[i] -= start_addr - start_adr[i];
+			start_adr[i] = start_addr;
+		}
+
+		total_bytes += length[i];
 	}
 
-	return page_num;
+	return (u32)lldiv(total_bytes, page_size_byte);
 }
 
 static int get_page_addr(struct page *page_list,
@@ -532,6 +563,8 @@ static int get_page_addr(struct page *page_list,
 	u32 page = 0;
 
 	get_print_available_addr(start_adr, length, 0);
+
+	clamp_available_to_safe_end(start_adr, length);
 
 	printf("Address for test:\n	Start         End         Length\n");
 	for (int i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
@@ -1016,7 +1049,7 @@ static int doing_stressapptest(void)
 	u32 now_10s;
 
 	struct pattern pattern_list[PATTERN_LIST_SIZE];
-	void *page_info;
+	void *page_info = NULL;
 
 	u32 all_copy_err = 0;
 	u32 all_inv_err = 0;
@@ -1032,7 +1065,30 @@ static int doing_stressapptest(void)
 	}
 	pattern_page_init_finish = 0;
 	print_mutex = 0;
+
+	ulong start_adr[CONFIG_NR_DRAM_BANKS], length[CONFIG_NR_DRAM_BANKS];
+	ulong ddr_start = 0;
+
+	get_print_available_addr(start_adr, length, 0);
+
+	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
+		if (start_adr[i] != 0 || length[i] != 0) {
+			ddr_start = start_adr[i];
+			break;
+		}
+	}
+
+	if (sat.total_start_addr < ddr_start + SAT_LOW_RESERVE_OFFSET)
+		sat.total_start_addr = ddr_start + SAT_LOW_RESERVE_OFFSET;
+
 	asm volatile("clrex");
+
+	ulong sp_now;
+
+	asm volatile("mov %0, sp" : "=r" (sp_now));
+	sp_now &= ~(ulong)0xffff;
+	sat_safe_end = sp_now - SAT_STACK_GUARD_BYTES;
+	printf("sat_safe_end = 0x%lx\n", sat_safe_end);
 
 #if (CPU_NUM_MAX > 1)
 	if (test_count == 0) {
@@ -1049,9 +1105,24 @@ static int doing_stressapptest(void)
 			} else {
 				break;
 			}
+
+			u32 timeout = 0;
+
 			while (cpu_init_finish[sat.cpu_num] == 0) {
 				udelay(1000);
 				flush_dcache_all();
+				timeout++;
+
+				if (timeout > 100) {
+					//printf("WARNING: CPU%d start timeout, skipping.\n", sat.cpu_num);
+					break;
+				}
+			}
+
+			if (cpu_init_finish[sat.cpu_num] == 0) {
+				// printf("WARNING: CPU%d did not start, using %d CPUs.\n",
+				//	sat.cpu_num, sat.cpu_num);
+				break;
 			}
 		}
 	}
@@ -1060,9 +1131,16 @@ static int doing_stressapptest(void)
 #endif
 
 	if (sat.total_test_size_mb == 0)
-		sat.page_num = get_max_page_num(sat.page_size_byte);
+		sat.page_num = get_max_page_num(sat.page_size_byte,
+										sat.total_start_addr);
 	else
 		sat.page_num = (sat.total_test_size_mb << 20) / sat.page_size_byte;
+
+	if (sat.page_num == 0) {
+		printf("ERROR: No enough available memory after reserving 2MiB.\n");
+		ret = CMD_RET_FAILURE;
+		goto out;
+	}
 	sat.block_num = sat.page_size_byte / sat.block_size_byte;
 
 	udelay(100);

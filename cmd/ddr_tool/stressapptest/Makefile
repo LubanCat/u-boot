@@ -5,3 +5,5 @@
 #
 
 obj-$(CONFIG_CMD_STRESSAPPTEST) += stressapptest.o
+
+CFLAGS_stressapptest.o += -fPIC

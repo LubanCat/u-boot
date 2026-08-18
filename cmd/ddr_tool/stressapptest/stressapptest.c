@@ -663,10 +663,10 @@ static u32 block_mis_search(void *dst_addr, struct pattern *src_pattern, char *i
 			    struct stressapptest_params *sat, u8 cpu_id)
 {
 	u32 *dst_mem;
-	u32 read, reread, expected;
+	u32 read, expected; // reread;
 	u32 err = 0;
-	u32 *print_addr;
-	int i, j;
+	// u32 *print_addr;
+	int i; // j;
 
 	dst_mem = (u32 *)dst_addr;
 
@@ -676,36 +676,36 @@ static u32 block_mis_search(void *dst_addr, struct pattern *src_pattern, char *i
 
 		if (read != expected) {
 			flush_dcache_range((ulong)&dst_mem[i], (ulong)&dst_mem[i + 1]);
-			reread = dst_mem[i];
+			// reread = dst_mem[i];
 
-			lock_byte_mutex(&print_mutex);
+			// lock_byte_mutex(&print_mutex);
 
-			print_time_stamp();
-			printf("%s Hardware Error: miscompare on CPU %d at 0x%lx:\n",
-			       item, cpu_id, (ulong)&dst_mem[i]);
-			printf("	read:    0x%08x\n", read);
-			printf("	reread:  0x%08x(reread^read:0x%08x)\n",
-			       reread, reread ^ read);
-			printf("	expected:0x%08x(expected^read:0x%08x)\n",
-			       expected, expected ^ read);
-			printf("	\'%s%s%d\'", src_pattern->pat->name,
-							  src_pattern->inv ? "~" : "",
-							  32 << src_pattern->repeat);
-			if (reread == expected)
-				printf(" read error");
-			printf("\n");
+			// print_time_stamp();
+			// printf("%s Hardware Error: miscompare on CPU %d at 0x%lx:\n",
+			//        item, cpu_id, (ulong)&dst_mem[i]);
+			// printf("	read:    0x%08x\n", read);
+			// printf("	reread:  0x%08x(reread^read:0x%08x)\n",
+			//        reread, reread ^ read);
+			// printf("	expected:0x%08x(expected^read:0x%08x)\n",
+			//        expected, expected ^ read);
+			// printf("	\'%s%s%d\'", src_pattern->pat->name,
+			// 				  src_pattern->inv ? "~" : "",
+			// 				  32 << src_pattern->repeat);
+			// if (reread == expected)
+			// 	printf(" read error");
+			// printf("\n");
 
-			/* Dump data around the error address */
-			print_addr = &dst_mem[i] - 64;
-			for (j = 0; j < 128; j += 8)
-				printf("  [0x%010lx] 0x%08x, 0x%08x, 0x%08x, 0x%08x, 0x%08x, 0x%08x, 0x%08x, 0x%08x\n",
-				       (ulong)(print_addr + j),
-				       *(print_addr + j), *(print_addr + j + 1),
-				       *(print_addr + j + 2), *(print_addr + j + 3),
-				       *(print_addr + j + 4), *(print_addr + j + 5),
-				       *(print_addr + j + 6), *(print_addr + j + 7));
+			// /* Dump data around the error address */
+			// print_addr = &dst_mem[i] - 64;
+			// for (j = 0; j < 128; j += 8)
+			// 	printf("  [0x%010lx] 0x%08x, 0x%08x, 0x%08x, 0x%08x, 0x%08x, 0x%08x, 0x%08x, 0x%08x\n",
+			// 	       (ulong)(print_addr + j),
+			// 	       *(print_addr + j), *(print_addr + j + 1),
+			// 	       *(print_addr + j + 2), *(print_addr + j + 3),
+			// 	       *(print_addr + j + 4), *(print_addr + j + 5),
+			// 	       *(print_addr + j + 6), *(print_addr + j + 7));
 
-			unlock_byte_mutex(&print_mutex);
+			// unlock_byte_mutex(&print_mutex);
 
 			/* fix the error */
 			dst_mem[i] = expected;
@@ -714,11 +714,11 @@ static u32 block_mis_search(void *dst_addr, struct pattern *src_pattern, char *i
 		}
 	}
 
-	if (err == 0) {
-		lock_byte_mutex(&print_mutex);
-		printf("%s ERROR detected but cannot find mismatch data (maybe read error).\n", item);
-		unlock_byte_mutex(&print_mutex);
-	}
+	// if (err == 0) {
+	// 	lock_byte_mutex(&print_mutex);
+	// 	printf("%s ERROR detected but cannot find mismatch data (maybe read error).\n", item);
+	// 	unlock_byte_mutex(&print_mutex);
+	// }
 
 	return err;
 }
@@ -1104,6 +1104,16 @@ static int doing_stressapptest(void)
 		else
 			cpu_inv_err[0] += page_inv(&sat, 0);
 
+		/* 检查是否有错误，若有则立即返回 */
+		if (cpu_copy_err[0] > 0 || cpu_inv_err[0] > 0) {
+			lock_byte_mutex(&print_mutex);
+			print_time_stamp();
+			printf("ERROR: Detected copy or inv error, aborting test early.\n");
+			unlock_byte_mutex(&print_mutex);
+			ret = CMD_RET_FAILURE;
+			goto out;
+		}
+
 		/* Print every 10 seconds */
 		now_10s = (u32)(run_time_us() / 1000000 / 10);
 		if (now_10s > pre_10s) {
@@ -1141,11 +1151,15 @@ static int doing_stressapptest(void)
 	}
 	print_time_stamp();
 	printf("StressAppTest Result: ");
-	if (all_copy_err == 0 && all_inv_err == 0 && cpu_no_response_err == 0)
+	if (all_copy_err == 0 && all_inv_err == 0 && cpu_no_response_err == 0) {
 		printf("Pass.\n");
-	else
+		ret = CMD_RET_SUCCESS;
+	} else {
 		printf("FAIL!\nStressAppTest detects %d copy errors, %d inv errors.\n",
 		       all_copy_err, all_inv_err);
+		ret = CMD_RET_FAILURE;
+	}
+
 
 out:
 	free(page_info);

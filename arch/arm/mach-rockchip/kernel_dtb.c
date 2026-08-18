@@ -67,6 +67,43 @@ static int dm_rm_u_boot_dev(void)
 	return 0;
 }
 
+/* Remove duplicate U-Boot(non-kernel-dtb) devices that the kernel dtb
+ * re-binds (e.g. GPIO banks), to avoid DM seq collision warnings and
+ * wasted resources. Only purge when a kernel-dtb counterpart exists.
+ */
+static int dm_rm_duplicate_u_boot_dev(void)
+{
+	struct udevice *dev, *n;
+	struct uclass *uc;
+	u32 uclass[] = { UCLASS_GPIO };
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(uclass); i++) {
+		bool has_kernel_dev = false;
+
+		if (uclass_get(uclass[i], &uc))
+			continue;
+
+		uclass_foreach_dev(dev, uc) {
+			if (dev->flags & DM_FLAG_KNRL_DTB) {
+				has_kernel_dev = true;
+				break;
+			}
+		}
+		if (!has_kernel_dev)
+			continue;
+
+		uclass_foreach_dev_safe(dev, n, uc) {
+			if (!(dev->flags & DM_FLAG_KNRL_DTB)) {
+				device_remove(dev, DM_REMOVE_NORMAL);
+				device_unbind(dev);
+			}
+		}
+	}
+
+	return 0;
+}
+
 #else
 /* Here, only fixup cru phandle, pmucru is not included */
 static int phandles_fixup_cru(const void *fdt)
@@ -384,6 +421,7 @@ dtb_okay:
 #ifdef CONFIG_USING_KERNEL_DTB_V2
 	dm_rm_kernel_dev();
 	dm_rm_u_boot_dev();
+	dm_rm_duplicate_u_boot_dev();
 #endif
 	/*
 	 * There maybe something for the mmc devices to do after kernel dtb

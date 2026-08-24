@@ -421,6 +421,7 @@ static u64 test_time_us;
 static bool cpu_init_finish[CPU_NUM_MAX];
 static bool cpu_test_finish[CPU_NUM_MAX];
 static bool pattern_page_init_finish;
+static bool test_finished;
 
 #if (CPU_NUM_MAX > 1)
 static ulong test_count = 0;
@@ -1016,6 +1017,12 @@ void secondary_main(void)
 	}
 
 	while (1) {
+		if (test_finished) {
+			flush_dcache_all();
+			psci_cpu_off(0);
+			while (1)
+				asm volatile("wfi");
+		}
 		udelay(100);
 		flush_dcache_all();
 		while (test < test_count) {
@@ -1064,6 +1071,7 @@ static int doing_stressapptest(void)
 		cpu_test_finish[i] = 0;
 	}
 	pattern_page_init_finish = 0;
+	test_finished = false;
 	print_mutex = 0;
 
 	ulong start_adr[CONFIG_NR_DRAM_BANKS], length[CONFIG_NR_DRAM_BANKS];
@@ -1240,6 +1248,13 @@ static int doing_stressapptest(void)
 
 
 out:
+#if (CPU_NUM_MAX > 1)
+	if (sat.cpu_num > 1) {
+		test_finished = true;
+		flush_dcache_all();
+		mdelay(100);
+	}
+#endif
 	free(page_info);
 
 	return ret;

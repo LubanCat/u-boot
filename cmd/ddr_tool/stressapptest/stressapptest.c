@@ -437,7 +437,7 @@ static ulong sat_safe_end;
 
 static u64 get_time_us(void)
 {
-	return lldiv(get_ticks(), CONFIG_SYS_HZ_CLOCK / (CONFIG_SYS_HZ * 1000));
+	return lldiv(get_ticks(), gd->arch.timer_rate_hz / 1000000);
 }
 
 static u64 run_time_us(void)
@@ -693,6 +693,16 @@ static u32 page_rand_pick(struct page *page_list, bool valid,
 	return pick;
 }
 
+static void log_random_page_error(const char *op, u32 page_idx, void *page_addr,
+				 u32 block_idx, u32 err)
+{
+	printf("DDR_RAND_ERR op=%s page_idx=%u page_addr=0x%lx block_idx=%u err=%u\n",
+	       op, page_idx, (ulong)page_addr, block_idx, err);
+}
+
+static u32 block_mis_search(void *dst_addr, struct pattern *src_pattern, char *item,
+			    struct stressapptest_params *sat, u8 cpu_id);
+
 static u32 block_mis_search(void *dst_addr, struct pattern *src_pattern, char *item,
 			    struct stressapptest_params *sat, u8 cpu_id)
 {
@@ -830,7 +840,7 @@ static void page_inv_up(void *src_addr, struct stressapptest_params *sat)
 				data = dst_mem[k];
 				dst_mem[k] = ~data;
 			}
-			flush_dcache_range((ulong)&dst_mem[j], (ulong)&dst_mem[j + 1]);
+			flush_dcache_range((ulong)&dst_mem[j], (ulong)&dst_mem[j + 32]);
  		}
 		dst_addr += sat->block_size_byte;
 	}
@@ -842,7 +852,7 @@ static void page_inv_down(void *src_addr, struct stressapptest_params *sat)
 	uint data;
 	uint *dst_mem;
 
-	dst_addr += sat->block_size_byte * (sat->block_num - 1);
+	dst_addr += sat->block_size_byte * (sat->block_num - 32);
 
 	for (int i = sat->block_num - 1; i >= 0; i--) {
 		dst_mem = (uint *)dst_addr;
@@ -851,7 +861,7 @@ static void page_inv_down(void *src_addr, struct stressapptest_params *sat)
 				data = dst_mem[k];
 				dst_mem[k] = ~data;
 			}
-			flush_dcache_range((ulong)&dst_mem[j], (ulong)&dst_mem[j + 1]);
+			flush_dcache_range((ulong)&dst_mem[j], (ulong)&dst_mem[j + 32]);
  		}
 		dst_addr -= sat->block_size_byte;
 	}
@@ -866,7 +876,7 @@ static u32 page_inv(struct stressapptest_params *sat, u8 cpu_id)
 	src = page_rand_pick(page_list, 1, sat, cpu_id);	/* pick a valid page */
 	dst_block_addr = page_list[src].base_addr;
 
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < 4 * sat->intensity; i++) {
 		if (rand() % 2 == 0)
 			page_inv_up(page_list[src].base_addr, sat);
 		else
@@ -874,7 +884,11 @@ static u32 page_inv(struct stressapptest_params *sat, u8 cpu_id)
 	}
 
 	for (int i = 0; i < sat->block_num; i++) {
-		err += block_inv_check(dst_block_addr, page_list[src].pattern, sat, cpu_id);
+		err = block_inv_check(dst_block_addr, page_list[src].pattern, sat, cpu_id);
+		if (err > 0) {
+			log_random_page_error("inv", src, page_list[src].base_addr, i, err);
+			return err;
+		}
 		dst_block_addr += sat->block_size_byte;
 	}
 
@@ -956,7 +970,7 @@ static u32 block_copy(void *dst_addr, void *src_addr,
 		/* Reference the result so that it can't be discarded by the compiler. */
 		printf("This will probably never happen.\n");
 #endif
-
+	flush_dcache_range((ulong)dst_addr, (ulong)dst_addr + sat->block_size_byte);
 	return block_copy_check(dst_addr, &adler_sum, src_pattern, sat, cpu_id);
 }
 
@@ -973,11 +987,22 @@ static u32 page_copy(struct stressapptest_params *sat, u8 cpu_id)
 	src = page_rand_pick(page_list, 1, sat, cpu_id);	/* pick a valid page */
 	src_block_addr = page_list[src].base_addr;
 
-	for (int i = 0; i < sat->block_num; i++) {
-		err += block_copy(dst_block_addr, src_block_addr,
+	for (int repeat = 0; repeat < sat->intensity; repeat++) {
+		dst_block_addr = page_list[dst].base_addr;
+		src_block_addr = page_list[src].base_addr;
+		for (int i = 0; i < sat->block_num; i++) {
+			err = block_copy(dst_block_addr, src_block_addr,
 				  page_list[src].pattern, sat, cpu_id);
-		dst_block_addr += sat->block_size_byte;
-		src_block_addr += sat->block_size_byte;
+			if (err > 0) {
+				log_random_page_error("copy", src, page_list[src].base_addr,
+						     i, err);
+				printf("DDR_RAND_ERR dst_page=%u dst_addr=0x%lx\n",
+					       dst, (ulong)page_list[dst].base_addr);
+				return err;
+			}
+			dst_block_addr += sat->block_size_byte;
+			src_block_addr += sat->block_size_byte;
+		}
 	}
 
 	page_list[dst].pattern = page_list[src].pattern;
@@ -1052,6 +1077,7 @@ void secondary_main(void)
 static int doing_stressapptest(void)
 {
 	int i;
+	int requested_cpu_num = CPU_NUM_MAX;
 	u32 pre_10s;
 	u32 now_10s;
 
@@ -1094,11 +1120,12 @@ static int doing_stressapptest(void)
 	ulong sp_now;
 
 	asm volatile("mov %0, sp" : "=r" (sp_now));
-	sp_now &= ~(ulong)0xffff;
+	sp_now &= ~(ulong)0xffff; 
 	sat_safe_end = sp_now - SAT_STACK_GUARD_BYTES;
 	printf("sat_safe_end = 0x%lx\n", sat_safe_end);
 
 #if (CPU_NUM_MAX > 1)
+	test_count = 0;
 	if (test_count == 0) {
 		__gd = (ulong)gd;
 		asm volatile("mov %0, sp" : "=r" (__sp));
@@ -1111,6 +1138,9 @@ static int doing_stressapptest(void)
 				mdelay(10);
 				printf("Calling CPU%d, sp = 0x%lx\n", sat.cpu_num, __sp);
 			} else {
+				printf("ERROR: Cannot start CPU%d; requested %d CPUs.\n",
+				       sat.cpu_num, requested_cpu_num);
+				ret = CMD_RET_FAILURE;
 				break;
 			}
 
@@ -1128,11 +1158,14 @@ static int doing_stressapptest(void)
 			}
 
 			if (cpu_init_finish[sat.cpu_num] == 0) {
-				// printf("WARNING: CPU%d did not start, using %d CPUs.\n",
-				//	sat.cpu_num, sat.cpu_num);
+				printf("ERROR: CPU%d did not start; requested %d CPUs, available %d.\n",
+				       sat.cpu_num, requested_cpu_num, sat.cpu_num);
+				ret = CMD_RET_FAILURE;
 				break;
 			}
 		}
+		if (ret != CMD_RET_SUCCESS)
+			goto out;
 	}
 #else
 	sat.cpu_num = 1;
@@ -1264,6 +1297,7 @@ static int do_stressapptest(cmd_tbl_t *cmdtp, int flag, int argc, char *const ar
 {
 	ulong test_time_sec = 20;
 	ulong page_size_kb = 1024;
+	ulong intensity = 4;
 
 	sat.total_test_size_mb = 0;
 	sat.block_size_byte = 4096;
@@ -1294,9 +1328,18 @@ static int do_stressapptest(cmd_tbl_t *cmdtp, int flag, int argc, char *const ar
 			return CMD_RET_USAGE;
 		if (page_size_kb < 1)
 			page_size_kb = 1024;
+	}	
+	if (argc > 5) {
+		if (strict_strtoul(argv[5], 0, &intensity) < 0)
+			return CMD_RET_USAGE;
+		if (intensity < 1)
+			intensity = 1;
+		if (intensity > 16)
+			intensity = 16;
 	}
 
 	sat.page_size_byte = page_size_kb << 10;
+	sat.intensity = intensity;
 
 	start_time_us = get_time_us();
 	test_time_us = (u64)test_time_sec * 1000000;

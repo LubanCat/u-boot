@@ -28,6 +28,7 @@ struct stressapptest_params {
 	/* page_size = block_size * block_num */
 	u32 block_size_byte;
 	u32 block_num;
+	u32 intensity;
 
 	u32 weight_count;
 

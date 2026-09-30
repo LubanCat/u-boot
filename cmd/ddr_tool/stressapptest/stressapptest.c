@@ -1077,7 +1077,6 @@ void secondary_main(void)
 static int doing_stressapptest(void)
 {
 	int i;
-	int requested_cpu_num = CPU_NUM_MAX;
 	u32 pre_10s;
 	u32 now_10s;
 
@@ -1138,9 +1137,6 @@ static int doing_stressapptest(void)
 				mdelay(10);
 				printf("Calling CPU%d, sp = 0x%lx\n", sat.cpu_num, __sp);
 			} else {
-				printf("ERROR: Cannot start CPU%d; requested %d CPUs.\n",
-				       sat.cpu_num, requested_cpu_num);
-				ret = CMD_RET_FAILURE;
 				break;
 			}
 
@@ -1158,14 +1154,9 @@ static int doing_stressapptest(void)
 			}
 
 			if (cpu_init_finish[sat.cpu_num] == 0) {
-				printf("ERROR: CPU%d did not start; requested %d CPUs, available %d.\n",
-				       sat.cpu_num, requested_cpu_num, sat.cpu_num);
-				ret = CMD_RET_FAILURE;
 				break;
 			}
 		}
-		if (ret != CMD_RET_SUCCESS)
-			goto out;
 	}
 #else
 	sat.cpu_num = 1;

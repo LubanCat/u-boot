@@ -255,18 +255,20 @@ function fit_process_args()
 
 function fit_raw_compile()
 {
+	echo "min fit-core.sh -> fit_raw_compile ARG_SIGN=${ARG_SIGN}"
 	# Verified-boot: should rebuild code but don't need to repack images.
 	if [ "${ARG_SIGN}" == "y" ]; then
 		./make.sh --raw-compile ${ARG_FIT_FWVER}
 	fi
+	echo "min fit-core.sh -> fit_raw_compile FIT_DIR=${FIT_DIR} SIG_CFG_DIR=${SIG_CFG_DIR}"
 	rm ${FIT_DIR} -rf && mkdir -p ${FIT_DIR} && mkdir -p ${SIG_CFG_DIR}
 }
 
 function fit_gen_uboot_itb()
-{
+{	
+	echo "min fit-core.sh -> ./make.sh itb ${ARG_INI_TRUST}"
 	# generate u-boot.its file
 	./make.sh itb ${ARG_INI_TRUST}
-
 	# check existance of file in its
 	check_its ${ITS_UBOOT}
 

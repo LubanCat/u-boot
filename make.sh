@@ -393,6 +393,7 @@ function select_ini_file()
 function sub_commands()
 {
 	# skip "--" parameter, such as "--rollback-index-..."
+	echo "CMD_ARGS=${CMD_ARGS}"
 	if [[ ${CMD_ARGS} != --* ]]; then
 		CMD=${CMD_ARGS%-*}
 		ARG=${CMD_ARGS#*-}
@@ -553,8 +554,10 @@ function pack_uboot_itb_image()
 		BL31_ELF=`sed -n '/_bl31_/s/PATH=//p' ${INI} | tr -d '\r'`
 		BL32_BIN=`sed -n '/_bl32_/s/PATH=//p' ${INI} | tr -d '\r'`
 		rm bl31.elf tee.bin -rf
+		echo "cp ${RKBIN}/${BL31_ELF} bl31.elf"
 		cp ${RKBIN}/${BL31_ELF} bl31.elf
 		if grep BL32_OPTION -A 1 ${INI} | grep SEC=1 ; then
+			echo "cp ${RKBIN}/${BL32_BIN} tee.bin"
 			cp ${RKBIN}/${BL32_BIN} tee.bin
 			TEE_ADDR=`grep BL32_OPTION -A 3 ${INI} | grep ADDR= | awk -F "=" '{ printf $2 }' | tr -d '\r'`
 			TEE_ARG="-t ${TEE_ADDR}"
@@ -587,9 +590,11 @@ function pack_uboot_itb_image()
 		INIT_IDX="INIT${i}"
 		ENABLED=`awk -F "," '/'${INIT_IDX}'=/  { printf $3 }' ${INI} | tr -d ' '`
 		if [ "${ENABLED}" == "enabled" -o "${ENABLED}" == "okay" ]; then
+			
 			NAME=`awk -F "," '/'${INIT_IDX}'=/ { printf $1 }' ${INI} | tr -d ' ' | awk -F "=" '{ print $2 }'`
 			OFFS=`awk -F "," '/'${INIT_IDX}'=/ { printf $2 }' ${INI} | tr -d ' '`
 			cp ${RKBIN}/${NAME} ${INIT_BIN}
+			echo "cp ${RKBIN}/${NAME} ${INIT_BIN}"
 			if [ -z ${OFFS} ]; then
 				echo "ERROR: No ${INIT_BIN} address in ${INI}"
 				exit 1
@@ -618,6 +623,7 @@ function pack_uboot_itb_image()
 			NAME=`awk -F "," '/'${MCU_IDX}'=/ { printf $1 }' ${INI} | tr -d ' ' | awk -F "=" '{ print $2 }'`
 			OFFS=`awk -F "," '/'${MCU_IDX}'=/ { printf $2 }' ${INI} | tr -d ' '`
 			cp ${RKBIN}/${NAME} ${MCU_BIN}
+			echo "cp ${RKBIN}/${NAME} ${MCU_BIN}"
 			if [ -z ${OFFS} ]; then
 				echo "ERROR: No ${MCU_BIN} address in ${INI}"
 				exit 1
@@ -636,6 +642,7 @@ function pack_uboot_itb_image()
 			NAME=`awk -F "," '/'${LOAD_IDX}'=/ { printf $1 }' ${INI} | tr -d ' ' | awk -F "=" '{ print $2 }'`
 			OFFS=`awk -F "," '/'${LOAD_IDX}'=/ { printf $2 }' ${INI} | tr -d ' '`
 			cp ${RKBIN}/${NAME} ${LOAD_BIN}
+			echo "cp ${RKBIN}/${NAME} ${LOAD_BIN}"
 			if [ -z ${OFFS} ]; then
 				echo "ERROR: No ${LOAD_BIN} address in ${INI}"
 				exit 1
@@ -653,7 +660,7 @@ function pack_uboot_itb_image()
 			COMPRESSION_ARG="-c ${COMPRESSION}"
 		fi
 	fi
-
+	
 	if [ -d ${REP_DIR} ]; then
 		mv ${REP_DIR}/* ./
 	fi
@@ -667,7 +674,9 @@ function pack_uboot_itb_image()
 		if [[ ${SPL_FIT_GENERATOR} == *.py ]]; then
 			${SPL_FIT_GENERATOR} u-boot.dtb > u-boot.its
 		else
+			echo "MIN -> ${SPL_FIT_GENERATOR} ${TEE_ARG} ${COMPRESSION_ARG} ${INIT_ARG} ${MCU_ARG} ${LOAD_ARG} > u-boot.its"
 			${SPL_FIT_GENERATOR} ${TEE_ARG} ${COMPRESSION_ARG} ${INIT_ARG} ${MCU_ARG} ${LOAD_ARG} > u-boot.its
+			
 		fi
 	fi
 
@@ -768,8 +777,8 @@ function pack_fit_image()
 	fi
 
 	rm uboot.img trust*.img -rf
+	echo "MIN -> ${SCRIPT_FIT} ${ARG_LIST_FIT} --chip ${RKCHIP_LABEL}"
 	${SCRIPT_FIT} ${ARG_LIST_FIT} --chip ${RKCHIP_LABEL}
-
 	rm ${REP_DIR} -rf
 	echo "pack uboot.img okay! Input: ${INI_TRUST}"
 }
@@ -789,6 +798,7 @@ function pack_images()
 {
 	if [ "${ARG_RAW_COMPILE}" != "y" ]; then
 		if [ "${PLAT_TYPE}" == "FIT" ]; then
+			echo "MIN -> pack_fit_image ARG_LIST_FIT=${ARG_LIST_FIT}"
 			pack_fit_image ${ARG_LIST_FIT}
 		elif [ "${PLAT_TYPE}" == "DECOMP" ]; then
 			${SCRIPT_DECOMP} ${ARG_LIST_FIT} --chip ${RKCHIP_LABEL}
@@ -822,8 +832,11 @@ select_ini_file
 handle_args_late
 sub_commands
 clean_files
+echo "make PYTHON=python2 ${ARG_SPL_FWVER} ${ARG_FWVER} CROSS_COMPILE=${TOOLCHAIN} all --jobs=${JOB}"
 make PYTHON=python2 ${ARG_SPL_FWVER} ${ARG_FWVER} CROSS_COMPILE=${TOOLCHAIN} all --jobs=${JOB}
+echo "MIN -> pack_images"
 pack_images
+echo "MIN -> finish"
 finish
 echo ${TOOLCHAIN}
 date

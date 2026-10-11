@@ -188,15 +188,4 @@ config SYS_CONFIG_NAME
 	  The header file include/configs/<CONFIG_SYS_CONFIG_NAME>.h
 	  should be included from include/config.h.
 
-source "arch/arc/Kconfig"
 source "arch/arm/Kconfig"
-source "arch/m68k/Kconfig"
-source "arch/microblaze/Kconfig"
-source "arch/mips/Kconfig"
-source "arch/nds32/Kconfig"
-source "arch/nios2/Kconfig"
-source "arch/powerpc/Kconfig"
-source "arch/sandbox/Kconfig"
-source "arch/sh/Kconfig"
-source "arch/x86/Kconfig"
-source "arch/xtensa/Kconfig"
